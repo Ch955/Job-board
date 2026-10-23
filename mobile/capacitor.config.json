@@ -1,0 +1,10 @@
+{
+  "appId": "app.jobradar",
+  "appName": "Job Radar",
+  "webDir": "www",
+  "android": { "allowMixedContent": false },
+  "server": { "androidScheme": "https" },
+  "plugins": {
+    "FirebaseAuthentication": { "skipNativeAuth": true, "providers": ["google.com"] }
+  }
+}

@@ -10,6 +10,12 @@ No paid APIs, no paid hosting, no LLM calls.
 
 **Your app:** <https://ch955.github.io/job-board/> (live after the one-time setup below)
 
+
+> **Multi-user version:** Job Radar can now serve many people, each with their own resume,
+> matches, Gmail and drafts. See [DEPLOYMENT.md](DEPLOYMENT.md) (API, hosting, secrets, Google
+> verification), [PLAY_STORE.md](PLAY_STORE.md) (Android app) and [AUDIT.md](AUDIT.md). The
+> single-user setup below keeps working unchanged.
+
 ## How it works
 
 ```

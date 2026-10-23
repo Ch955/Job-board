@@ -1117,6 +1117,7 @@ async function renderAlerts() {
   const body = $("#alerts-body");
   $("#alert-score").textContent = JRAccount.enabled() ? JRAccount.profile().threshold ?? 70 : data.alert_score || 70;
   const note = (text) => body.replaceChildren(el("p", { className: "note", textContent: text }));
+  if (window.JRNative?.isApp) return note("Phone alerts aren't available inside the Android app yet. Open Job Radar in Chrome on this phone and enable them there.");
   if (!("serviceWorker" in navigator && "PushManager" in window && "Notification" in window)) {
     return note(isIOS() && !isStandalone()
       ? "On iPhone, alerts work only from the installed app: Share → Add to Home Screen, then open Job Radar from the home screen."

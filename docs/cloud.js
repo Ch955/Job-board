@@ -52,6 +52,10 @@ const JRCloud = {
   signOut: () => A.signOut(auth),
 
   async google() {
+    if (window.JRNative?.isApp) {  // Android app: the phone's own Google account picker
+      const idToken = await window.JRNative.googleIdToken();
+      return A.signInWithCredential(auth, A.GoogleAuthProvider.credential(idToken));
+    }
     const provider = new A.GoogleAuthProvider();
     provider.setCustomParameters({ prompt: "select_account" });
     try {

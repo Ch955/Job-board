@@ -1,0 +1,10 @@
+.git
+docs
+tests
+assets
+scripts
+android
+**/__pycache__
+**/node_modules
+*.pdf
+.env

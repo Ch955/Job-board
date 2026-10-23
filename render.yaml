@@ -1,0 +1,21 @@
+# Render Blueprint for the Job Radar API (free web service). Secrets are set in the
+# Render dashboard (sync: false), never in this file.
+services:
+  - type: web
+    name: jobradar-api
+    runtime: docker
+    plan: free
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - { key: FIREBASE_PROJECT_ID, sync: false }
+      - { key: FIREBASE_SERVICE_ACCOUNT, sync: false }
+      - { key: APP_ENCRYPTION_KEY, sync: false }
+      - { key: GMAIL_WEB_CLIENT_ID, sync: false }
+      - { key: GMAIL_WEB_CLIENT_SECRET, sync: false }
+      - { key: API_URL, sync: false }
+      - { key: APP_URL, sync: false }
+      - { key: ALLOWED_ORIGINS, sync: false }
+      - { key: CRON_SECRET, sync: false }
+      - { key: VAPID_PRIVATE_KEY, sync: false }
+      - { key: VAPID_SUBJECT, sync: false }

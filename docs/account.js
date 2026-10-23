@@ -572,5 +572,5 @@ const JRAccount = (() => {
   }
 
   return { enabled, api, refreshMe, onSignedIn, loadMatches, decorateCard, renderInbox, renderDrafts, renderSettings,
-    openOnboarding, pushKey, savePush, signedOut, profile, get me() { return me; } };
+    openOnboarding, pushKey, savePush, signedOut, profile, handleReturn, get me() { return me; } };
 })();

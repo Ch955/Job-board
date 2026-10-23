@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Job Radar Privacy Policy</title>
+  <style>
+    :root { --bg: #f4f6fb; --text: #0f172a; --muted: #5b6577; --card: #fff; --border: #dde2ec; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #0b1220; --text: #e5e9f2; --muted: #9aa4b6; --card: #111a2e; --border: #24314d; } }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 system-ui, sans-serif; }
+    main { max-width: 720px; margin: 0 auto; padding: 24px 16px 48px; }
+    section { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 4px 18px; margin: 14px 0; }
+    h1 { font-size: 26px; } h2 { font-size: 18px; } .muted { color: var(--muted); }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Job Radar Privacy Policy</h1>
+  <p class="muted">Draft for the app owner to review before publishing. Last updated: [date]. Contact: [your email].</p>
+
+  <section><h2>What Job Radar does</h2>
+    <p>Job Radar finds job postings that match your own profile, tracks your applications, and, only if you connect Gmail, updates application statuses from job emails and creates email drafts for you. It never sends email on your behalf.</p></section>
+
+  <section><h2>What we store</h2>
+    <ul>
+      <li><b>Account:</b> your email address and sign-in details (Firebase Authentication).</li>
+      <li><b>Profile:</b> details you confirm: name, email, optional phone number, LinkedIn, role, experience, skills, education, certifications, preferences.</li>
+      <li><b>Resume:</b> the file you upload, encrypted. Its text is read to suggest profile details and is not stored separately.</li>
+      <li><b>Applications:</b> the statuses you set, your matches and their explanations.</li>
+      <li><b>Gmail (only if you connect it):</b> an encrypted access key, your Gmail address, and for job-related emails: type, date, sender name, subject and message ids. Email bodies may be read to understand an unclear email and are never stored.</li>
+      <li><b>Notifications:</b> your device's push subscription, if you enable alerts.</li>
+    </ul></section>
+
+  <section><h2>Google user data</h2>
+    <p>Job Radar asks for two Gmail permissions: read-only access (to recognise application confirmations, tests, interviews, rejections, offers and recruiter replies) and compose (to create drafts you review and send yourself). Data from Gmail is used only to provide these features to you, is not used for advertising, is not sold, and is not shared with anyone else. Job Radar's use of information received from Google APIs adheres to the Google API Services User Data Policy, including the Limited Use requirements.</p></section>
+
+  <section><h2>Sharing</h2>
+    <p>We don't sell or share your data. It is processed by the services that run Job Radar: Google Firebase and Google Cloud (database, sign-in, Gmail) and our API host, acting on our behalf.</p></section>
+
+  <section><h2>Security</h2>
+    <p>Data travels over HTTPS. Gmail keys and resumes are encrypted with a key held only by the server. Each account can reach only its own data.</p></section>
+
+  <section><h2>Your choices</h2>
+    <ul>
+      <li>Disconnect Gmail at any time in Settings; this revokes access at Google and deletes the stored key. You can also remove access at myaccount.google.com/permissions.</li>
+      <li>Delete your resume at any time in Settings.</li>
+      <li>Delete your account in Settings → Delete my account: this removes your profile, resume, matches, statuses, Gmail connection and sign-in.</li>
+    </ul></section>
+</main>
+</body>
+</html>
