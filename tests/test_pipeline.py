@@ -202,3 +202,9 @@ def test_switched_off_source_listings_are_dropped_but_tracked_ones_stay(config):
     previous = {x.id: x for x in (j("naukri"), j("linkedin", "applied"), j("greenhouse"), j("email"))}
     jobs, _, _ = pipeline.process([], previous, config, now)
     assert {(x.source, x.status) for x in jobs} == {("linkedin", "applied"), ("greenhouse", "new"), ("email", "new")}
+
+
+def test_every_job_platform_is_on(config):
+    on = set(pipeline.permitted_sources(config))
+    assert {"naukri", "linkedin", "indeed", "glassdoor", "google", "greenhouse", "lever", "ashby",
+            "smartrecruiters", "adzuna", "jooble", "remotive", "arbeitnow"} <= on

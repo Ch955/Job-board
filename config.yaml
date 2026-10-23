@@ -211,7 +211,7 @@ sources:
     # decision (Oct 2026) for this private group. Set both to false to stop it.
     enabled: true
     permitted: true
-    sites: [naukri, linkedin, indeed]
+    sites: [naukri, linkedin, indeed, glassdoor, google]   # google = Google Jobs search results
     queries: ['azure data engineer', 'databricks data engineer', 'data engineer pyspark']
     location: India
     country_indeed: india
@@ -236,7 +236,7 @@ sources:
     search: data engineer
     min_interval_hours: 6   # Remotive asks for at most ~4 calls/day
   arbeitnow:
-    enabled: false          # mostly Germany-based jobs; nothing for India-only search
+    enabled: true           # mostly Europe; the India-only filter keeps any Indian / India-remote ones
     pages: 3
     remote_only: true
 

@@ -126,7 +126,7 @@ step and needs your approval. Everything else in Job Radar works without Gmail.
 ## 7. Job sources, application types and walk-ins
 
 **Sources in use:** company career boards via their public APIs (Greenhouse, Lever, Ashby, SmartRecruiters),
-Remotive, Adzuna and Jooble (with free API keys), and **LinkedIn, Naukri and Indeed via JobSpy**. JobSpy reads
+Remotive, Arbeitnow, Adzuna and Jooble (with free API keys), and **LinkedIn, Naukri, Indeed, Glassdoor and Google Jobs via JobSpy**. JobSpy reads
 those sites' public search pages without logging in, which their terms of use don't allow; it is on by the app
 owner's decision for this private group. To stop it, set `sources.jobspy.enabled` and `permitted` to `false` in
 `config.yaml`: untracked listings from it then drop out, tracked ones stay. Naukri tends to refuse requests from

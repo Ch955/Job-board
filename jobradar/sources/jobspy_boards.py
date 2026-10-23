@@ -1,4 +1,4 @@
-"""LinkedIn, Naukri and Indeed via the open-source JobSpy scraper (python-jobspy).
+"""LinkedIn, Naukri, Indeed, Glassdoor and Google Jobs via the open-source JobSpy scraper (python-jobspy).
 
 No login and no account: JobSpy reads the public, logged-out search pages.
 Each site x query is its own call, so one site rate-limiting us only loses
@@ -91,6 +91,8 @@ def _scrape(ctx: SourceContext, site: str, query: str) -> list[dict]:
         df = scrape_jobs(
             site_name=[site],
             search_term=query,
+            # Google Jobs takes one plain search, like typing into Google
+            google_search_term=f"{query} jobs in {cfg.get('location', 'India')} since {(cfg.get('hours_old') or 72) // 24 or 1} days",
             location=cfg.get("location", "India"),
             country_indeed=cfg.get("country_indeed", "india"),
             results_wanted=int(cfg.get("results_wanted", 30)),
