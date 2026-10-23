@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Job Radar</title>
-  <meta name="description" content="Personal data engineering job alerts">
+  <meta name="description" content="Job matches from your own resume, with Gmail application tracking">
   <meta name="theme-color" content="#0b1220" media="(prefers-color-scheme: dark)">
   <meta name="theme-color" content="#f4f6fb" media="(prefers-color-scheme: light)">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -72,6 +72,7 @@
       </button>
     </header>
 
+    <div id="acct-banner" class="acct-banner" role="status" hidden></div>
     <div id="ptr" class="ptr" aria-hidden="true"><span></span></div>
 
     <section class="stats" aria-label="Your activity">
@@ -169,6 +170,10 @@
       <h2>Settings</h2>
       <button class="icon-btn" aria-label="Close">✕</button>
     </form>
+    <section class="menu-section" id="account-section" hidden>
+      <h3>Your account</h3>
+      <div id="account-body"></div>
+    </section>
     <section class="menu-section">
       <h3>Sync</h3>
       <div id="sync-body"></div>
@@ -201,9 +206,19 @@
     </section>
   </dialog>
 
+  <!-- ======================================================= onboarding -->
+  <dialog id="onboard" class="sheet" aria-label="Your profile">
+    <form method="dialog" class="menu-head">
+      <h2>Your profile</h2>
+      <button class="icon-btn" aria-label="Close">✕</button>
+    </form>
+    <section class="menu-section" id="onboard-body"></section>
+  </dialog>
+
   <div id="toast" class="toast" role="status" hidden></div>
 
   <script src="sync.js" defer></script>
+  <script src="account.js" defer></script>
   <script src="app.js" defer></script>
   <script type="module" src="cloud.js"></script>
 </body>

@@ -688,3 +688,25 @@ dialog.sheet[open] { animation: rise .2s ease-out; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before { animation: none !important; transition: none !important; }
 }
+
+/* ------------------------------------------------------- accounts (account.js) */
+.acct-banner { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: 8px 16px 0; padding: 10px 12px;
+  border-radius: 12px; background: var(--pending-soft); color: var(--text); font-size: 13px; }
+.acct-banner[hidden] { display: none; }
+.why { margin: 10px 0 0; padding: 8px 10px; border-radius: 12px; background: var(--primary-soft); font-size: 13px; }
+.why p { margin: 0; }
+.keywords.missing li { background: transparent; border-style: dashed; color: var(--muted); }
+.keywords.missing li::before { content: "＋ "; }
+.panel-h { margin: 14px 2px 0; font-size: 14px; }
+.panel-item.review { border-color: var(--pending); }
+.gm-card { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border: 1px solid var(--border);
+  border-radius: var(--radius); background: var(--surface); }
+#account-body h4 { margin: 14px 0 4px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+#account-body h4:first-child { margin-top: 0; }
+.btn.danger { color: var(--bad); border-color: var(--bad); }
+.pf { display: flex; flex-direction: column; gap: 12px; margin-top: 8px; }
+.pf textarea, .pf .lg-field .row input { font: inherit; font-weight: 400; color: var(--text); background: var(--surface);
+  border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; min-width: 0; width: 100%; }
+.pf .lg-field .row { flex-wrap: nowrap; }
+.pf input[type="range"] { width: 100%; }
+.pf input[type="range"] { height: auto; padding: 0; border: 0; background: none; box-shadow: none; }

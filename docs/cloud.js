@@ -31,7 +31,15 @@ const JRCloud = {
   },
 
   onUser(cb) {
-    return A.onAuthStateChanged(auth, (u) => cb(u ? { uid: u.uid, email: u.email, name: u.displayName, photo: u.photoURL } : null));
+    return A.onAuthStateChanged(auth, (u) => cb(u ? { uid: u.uid, email: u.email, name: u.displayName, photo: u.photoURL, verified: u.emailVerified } : null));
+  },
+
+  // For the Job Radar API: proves who you are on each request (refreshed by Firebase as needed)
+  idToken: () => (auth.currentUser ? auth.currentUser.getIdToken() : Promise.reject(new Error("Sign in first."))),
+  sendVerification: () => A.sendEmailVerification(auth.currentUser),
+  async reloadUser() {
+    await auth.currentUser?.reload();
+    await auth.currentUser?.getIdToken(true); // so the server sees the verified email
   },
 
   async remember(keep) {

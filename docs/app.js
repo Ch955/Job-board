@@ -235,9 +235,13 @@ window.addEventListener("popstate", (e) => {
 async function load({ quiet = false } = {}) {
   $("#refresh").classList.add("spinning");
   try {
-    const r = await fetch(`jobs.json?t=${Date.now()}`, { cache: "no-store" });
-    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-    data = await r.json();
+    if (JRAccount.enabled()) {
+      data = await JRAccount.loadMatches(); // your own matches, scored from your profile
+    } else {
+      const r = await fetch(`jobs.json?t=${Date.now()}`, { cache: "no-store" });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      data = await r.json();
+    }
     data.jobs = Array.isArray(data.jobs) ? data.jobs : [];
     lastFetch = Date.now();
     if (!quiet) toast(`Updated · ${data.jobs.length} jobs`);
@@ -346,12 +350,16 @@ function render() {
   document.title = `${sectionLabel(section)} · Job Radar`;
 
   if (isGmail) {
-    list.replaceChildren(section === "mail" ? renderMailSection() : renderInboxSection());
+    const multi = JRAccount.enabled();
+    list.replaceChildren(section === "mail" ? (multi ? JRAccount.renderDrafts() : renderMailSection())
+      : multi ? JRAccount.renderInbox() : renderInboxSection());
   } else if (!shown.length) {
     const any = jobs.some((j) => statusOf(j) === section);
     list.replaceChildren(el("div", { className: "empty" },
       el("b", { textContent: any ? "No jobs match these filters" : !data.jobs.length && section === "new" ? "No jobs yet" : `Nothing in ${sectionLabel(section)} yet` }),
       any ? "Try lowering the minimum score or resetting filters."
+        : section === "new" && JRAccount.enabled() && JRAccount.me?.missing?.length ? "Add your resume or profile (Settings → Your account) and your matches appear here."
+        : section === "new" && JRAccount.enabled() ? `Nothing at or above your threshold (${JRAccount.profile().threshold ?? 70}) yet. New jobs are checked every 3 hours; you can lower the threshold in your profile.`
         : section === "new" ? "The next run (every 3 hours) fills this in."
         : section === "applied" ? "Tap Applied on a job and it moves here." : ""));
   } else {
@@ -481,6 +489,7 @@ function renderCard(job, index) {
     }
   }
   renderOutreach(job, status, $(".outreach-row", card));
+  JRAccount.decorateCard(job, card);
   return card;
 }
 
@@ -555,8 +564,9 @@ function renderNav(jobs) {
     el("p", { className: "nav-group", textContent: "Jobs" }),
     ...SECTIONS.map((sec) => item(sec, counts[sec.id] || 0)),
     el("p", { className: "nav-group", textContent: "Gmail" }),
-    item(GMAIL_SECTIONS[0], jobs.filter((j) => j.outreach?.draft_id).length),
-    item(GMAIL_SECTIONS[1], (store.gmail.events || []).length),
+    item(GMAIL_SECTIONS[0], JRAccount.enabled() ? Object.keys(store.drafts).length : jobs.filter((j) => j.outreach?.draft_id).length),
+    item(GMAIL_SECTIONS[1], JRAccount.enabled() ? (store.gmail.review || []).filter((r) => !store.reviews[r.id]).length || (store.gmail.events || []).length
+      : (store.gmail.events || []).length),
     el("p", { className: "nav-group", textContent: "Tools" }),
     tool("📊", "Export to Excel (.csv)", () => {
       closeOverlay($("#nav"));
@@ -606,7 +616,7 @@ function fillTemplate(tpl, job) {
     notice, notice_lower: notice.charAt(0).toLowerCase() + notice.slice(1), linkedin: p.linkedin || "",
     email: "", title: job.title, company: job.company, url: job.url || "",
     location: job.score_breakdown?.location_label || job.location,
-    skills: (skills.length ? skills : ["ADF", "Databricks", "PySpark"]).join(", "),
+    skills: skills.join(", "), // only skills that are both in the posting and yours
   };
   return String(tpl || "").replace(/\{(\w+)\}/g, (_, k) => values[k] ?? "").trim();
 }
@@ -646,6 +656,7 @@ function renderOutreach(job, status, row) {
   const copy = el("button", { className: "mini-btn", type: "button", textContent: "📋 Copy note", title: "LinkedIn connection note (200 characters)" });
   copy.addEventListener("click", () => copyText(linkedinNote(job), "Note copied. LinkedIn: Connect → Add a note → paste"));
   row.append(copy);
+  if (JRAccount.enabled()) return; // drafts come from your own Gmail connection (account.js)
   if (job.outreach?.draft_id) row.append(link("mail", store.sent[job.id] ? "✉️ Draft sent" : "✉️ Open draft", draftLink(job), `Draft to ${job.outreach.email}`));
   else if (mailtoLink(job)) row.append(link("mail", "✉️ Email", mailtoLink(job), `Write to ${job.contact_emails[0]}`));
 }
@@ -693,9 +704,9 @@ function renderInboxSection() {
   const g = store.gmail || {};
   const events = g.events || [];
   if (!session) {
-    wrap.append(el("p", { className: "note", textContent: "Sign in to sync first: Gmail updates are saved in your encrypted sync file." }));
+    wrap.append(el("p", { className: "note", textContent: "Sign in first: Gmail updates are saved to your account." }));
   } else if (!g.last_check) {
-    wrap.append(el("p", { className: "note", textContent: "Not connected to Gmail yet. Finish the Gmail setup in the README and add the SYNC_PASSPHRASE secret (the passphrase you sign in with). Then confirmations, interview invites and rejections update your jobs every 3 hours." }));
+    wrap.append(el("p", { className: "note", textContent: "Not connected to Gmail yet. Finish the Gmail setup in the README (GMAIL_* and FIREBASE_SERVICE_ACCOUNT secrets). Then confirmations, interview invites and rejections update your jobs every 3 hours." }));
   } else {
     wrap.append(el("p", { className: "muted", textContent: `Gmail checked ${ago(g.last_check)} (read-only).` }));
   }
@@ -892,7 +903,9 @@ function onUserChanged(user) {
     listen();
     showApp();
     syncNow();
+    JRAccount.onSignedIn();
   } else {
+    JRAccount.signedOut();
     unsubscribe?.();
     unsubscribe = null;
     session = null;
@@ -985,7 +998,10 @@ async function onLogin(e) {
     try {
       await JRCloud.remember($("#lg-remember").checked);
       freshSignIn = true;
-      if (loginMode === "signup") await JRCloud.signUp(email, pass);
+      if (loginMode === "signup") {
+        await JRCloud.signUp(email, pass);
+        await JRCloud.sendVerification().catch(() => null); // the app asks you to verify before Gmail and uploads
+      }
       else await JRCloud.signIn(email, pass);
       // onUserChanged takes it from here
     } catch (ex) {
@@ -1057,6 +1073,7 @@ function waitForCloud(ms = 8000) {
 
 // ------------------------------------------------------------------ settings
 function openSettings() {
+  JRAccount.renderSettings();
   renderSyncBody();
   renderAlerts();
   openOverlay($("#settings"));
@@ -1098,14 +1115,16 @@ const isStandalone = () => matchMedia("(display-mode: standalone)").matches || n
 
 async function renderAlerts() {
   const body = $("#alerts-body");
-  $("#alert-score").textContent = data.alert_score || 70;
+  $("#alert-score").textContent = JRAccount.enabled() ? JRAccount.profile().threshold ?? 70 : data.alert_score || 70;
   const note = (text) => body.replaceChildren(el("p", { className: "note", textContent: text }));
   if (!("serviceWorker" in navigator && "PushManager" in window && "Notification" in window)) {
     return note(isIOS() && !isStandalone()
       ? "On iPhone, alerts work only from the installed app: Share → Add to Home Screen, then open Job Radar from the home screen."
       : "This browser doesn't support notifications. Try Chrome on Android, or the installed app on iPhone.");
   }
-  const publicKey = data.push?.public_key;
+  const multi = JRAccount.enabled();
+  const publicKey = multi ? await JRAccount.pushKey() : data.push?.public_key;
+  if (!publicKey && multi) return note("Alerts aren't switched on on this server yet.");
   if (!publicKey) return note("Alerts aren't switched on yet. Add the VAPID_PRIVATE_KEY secret on GitHub (README: phone alerts), run the workflow once, then come back.");
   if (Notification.permission === "denied") return note("Notifications are blocked for this site. Allow them in the browser's site settings, then reopen Settings.");
   const reg = await Promise.race([navigator.serviceWorker.ready, new Promise((r) => setTimeout(r, 4000))]);
@@ -1121,7 +1140,8 @@ async function renderAlerts() {
       btn.disabled = true;
       try {
         if ((await Notification.requestPermission()) !== "granted") throw new Error("permission not granted");
-        await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64uToBytes(publicKey) });
+        const created = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64uToBytes(publicKey) });
+        if (multi) await JRAccount.savePush(created);
         renderAlerts();
       } catch (e) {
         toast(`Couldn't enable alerts: ${e.message}`);
@@ -1129,6 +1149,16 @@ async function renderAlerts() {
       }
     });
     return body.replaceChildren(btn);
+  }
+  if (multi) {
+    const off = el("button", { className: "btn", type: "button", textContent: "Turn off on this device" });
+    off.addEventListener("click", async () => {
+      await sub.unsubscribe();
+      toast("Alerts turned off on this device");
+      renderAlerts();
+    });
+    JRAccount.savePush(sub).catch(() => null); // keep the server's copy current
+    return body.replaceChildren(el("p", { className: "note", textContent: "✓ Alerts are on for this device: new matches at or above your threshold." }), el("div", { className: "row" }, off));
   }
   const json = JSON.stringify(sub.toJSON());
   const box = el("textarea", { className: "sub-box", readOnly: true, value: json });
@@ -1277,7 +1307,8 @@ async function init() {
   } catch {
     appConfig = {};
   }
-  load({ quiet: true });
+  // With a Job Radar server, jobs are your own matches and load once you've signed in
+  if (!appConfig.api_url) load({ quiet: true });
   if (!cloudConfigured()) {
     if (readJSON(K.mode, null) === "local") showApp();
     else showLogin();
