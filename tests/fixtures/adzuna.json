@@ -1,0 +1,11 @@
+{
+  "results": [
+    {"id": "az-1", "title": "Azure Data Engineer", "company": {"display_name": "Example Analytics Pvt Ltd"},
+     "location": {"display_name": "Pune, Maharashtra"}, "created": "{{DAYS_AGO:1}}",
+     "redirect_url": "https://example.com/adzuna/az-1",
+     "description": "Azure Data Factory, Databricks, SQL and Python. 4+ years experience required."},
+    {"id": "az-2", "title": "Senior Data Engineer", "company": {"display_name": "Databricks Inc"},
+     "location": {"display_name": "Bangalore, Karnataka"}, "created": "{{DAYS_AGO:1}}",
+     "redirect_url": "https://example.com/adzuna/az-2", "description": "Duplicate of the Greenhouse posting."}
+  ]
+}

@@ -1,0 +1,16 @@
+[
+  {
+    "id": "lv-1", "text": "Data Engineer II",
+    "categories": {"location": "Bangalore", "allLocations": ["Bangalore"], "team": "Data"},
+    "workplaceType": "hybrid", "createdAt": "{{EPOCH_MS_DAYS_AGO:2}}",
+    "hostedUrl": "https://example.com/lever/cred/lv-1",
+    "descriptionPlain": "Own batch and streaming pipelines.",
+    "lists": [{"text": "Requirements", "content": "<li>2-5 years of experience with Spark, Airflow and SQL</li><li>Kafka and Python</li>"}],
+    "additionalPlain": "Immediate joiners preferred."
+  },
+  {
+    "id": "lv-2", "text": "Data Engineering Intern",
+    "categories": {"location": "Bangalore"}, "createdAt": "{{EPOCH_MS_DAYS_AGO:1}}",
+    "hostedUrl": "https://example.com/lever/cred/lv-2", "descriptionPlain": "Internship"
+  }
+]

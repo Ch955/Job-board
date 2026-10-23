@@ -1,0 +1,9 @@
+{
+  "data": [
+    {"slug": "a1", "company_name": "Berlin GmbH", "title": "Data Engineer (m/w/d)", "description": "Spark, Python",
+     "remote": true, "url": "https://example.com/arbeitnow/a1", "tags": ["data"], "location": "Berlin", "created_at": "{{EPOCH_DAYS_AGO:1}}"},
+    {"slug": "a2", "company_name": "Onsite AG", "title": "Data Engineer", "description": "On site only",
+     "remote": false, "url": "https://example.com/arbeitnow/a2", "tags": [], "location": "Munich", "created_at": "{{EPOCH_DAYS_AGO:1}}"}
+  ],
+  "links": {"next": null}
+}

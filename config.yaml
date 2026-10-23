@@ -1,0 +1,215 @@
+# Job Radar configuration. Everything tunable lives here: no code changes needed
+# to add companies, keywords or change scoring weights.
+
+profile:
+  name: Chakri
+  role: Azure Data Engineer
+  years_experience: 3
+  apply_email: chakri.evn@gmail.com
+  notice: Immediate joiner
+
+# ---------------------------------------------------------------------------
+# Pipeline limits
+# ---------------------------------------------------------------------------
+pipeline:
+  max_age_days: 30          # drop jobs posted (or first seen) more than N days ago
+  min_score: 40             # drop jobs scoring below this
+  alert_score: 70           # Telegram alert threshold (phase 2)
+  snippet_chars: 300
+  http_timeout_s: 20
+  max_workers: 8            # parallel requests to company boards
+  output: docs/jobs.json
+  # Jobs you have applied to / are interviewing for are kept past max_age_days
+  keep_statuses: [applied, interview, offer]
+
+# ---------------------------------------------------------------------------
+# Relevance gate: a title must match at least one title rule to be considered
+# at all, and must not match any exclude pattern. Patterns are Python regexes,
+# matched case-insensitively.
+# ---------------------------------------------------------------------------
+title:
+  rules:                     # best matching rule gives the title points (max 25)
+    - { pattern: 'azure\s+data\s+engineer',            points: 25 }
+    - { pattern: '\bdata\s+engineer',                  points: 25 }
+    - { pattern: '\bdata\s+engineering\b',             points: 22 }
+    - { pattern: 'big\s*data',                         points: 22 }
+    - { pattern: 'databricks',                         points: 22 }
+    - { pattern: '(cloud|platform)\s+data',            points: 22 }
+    - { pattern: 'data\s+(platform|pipeline|integration|warehouse|lake)', points: 20 }
+    - { pattern: '\b(etl|elt)\b',                      points: 18 }
+    - { pattern: 'analytics\s+engineer',               points: 18 }
+    - { pattern: '(spark|pyspark|snowflake|bigquery)\s+(developer|engineer)', points: 20 }
+    - { pattern: '(software|backend)\s+engineer.*\bdata\b', points: 14 }
+    - { pattern: '\bdata\b.*\b(engineer|developer)\b', points: 15 }
+  exclude:                   # title matching any of these is dropped
+    - '\bintern(ship)?\b'
+    - '\b(director|vp|vice president|head of)\b'
+    - '\bmanager\b'
+    - '\b(sales|recruit(er|ing)|marketing|account executive)\b'
+    - '\bdata\s+(scientist|analyst|entry)\b'
+  penalties:                 # matched patterns subtract points
+    - { pattern: '\b(principal|staff|distinguished)\b', points: -15 }
+    - { pattern: '\b(lead|architect)\b',                points: -8 }
+
+# ---------------------------------------------------------------------------
+# Skills: matched in title + description. Matched names are shown on the card.
+# Total skill points are capped at `max_points`.
+# ---------------------------------------------------------------------------
+skills:
+  max_points: 35
+  keywords:
+    - { name: ADF,             weight: 6, patterns: ['azure data factory', '\badf\b'] }
+    - { name: Databricks,      weight: 6, patterns: ['databricks'] }
+    - { name: PySpark,         weight: 6, patterns: ['pyspark'] }
+    - { name: Spark,           weight: 4, patterns: ['\bspark\b', 'spark sql'] }
+    - { name: ADLS Gen2,       weight: 5, patterns: ['\badls\b', 'adls gen ?2', 'azure data lake'] }
+    - { name: Azure,           weight: 5, patterns: ['\bazure\b'] }
+    - { name: Snowflake,       weight: 5, patterns: ['snowflake'] }
+    - { name: BigQuery,        weight: 4, patterns: ['bigquery', 'big query'] }
+    - { name: Azure DevOps,    weight: 3, patterns: ['azure devops', '\bado\b pipelines'] }
+    - { name: Synapse,         weight: 3, patterns: ['synapse'] }
+    - { name: Delta Lake,      weight: 3, patterns: ['delta lake', 'delta tables?', 'lakehouse'] }
+    - { name: SQL,             weight: 3, patterns: ['\bsql\b', 't-sql', 'tsql'] }
+    - { name: Python,          weight: 3, patterns: ['\bpython\b'] }
+    - { name: Airflow,         weight: 2, patterns: ['airflow'] }
+    - { name: dbt,             weight: 2, patterns: ['\bdbt\b'] }
+    - { name: Kafka,           weight: 2, patterns: ['kafka', 'event ?hubs?'] }
+    - { name: ETL/ELT,         weight: 2, patterns: ['\betl\b', '\belt\b'] }
+    - { name: Data Modeling,   weight: 2, patterns: ['data model(l)?ing', 'dimensional model', 'star schema'] }
+    - { name: CI/CD,           weight: 2, patterns: ['ci ?/ ?cd'] }
+    - { name: Unity Catalog,   weight: 2, patterns: ['unity catalog'] }
+    - { name: GCP,             weight: 1, patterns: ['\bgcp\b', 'google cloud'] }
+    - { name: Terraform,       weight: 1, patterns: ['terraform'] }
+
+# ---------------------------------------------------------------------------
+# Location: preferred cities get full points, remote that is open to India
+# gets nearly full, rest of India gets some, everything else gets zero.
+# ---------------------------------------------------------------------------
+location:
+  points_preferred: 20
+  points_remote: 18
+  points_india_other: 8
+  preferred:
+    Hyderabad: ['hyderabad', 'secunderabad', 'hitec city', 'gachibowli']
+    Bangalore: ['bangalore', 'bengaluru']
+    Pune:      ['pune']
+    Mumbai:    ['mumbai', 'navi mumbai', 'thane']
+  india_terms: ['india', ',\s*in$', '\bind$', 'chennai', 'gurgaon', 'gurugram', 'noida', 'delhi', 'kolkata',
+                'ahmedabad', 'kochi', 'trivandrum', 'coimbatore', 'jaipur', 'chandigarh', 'indore']
+  remote_terms: ['remote', 'work from home', '\bwfh\b', 'anywhere', 'distributed']
+  # A remote job is only useful if it's open to India. These make it eligible...
+  remote_ok_terms: ['india', 'apac', 'asia', 'worldwide', 'global', 'anywhere', 'emea']
+  # ...and if it mentions one of these (and none of the above) it's treated as not open to you.
+  remote_blocked_terms: ['\bus\b', 'usa', 'united states', 'canada', 'europe', '\beu\b', '\buk\b',
+                         'united kingdom', 'germany', 'latam', 'brazil', 'mexico', 'americas',
+                         'north america', 'australia', 'new york', 'san francisco', 'london', 'berlin']
+  # Drop jobs that are neither in India nor remote-open-to-India (saves noise).
+  drop_ineligible: true
+
+experience:
+  points: 10
+  my_years: 3
+  # Parsed "X+ years" / "X-Y years" from the description. Required minimum years:
+  full_if_min_at_most: 4     # min <= 4 -> full points
+  half_if_min_at_most: 6     # min <= 6 -> half points, above that -> 0
+  unknown_points: 5          # no years mentioned
+
+recency:                     # days since posted -> points (first match wins)
+  - { max_days: 1,  points: 10 }
+  - { max_days: 3,  points: 8 }
+  - { max_days: 7,  points: 6 }
+  - { max_days: 14, points: 3 }
+  - { max_days: 30, points: 1 }
+
+# ---------------------------------------------------------------------------
+# Sources. Each runs in isolation: one failing never stops the others.
+# Set enabled: false to switch one off. min_interval_hours throttles sources
+# that ask for gentle use (state is kept in docs/jobs.json).
+# ---------------------------------------------------------------------------
+sources:
+  greenhouse:      { enabled: true }
+  lever:           { enabled: true }
+  ashby:           { enabled: true }
+  smartrecruiters: { enabled: true, query: data, max_details_per_company: 15 }
+  adzuna:
+    enabled: true           # needs ADZUNA_APP_ID + ADZUNA_APP_KEY, skipped otherwise
+    country: in
+    queries: ['azure data engineer', 'data engineer databricks']
+    where: ['Hyderabad', 'Bangalore', 'Pune', 'Mumbai']
+    results_per_page: 50
+    # 2 queries x 4 cities = 8 calls/run, 64/day: well under the free quota
+  jooble:
+    enabled: true           # needs JOOBLE_API_KEY, skipped otherwise
+    queries: ['azure data engineer', 'databricks data engineer']
+    locations: ['Hyderabad', 'Bangalore', 'Pune', 'Mumbai', 'India']
+    min_interval_hours: 6   # 10 calls/run x 4 runs/day, keeps the free key happy
+  remotive:
+    enabled: true
+    category: data
+    search: data engineer
+    min_interval_hours: 6   # Remotive asks for at most ~4 calls/day
+  arbeitnow:
+    enabled: true
+    pages: 3
+    remote_only: true
+
+# ---------------------------------------------------------------------------
+# Company career boards (public, no key). The slug is the part of the board
+# URL: boards.greenhouse.io/<slug>, jobs.lever.co/<slug>,
+# jobs.ashbyhq.com/<slug>, jobs.smartrecruiters.com/<slug>.
+# Companies move between ATS vendors; run `python -m jobradar check-companies`
+# to find dead slugs, then fix or remove them here.
+# ---------------------------------------------------------------------------
+companies:
+  greenhouse:
+    - { slug: databricks,   name: Databricks }
+    - { slug: mongodb,      name: MongoDB }
+    - { slug: elastic,      name: Elastic }
+    - { slug: postman,      name: Postman }
+    - { slug: stripe,       name: Stripe }
+    - { slug: airbnb,       name: Airbnb }
+    - { slug: coinbase,     name: Coinbase }
+    - { slug: twilio,       name: Twilio }
+    - { slug: okta,         name: Okta }
+    - { slug: rubrik,       name: Rubrik }
+    - { slug: phonepe,      name: PhonePe }
+    - { slug: druva,        name: Druva }
+    - { slug: fivetran,     name: Fivetran }
+    - { slug: dbtlabsinc,   name: dbt Labs }
+    - { slug: thoughtspot,  name: ThoughtSpot }
+    - { slug: clickhouse,   name: ClickHouse }
+    - { slug: samsara,      name: Samsara }
+    - { slug: inmobi,       name: InMobi }
+    - { slug: datadog,      name: Datadog }
+    - { slug: gitlab,       name: GitLab }
+    - { slug: cloudflare,   name: Cloudflare }
+    - { slug: intercom,     name: Intercom }
+    - { slug: groww,        name: Groww }
+    - { slug: sumologic,    name: Sumo Logic }
+  lever:
+    - { slug: cred,         name: CRED }
+    - { slug: meesho,       name: Meesho }
+    - { slug: zeta,         name: Zeta }
+    - { slug: palantir,     name: Palantir }
+    - { slug: hevodata,     name: Hevo Data }
+    - { slug: mindtickle,   name: MindTickle }
+    - { slug: upstox,       name: Upstox }
+    - { slug: jupiter,      name: Jupiter }
+  ashby:
+    - { slug: snowflake,    name: Snowflake }
+    - { slug: confluent,    name: Confluent }
+    - { slug: rippling,     name: Rippling }
+    - { slug: atlan,        name: Atlan }
+    - { slug: deel,         name: Deel }
+    - { slug: notion,       name: Notion }
+    - { slug: airbyte,      name: Airbyte }
+    - { slug: posthog,      name: PostHog }
+    - { slug: supabase,     name: Supabase }
+  smartrecruiters:
+    - { slug: Visa,           name: Visa }
+    - { slug: ServiceNow,     name: ServiceNow }
+    - { slug: Freshworks,     name: Freshworks }
+    - { slug: NielsenIQ,      name: NielsenIQ }
+    - { slug: BoschGroup,     name: Bosch }
+    - { slug: WesternDigital, name: Western Digital }
+    - { slug: PublicisGroupe, name: Publicis Sapient }

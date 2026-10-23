@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+.pytest_cache/
+# Gmail OAuth material (phase 5) - never commit
+credentials.json
+token.json
+client_secret*.json
+# local run outputs
+out/

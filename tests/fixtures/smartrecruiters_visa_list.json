@@ -1,0 +1,9 @@
+{
+  "totalFound": 2,
+  "content": [
+    {"id": "sr-1", "name": "Azure Data Engineer", "releasedDate": "{{DAYS_AGO:0}}",
+     "location": {"city": "Hyderabad", "region": "TS", "country": "in", "remote": false}},
+    {"id": "sr-2", "name": "Software Engineer, Payments", "releasedDate": "{{DAYS_AGO:0}}",
+     "location": {"city": "Bangalore", "country": "in", "remote": false}}
+  ]
+}

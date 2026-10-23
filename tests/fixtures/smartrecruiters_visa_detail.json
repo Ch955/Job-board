@@ -1,0 +1,7 @@
+{
+  "id": "sr-1",
+  "jobAd": {"sections": {
+    "jobDescription": {"text": "<p>Design ADF v2 pipelines, Databricks notebooks in PySpark, ADLS Gen2 and Synapse.</p>"},
+    "qualifications": {"text": "<p>3 to 6 years of experience. Snowflake or BigQuery a plus.</p>"}
+  }}
+}

@@ -1,0 +1,10 @@
+{
+  "jobs": [
+    {"id": 1, "url": "https://example.com/remotive/1", "title": "Data Engineer", "company_name": "US Only Co",
+     "candidate_required_location": "USA Only", "publication_date": "{{DAYS_AGO:1}}",
+     "description": "Snowflake, dbt, Airflow."},
+    {"id": 2, "url": "https://example.com/remotive/2", "title": "Analytics Engineer", "company_name": "Global Remote Co",
+     "candidate_required_location": "Worldwide", "publication_date": "{{DAYS_AGO:2}}",
+     "description": "<p>dbt, BigQuery, SQL, Python. 2+ years of experience.</p>"}
+  ]
+}

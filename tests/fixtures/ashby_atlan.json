@@ -1,0 +1,10 @@
+{
+  "jobs": [
+    {
+      "id": "ab-1", "title": "Data Platform Engineer", "location": "Remote - India",
+      "secondaryLocations": [], "isRemote": true, "workplaceType": "Remote", "isListed": true,
+      "publishedAt": "{{DAYS_AGO:4}}", "jobUrl": "https://example.com/ashby/atlan/ab-1",
+      "descriptionPlain": "Snowflake, dbt, Python and Airflow. Data modeling with star schema. Minimum 3 years experience."
+    }
+  ]
+}

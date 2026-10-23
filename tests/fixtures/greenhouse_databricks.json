@@ -1,0 +1,22 @@
+{
+  "jobs": [
+    {
+      "id": 7001, "title": "Senior Data Engineer",
+      "updated_at": "{{DAYS_AGO:1}}", "first_published": "{{DAYS_AGO:1}}",
+      "location": {"name": "Bengaluru, India"},
+      "absolute_url": "https://example.com/greenhouse/databricks/7001",
+      "content": "&lt;p&gt;Build pipelines with &lt;strong&gt;Azure Data Factory&lt;/strong&gt;, Databricks and PySpark on ADLS Gen2. Delta Lake, SQL, Python, CI/CD with Azure DevOps.&lt;/p&gt;&lt;p&gt;3+ years of experience in data engineering.&lt;/p&gt;"
+    },
+    {
+      "id": 7002, "title": "Account Executive, Enterprise",
+      "updated_at": "{{DAYS_AGO:2}}", "location": {"name": "Mumbai, India"},
+      "absolute_url": "https://example.com/greenhouse/databricks/7002", "content": "Sell things."
+    },
+    {
+      "id": 7003, "title": "Staff Data Engineer",
+      "updated_at": "{{DAYS_AGO:3}}", "location": {"name": "San Francisco, California"},
+      "absolute_url": "https://example.com/greenhouse/databricks/7003",
+      "content": "Spark, Databricks, 10+ years of experience."
+    }
+  ]
+}
