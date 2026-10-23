@@ -159,3 +159,10 @@ def test_email_never_claims_skills_not_on_resume(config):
     body = outreach.email_for(j, config)[1]
     assert "focus on ADF matches" in body
     assert not any(s in body for s in ("Snowflake", "Delta Lake", "Fabric", "Kafka"))
+
+
+def test_no_shared_skills_drops_the_sentence_instead_of_guessing():
+    from jobradar import outreach
+    t = "I'm a data engineer. The role's focus on {skills} matches my work. Thanks."
+    assert outreach.drop_empty(t, {"skills": ""}) == "I'm a data engineer. Thanks."
+    assert "{skills}" in outreach.drop_empty(t, {"skills": "dbt"})

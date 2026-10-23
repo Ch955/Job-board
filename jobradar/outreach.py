@@ -47,7 +47,8 @@ class _SafeDict(dict):
 def fields(job: Job, config: dict) -> dict:
     p = config.get("profile", {})
     mine = config.get("outreach", {}).get("my_skills") or []
-    skills = [k for k in job.matched_keywords if k in mine and k not in ("SQL", "Python")][:3] or ["ADF", "Databricks", "PySpark"]
+    # Only skills that are both in the posting and yours; none -> the {skills} sentence is dropped
+    skills = [k for k in job.matched_keywords if k in mine and k not in ("SQL", "Python")][:3]
     return _SafeDict(
         name=p.get("name", ""),
         full_name=p.get("full_name") or p.get("name", ""),
@@ -65,8 +66,21 @@ def fields(job: Job, config: dict) -> dict:
     )
 
 
+def drop_empty(template: str, values: dict) -> str:
+    """Remove sentences whose placeholders have no value, rather than filling them with a guess."""
+    out = []
+    for line in template.split("\n"):
+        parts = re.split(r"(?<=[.!?])\s+", line)
+        keep = [p for p in parts if all(values.get(k) for k in re.findall(r"\{(\w+)\}", p) if k in ("skills",))]
+        if line.strip() and not keep:
+            continue
+        out.append(" ".join(keep))
+    return "\n".join(out)
+
+
 def render(template: str, job: Job, config: dict) -> str:
-    return template.format_map(fields(job, config)).strip()
+    values = fields(job, config)
+    return drop_empty(template, values).format_map(values).strip()
 
 
 def email_for(job: Job, config: dict) -> tuple[str, str]:

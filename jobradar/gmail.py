@@ -23,6 +23,7 @@ API = "https://gmail.googleapis.com/gmail/v1/users/me"
 SCOPES = "https://www.googleapis.com/auth/gmail.compose https://www.googleapis.com/auth/gmail.readonly"
 
 
+DOCX_SUBTYPE = "vnd.openxmlformats-officedocument.wordprocessingml.document"
 REVOKE_URL = "https://oauth2.googleapis.com/revoke"
 # The minimum for Job Radar's Gmail features, requested only when a user taps "Connect Gmail"
 # (separately from signing in): readonly to spot job emails, compose to create drafts (never send).
@@ -72,7 +73,8 @@ def build_message(to: str, subject: str, body: str, sender: str | None = None,
     msg.set_content(body)
     if attachment:
         name, data = attachment
-        msg.add_attachment(data, maintype="application", subtype="pdf", filename=name)
+        subtype = DOCX_SUBTYPE if name.lower().endswith(".docx") else "pdf"
+        msg.add_attachment(data, maintype="application", subtype=subtype, filename=name)
     return msg
 
 
