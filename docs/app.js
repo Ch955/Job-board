@@ -8,7 +8,13 @@ const THEME_KEY = "jobradar.theme";
 const SECTION_KEY = "jobradar.section";
 // Statuses whose jobs are snapshotted on the device so they survive aging out of jobs.json
 const KEEP_STATUSES = ["later", "applied", "interview", "offer", "rejected"];
-const DEFAULT_FILTERS = { q: "", minScore: 40, location: "", source: "", remote: "" };
+// location, source and remote are multi-select: an empty list means "any"
+const DEFAULT_FILTERS = { q: "", minScore: 40, location: [], source: [], remote: [] };
+const MULTI = ["source", "location", "remote"];
+const SOURCE_LABELS = { naukri: "Naukri", linkedin: "LinkedIn", indeed: "Indeed", glassdoor: "Glassdoor", google: "Google",
+  greenhouse: "Greenhouse", lever: "Lever", ashby: "Ashby", smartrecruiters: "SmartRecruiters", adzuna: "Adzuna",
+  jooble: "Jooble", remotive: "Remotive", arbeitnow: "Arbeitnow" };
+const WORK_MODES = [["remote", "Remote"], ["onsite", "On-site / hybrid"]];
 
 // Each job lives in exactly one section, decided by its status
 const SECTIONS = [
@@ -186,41 +192,72 @@ function locationLabel(job) {
 }
 
 // ------------------------------------------------------------------ filters
+const modeOf = (job) => (job.remote ? "remote" : "onsite");
+const FIELD_VALUE = { source: (j) => j.source, location: locationLabel, remote: modeOf };
+
+// Chips show how many jobs in this section each choice would give, given the other filters
 function buildFilterOptions() {
-  const jobs = allJobs();
-  fillSelect($("#f-location"), [...new Set(jobs.map(locationLabel))].sort(), "All of India", filters.location);
-  fillSelect($("#f-source"), [...new Set(jobs.map((j) => j.source))].sort(), "All sources", filters.source);
+  const jobs = allJobs().filter((j) => statusOf(j) === section);
+  const all = allJobs();
+  const groups = {
+    source: [...new Set(all.map((j) => j.source))].sort().map((v) => [v, SOURCE_LABELS[v] || v]),
+    location: [...new Set(all.map(locationLabel))].sort().map((v) => [v, v]),
+    remote: WORK_MODES,
+  };
+  const focused = document.activeElement?.dataset?.chip;
+  for (const key of MULTI) {
+    const base = jobs.filter((j) => matchesFilters(j, key));
+    const chips = groups[key].map(([value, label]) => {
+      const n = base.filter((j) => FIELD_VALUE[key](j) === value).length;
+      const on = filters[key].includes(value);
+      const b = el("button", { type: "button", className: "chip" });
+      b.dataset.chip = `${key}:${value}`;
+      b.setAttribute("aria-pressed", String(on));
+      b.append(label, el("span", { className: "chip-count", textContent: n }));
+      b.addEventListener("click", () => {
+        const next = on ? filters[key].filter((x) => x !== value) : [...filters[key], value];
+        setFilters({ [key]: next });
+      });
+      return b;
+    });
+    $(`#f-${key}`).replaceChildren(...chips);
+  }
+  if (focused) document.querySelector(`[data-chip="${CSS.escape(focused)}"]`)?.focus();
 }
 
-function fillSelect(select, values, allLabel, current) {
-  const opts = [new Option(allLabel, "")];
-  for (const v of values) opts.push(new Option(v, v));
-  if (current && !values.includes(current)) opts.push(new Option(current, current));
-  select.replaceChildren(...opts);
-  select.value = current || "";
+function setFilters(patch) {
+  filters = { ...filters, ...patch };
+  writeJSON(FILTER_KEY, filters);
+  render();
+}
+
+// Older versions saved single values ("naukri"); turn them into lists
+function normalizeFilters(f) {
+  const out = { ...DEFAULT_FILTERS, ...f };
+  for (const k of MULTI) {
+    const v = out[k];
+    out[k] = Array.isArray(v) ? v.filter(Boolean) : v ? [v] : [];
+  }
+  return out;
 }
 
 function applyFiltersToInputs() {
   $("#f-search").value = filters.q;
   $("#f-score").value = filters.minScore;
   $("#f-score-val").textContent = filters.minScore;
-  $("#f-location").value = filters.location;
-  $("#f-source").value = filters.source;
-  $("#f-remote").value = filters.remote;
 }
 
 function activeFilterCount() {
-  return ["minScore", "location", "source", "remote"].filter((k) => filters[k] !== DEFAULT_FILTERS[k]).length;
+  return (filters.minScore !== DEFAULT_FILTERS.minScore ? 1 : 0) + MULTI.filter((k) => filters[k].length).length;
 }
 
-function matchesFilters(job) {
+function matchesFilters(job, ignore) {
   const status = statusOf(job);
   // The score floor only hides jobs you haven't acted on
   if ((job.score || 0) < filters.minScore && (status === "new" || status === "skipped")) return false;
-  if (filters.location && locationLabel(job) !== filters.location) return false;
-  if (filters.source && job.source !== filters.source) return false;
-  if (filters.remote === "remote" && !job.remote) return false;
-  if (filters.remote === "onsite" && job.remote) return false;
+  for (const k of MULTI) {
+    if (k !== ignore && filters[k].length && !filters[k].includes(FIELD_VALUE[k](job))) return false;
+  }
   if (filters.q) {
     const hay = `${job.title} ${job.company} ${job.location} ${(job.matched_keywords || []).join(" ")}`.toLowerCase();
     if (!filters.q.toLowerCase().split(/\s+/).every((w) => hay.includes(w))) return false;
@@ -287,6 +324,7 @@ function render() {
   tf.textContent = n ? `Filters (${n})` : "Filters";
   tf.classList.toggle("has-filters", n > 0);
   renderNav(jobs);
+  if (!isGmail) buildFilterOptions();
 }
 
 function renderNav(jobs = allJobs()) {
@@ -780,9 +818,6 @@ function bind() {
   $("#nav").addEventListener("click", (e) => {
     if (e.target === $("#nav")) $("#nav").close();
   });
-  $("#f-location").addEventListener("change", (e) => update({ location: e.target.value }));
-  $("#f-source").addEventListener("change", (e) => update({ source: e.target.value }));
-  $("#f-remote").addEventListener("change", (e) => update({ remote: e.target.value }));
   $("#reset-filters").addEventListener("click", () => {
     filters = { ...DEFAULT_FILTERS };
     writeJSON(FILTER_KEY, filters);
@@ -831,7 +866,7 @@ async function init() {
   applyTheme(readJSON(THEME_KEY, "auto"));
   const savedFilters = readJSON(FILTER_KEY, {});
   delete savedFilters.status; // replaced by sections
-  filters = { ...DEFAULT_FILTERS, ...savedFilters };
+  filters = normalizeFilters(savedFilters);
   const savedSection = readJSON(SECTION_KEY, "new");
   section = [...SECTIONS, ...GMAIL_SECTIONS].some((x) => x.id === savedSection) ? savedSection : "new";
   bind();

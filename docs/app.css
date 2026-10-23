@@ -186,6 +186,26 @@ button, input, select { font: inherit; color: inherit; }
 .field input[type="range"] { accent-color: var(--accent); width: 100%; }
 .field output { color: var(--text); font-weight: 600; }
 
+.chip-field { grid-column: 1 / -1; }
+.chip-field small { font-size: 11px; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 14px;
+  cursor: pointer;
+}
+.chip-count { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-text); font-weight: 600; }
+.chip[aria-pressed="true"] .chip-count { color: inherit; opacity: .8; }
+
 .link-btn {
   grid-column: 1 / -1;
   justify-self: start;

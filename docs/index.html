@@ -58,15 +58,18 @@
         <span>Min score <output id="f-score-val">40</output></span>
         <input id="f-score" type="range" min="40" max="100" step="5" value="40">
       </label>
-      <label class="field"><span>Location</span><select id="f-location"><option value="">All of India</option></select></label>
-      <label class="field"><span>Source</span><select id="f-source"><option value="">All sources</option></select></label>
-      <label class="field"><span>Work mode</span>
-        <select id="f-remote">
-          <option value="">Any</option>
-          <option value="remote">Remote only</option>
-          <option value="onsite">On-site / hybrid</option>
-        </select>
-      </label>
+      <div class="field chip-field" role="group" aria-labelledby="l-source">
+        <span id="l-source">Source <small class="muted">· tap several</small></span>
+        <div id="f-source" class="chips"></div>
+      </div>
+      <div class="field chip-field" role="group" aria-labelledby="l-location">
+        <span id="l-location">Location</span>
+        <div id="f-location" class="chips"></div>
+      </div>
+      <div class="field chip-field" role="group" aria-labelledby="l-remote">
+        <span id="l-remote">Work mode</span>
+        <div id="f-remote" class="chips"></div>
+      </div>
       <button id="reset-filters" class="link-btn" type="button">Reset filters</button>
     </div>
   </section>

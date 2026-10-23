@@ -149,7 +149,8 @@ emails and recruiter replies). It can't send. You can revoke it any time at <htt
 
   Tapping **Applied** moves the job out of *To apply* and into *Applied* straight away, with an **Undo** toast.
 - Job cards are sorted by score, with the matched skills and a tap-the-score breakdown.
-- Filters: minimum score, location, source, remote / on-site, plus a search box.
+- Filters: minimum score, plus **multi-select** chips for source (e.g. Naukri + LinkedIn together), location and
+  work mode, and a search box. Each chip shows how many jobs it would give.
 - **Apply** opens the original posting and then asks "Did you apply?".
 - Counters: applied today / this week, jobs to apply, interviews.
 - Your statuses are saved on the phone (localStorage). ☰ → **Export JSON** makes a backup file; **Import JSON**
