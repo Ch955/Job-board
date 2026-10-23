@@ -4,5 +4,6 @@
     "authDomain": "jobradar-70bc7.firebaseapp.com",
     "projectId": "jobradar-70bc7",
     "appId": "1:979341312634:web:ea2f5bbae4d09b9e74b1c3"
-  }
+  },
+  "api_url": "https://jobradar-api-ft9s.onrender.com"
 }
