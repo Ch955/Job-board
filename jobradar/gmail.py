@@ -23,8 +23,24 @@ API = "https://gmail.googleapis.com/gmail/v1/users/me"
 SCOPES = "https://www.googleapis.com/auth/gmail.compose https://www.googleapis.com/auth/gmail.readonly"
 
 
+REVOKE_URL = "https://oauth2.googleapis.com/revoke"
+# The minimum for Job Radar's Gmail features, requested only when a user taps "Connect Gmail"
+# (separately from signing in): readonly to spot job emails, compose to create drafts (never send).
+WEB_SCOPES = ("https://www.googleapis.com/auth/gmail.readonly", "https://www.googleapis.com/auth/gmail.compose")
+
+
 class GmailAuthError(Exception):
-    pass
+    """Access token can't be obtained: revoked, expired or never granted. `revoked` = reconnect needed."""
+
+    def __init__(self, message: str, revoked: bool = False):
+        super().__init__(message)
+        self.revoked = revoked
+
+
+class GmailApiError(Exception):
+    def __init__(self, status: int, message: str):
+        super().__init__(f"Gmail API {status}: {message}")
+        self.status = status
 
 
 def access_token(session, client_id: str, client_secret: str, refresh_token: str) -> str:
@@ -38,18 +54,21 @@ def access_token(session, client_id: str, client_secret: str, refresh_token: str
         except ValueError:
             err = r.status_code
         hint = " (refresh token expired or revoked: run `python -m jobradar gmail-auth` again)" if err == "invalid_grant" else ""
-        raise GmailAuthError(f"{err}{hint}")
+        raise GmailAuthError(f"{err}{hint}", revoked=err == "invalid_grant")
     return r.json()["access_token"]
 
 
 def build_message(to: str, subject: str, body: str, sender: str | None = None,
-                  attachment: tuple[str, bytes] | None = None) -> EmailMessage:
+                  attachment: tuple[str, bytes] | None = None, in_reply_to: str | None = None) -> EmailMessage:
     msg = EmailMessage()
     msg["To"] = to
     if sender:
         msg["From"] = sender
     msg["Subject"] = subject
     msg["Message-ID"] = make_msgid(domain="jobradar.local")
+    if in_reply_to:  # keeps a reply in the recruiter's thread in their mail client too
+        msg["In-Reply-To"] = in_reply_to
+        msg["References"] = in_reply_to
     msg.set_content(body)
     if attachment:
         name, data = attachment
@@ -58,13 +77,124 @@ def build_message(to: str, subject: str, body: str, sender: str | None = None,
 
 
 def create_draft(session, token: str, *, to: str, subject: str, body: str, sender: str | None = None,
-                 attachment: tuple[str, bytes] | None = None) -> dict:
-    raw = base64.urlsafe_b64encode(build_message(to, subject, body, sender, attachment).as_bytes()).decode()
-    r = session.post(f"{API}/drafts", headers={"Authorization": f"Bearer {token}"},
-                     json={"message": {"raw": raw}})
+                 attachment: tuple[str, bytes] | None = None, thread_id: str | None = None,
+                 in_reply_to: str | None = None) -> dict:
+    """Create a Gmail draft (never sends). With thread_id it lands in that conversation."""
+    raw = base64.urlsafe_b64encode(build_message(to, subject, body, sender, attachment, in_reply_to).as_bytes()).decode()
+    message = {"raw": raw}
+    if thread_id:
+        message["threadId"] = thread_id
+    r = session.post(f"{API}/drafts", headers={"Authorization": f"Bearer {token}"}, json={"message": message})
+    if r.status_code == 401:
+        raise GmailAuthError("Gmail access expired", revoked=False)
+    if r.status_code == 403:
+        raise GmailAuthError("Gmail didn't allow creating drafts (permission missing)", revoked=True)
     r.raise_for_status()
     d = r.json()
-    return {"id": d["id"], "message_id": (d.get("message") or {}).get("id", "")}
+    msg = d.get("message") or {}
+    return {"id": d["id"], "message_id": msg.get("id", ""), "thread_id": msg.get("threadId", thread_id or "")}
+
+
+# ------------------------------------------------------- per-user web consent
+def pkce_pair() -> tuple[str, str]:
+    verifier = secrets.token_urlsafe(64)
+    challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
+    return verifier, challenge
+
+
+def build_auth_url(client_id: str, redirect_uri: str, state: str, code_challenge: str,
+                   login_hint: str | None = None, scopes=WEB_SCOPES) -> str:
+    q = {"client_id": client_id, "redirect_uri": redirect_uri, "response_type": "code", "scope": " ".join(scopes),
+         "access_type": "offline", "prompt": "consent", "state": state, "include_granted_scopes": "false",
+         "code_challenge": code_challenge, "code_challenge_method": "S256"}
+    if login_hint:
+        q["login_hint"] = login_hint
+    return AUTH_URL + "?" + urllib.parse.urlencode(q)
+
+
+def exchange_code(session, client_id: str, client_secret: str, code: str, redirect_uri: str, verifier: str) -> dict:
+    """Server-side code exchange. Returns Google's token response (with refresh_token)."""
+    r = session.post(TOKEN_URL, data={"client_id": client_id, "client_secret": client_secret, "code": code,
+                                      "code_verifier": verifier, "grant_type": "authorization_code",
+                                      "redirect_uri": redirect_uri})
+    if r.status_code != 200:
+        try:
+            err = r.json().get("error_description") or r.json().get("error")
+        except ValueError:
+            err = r.status_code
+        raise GmailAuthError(f"Google refused the sign-in: {err}")
+    return r.json()
+
+
+def revoke(session, token: str) -> bool:
+    """Revoke a refresh (or access) token. True if Google confirmed or it was already invalid."""
+    try:
+        r = session.post(REVOKE_URL, data={"token": token}, headers={"Content-Type": "application/x-www-form-urlencoded"})
+        return r.status_code in (200, 400)
+    except Exception:  # noqa: BLE001 - best effort; the stored copy is deleted regardless
+        return False
+
+
+class GmailClient:
+    """Thin Gmail REST client bound to one user's access token."""
+
+    def __init__(self, session, token: str):
+        self.session, self.token = session, token
+
+    def _get(self, path: str, params=None) -> dict:
+        r = self.session.get(f"{API}{path}", headers={"Authorization": f"Bearer {self.token}"}, params=params)
+        if r.status_code == 401:
+            raise GmailAuthError("Gmail access expired or was revoked", revoked=True)
+        if r.status_code == 403:
+            raise GmailAuthError("Gmail permission missing", revoked=True)
+        if r.status_code >= 400:
+            raise GmailApiError(r.status_code, r.text[:200])
+        return r.json()
+
+    def profile(self) -> dict:
+        return self._get("/profile")
+
+    def list_message_ids(self, query: str, limit: int = 300) -> list[str]:
+        ids, page = [], None
+        while len(ids) < limit:
+            params = {"q": query, "maxResults": min(100, limit - len(ids))}
+            if page:
+                params["pageToken"] = page
+            j = self._get("/messages", params)
+            ids += [m["id"] for m in j.get("messages", [])]
+            page = j.get("nextPageToken")
+            if not page:
+                break
+        return ids
+
+    def message(self, mid: str, full: bool = False) -> dict:
+        if full:
+            return self._get(f"/messages/{mid}", {"format": "full"})
+        return self._get(f"/messages/{mid}", {"format": "metadata", "metadataHeaders": ["Subject", "From", "Message-ID"]})
+
+    def create_draft(self, **kw) -> dict:
+        return create_draft(self.session, self.token, **kw)
+
+
+def message_text(msg: dict, limit: int = 6000) -> str:
+    """Plain text of a 'full' message (first text/plain part, else stripped HTML). Used, never stored."""
+    import html as _html
+    import re as _re
+
+    def walk(part):
+        yield part
+        for p in part.get("parts") or []:
+            yield from walk(p)
+
+    plain, htmls = [], []
+    for part in walk(msg.get("payload") or {}):
+        data = (part.get("body") or {}).get("data")
+        if not data:
+            continue
+        text = base64.urlsafe_b64decode(data + "=" * (-len(data) % 4)).decode("utf-8", "replace")
+        (plain if part.get("mimeType") == "text/plain" else htmls if part.get("mimeType") == "text/html" else []).append(text)
+    text = "\n".join(plain) or _re.sub(r"<[^>]+>", " ", _html.unescape("\n".join(htmls)))
+    return _re.sub(r"\s+", " ", text)[:limit]
 
 
 # ----------------------------------------------------------------- sign-in

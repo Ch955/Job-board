@@ -31,6 +31,9 @@ MERGE_CASES = [
     # pending opened on phone, answered "not yet" on laptop later
     ({"pending": {"p": {"at": "2026-10-23T09:00:00Z", "open": True}}},
      {"pending": {"p": {"at": "2026-10-23T09:10:00Z", "open": False}}, "sent": {"x": "2026-10-23T01:00:00Z"}}),
+    # review answered on phone; a draft recorded by the server on each side
+    ({"reviews": {"r-m1": {"job_id": None, "at": "2026-10-23T09:00:00Z"}}, "drafts": {"apply:j": {"id": "d1", "at": "2026-10-23T07:00:00Z"}}},
+     {"reviews": {"r-m1": {"job_id": "j2", "at": "2026-10-23T09:30:00Z"}}, "drafts": {"reply:t1": {"id": "d2", "at": "2026-10-23T08:00:00Z"}}}),
     # gmail bookkeeping: newer last_check wins
     ({"gmail": {"last_check": "2026-10-23T06:00:00Z", "processed": ["m1"]}},
      {"gmail": {"last_check": "2026-10-23T09:00:00Z", "processed": ["m1", "m2"]}}),

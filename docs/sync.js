@@ -2,7 +2,8 @@
    (jobradar/sync.py has the identical rules; tests check they agree).
 
    State: {statuses:{id:{status,at,appliedAt?,source?}}, saved:{id:job}, sent:{id:iso},
-           pending:{id:{at,open}}, gmail:{last_check, processed, events}}
+           pending:{id:{at,open}}, gmail:{last_check, processed, events, review},
+           reviews:{reviewId:{job_id|null, at}}, drafts:{key:{id, thread_id, job_id, type, at}}}
    Per job the newest change wins, the first applied time is never lost, and
    removing a status is a newer "new" record, so undo travels between devices.
 
@@ -11,10 +12,12 @@
 
 const JRSync = (() => {
   const KEEP = ["later", "applied", "interview", "offer", "rejected"];
-  const empty = () => ({ statuses: {}, saved: {}, sent: {}, pending: {}, gmail: {} });
+  const MAPS = ["statuses", "saved", "sent", "pending", "gmail", "reviews", "drafts"];
+  const NEWEST = ["pending", "reviews", "drafts"]; // per key, the record with the later "at" wins
+  const empty = () => Object.fromEntries(MAPS.map((k) => [k, {}]));
   function normalize(s) {
     const out = { ...empty(), ...(s || {}) };
-    for (const k of ["statuses", "saved", "sent", "pending", "gmail"]) out[k] = { ...(out[k] || {}) };
+    for (const k of MAPS) out[k] = { ...(out[k] || {}) };
     return out;
   }
   function merge(a, b) {
@@ -28,10 +31,13 @@ const JRSync = (() => {
       out.statuses[id] = applied ? { ...win, appliedAt: applied } : { ...win };
       if (!applied) delete out.statuses[id].appliedAt;
     }
-    // pending[id] = {at, open}: you tapped Apply (open) or answered "not yet" (closed)
-    for (const id of new Set([...Object.keys(a.pending), ...Object.keys(b.pending)])) {
-      const x = a.pending[id], y = b.pending[id];
-      out.pending[id] = !x ? y : !y ? x : String(y.at) > String(x.at) ? y : x;
+    // pending[id] = {at, open}: you tapped Apply (open) or answered "not yet" (closed);
+    // reviews: your answer to an uncertain Gmail match; drafts: drafts already created
+    for (const k of NEWEST) {
+      for (const id of new Set([...Object.keys(a[k]), ...Object.keys(b[k])])) {
+        const x = a[k][id], y = b[k][id];
+        out[k][id] = !x ? y : !y ? x : String(y.at || "") > String(x.at || "") ? y : x;
+      }
     }
     for (const id of new Set([...Object.keys(a.sent), ...Object.keys(b.sent)])) {
       const v = [a.sent[id], b.sent[id]].filter(Boolean).sort().pop();

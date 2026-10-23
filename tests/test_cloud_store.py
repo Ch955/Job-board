@@ -65,7 +65,7 @@ class FakeGoogle:
         if url.endswith("/messages"):
             return Resp(200, {"messages": [{"id": "m1"}]})
         return Resp(200, {"id": "m1", "threadId": "t1", "snippet": "", "internalDate": "1792900000000",
-                          "payload": {"headers": [{"name": "Subject", "value": "Your application was sent to Qloron Pvt Ltd"},
+                          "payload": {"headers": [{"name": "Subject", "value": "Your application was sent to Zyntrix Analytics Pvt Ltd"},
                                                   {"name": "From", "value": "LinkedIn <jobs-noreply@linkedin.com>"}]}})
 
     def patch(self, url, headers=None, params=None, json=None):
@@ -102,7 +102,7 @@ def test_gmail_sync_writes_to_firestore(env, monkeypatch, capsys):
     state = json.loads(fake.doc["state"])
     assert state["statuses"]["keep"]["status"] == "applied"                     # your own statuses untouched
     added = [k for k, v in state["statuses"].items() if v.get("source") == "gmail"]
-    assert len(added) == 1 and state["saved"][added[0]]["company"] == "Qloron Pvt Ltd"
+    assert len(added) == 1 and state["saved"][added[0]]["company"] == "Zyntrix Analytics Pvt Ltd"
     assert fake.writes[0]["fields"]["email"]["stringValue"] == "chakri.evn@gmail.com"
     assert "Gmail status sync" in capsys.readouterr().out
 
