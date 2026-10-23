@@ -31,7 +31,7 @@ def _key(key_b64: str | None = None) -> bytes:
         raise SecretBoxError("APP_ENCRYPTION_KEY is not set")
     key = b64u_decode(raw)
     if len(key) != 32:
-        raise SecretBoxError("APP_ENCRYPTION_KEY must be 32 bytes (base64url); create one with `python -m jobradar new-key`")
+        raise SecretBoxError("APP_ENCRYPTION_KEY must be 32 bytes (base64url); create one with `python -m jobradar.backend new-key`")
     return key
 
 

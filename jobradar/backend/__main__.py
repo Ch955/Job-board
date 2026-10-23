@@ -15,11 +15,6 @@ import logging
 import os
 import sys
 
-from ..config import load_config
-from ..http import make_session
-from . import tasks
-from .api import Settings
-from .store import FirestoreStore
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -34,6 +29,11 @@ def main(argv: list[str] | None = None) -> int:
         from .secretbox import new_key
         print(new_key())
         return 0
+    from ..config import load_config  # the server libraries are only needed from here on
+    from ..http import make_session
+    from . import tasks
+    from .api import Settings
+    from .store import FirestoreStore
     s = Settings.from_env()
     missing = [k for k in ("FIREBASE_PROJECT_ID", "FIREBASE_SERVICE_ACCOUNT", "APP_ENCRYPTION_KEY") if not os.environ.get(k)]
     if missing:
