@@ -36,14 +36,32 @@ const JRCloud = {
 
   // For the Job Radar API: proves who you are on each request (refreshed by Firebase as needed)
   idToken: () => (auth.currentUser ? auth.currentUser.getIdToken() : Promise.reject(new Error("Sign in first."))),
-  sendVerification: () => A.sendEmailVerification(auth.currentUser),
+  // The link brings people back to this page once Firebase has verified the address
+  sendVerification: () => A.sendEmailVerification(auth.currentUser, { url: location.origin + location.pathname }),
+
+  // Ask Firebase (not this device's cached copy) whether the email is verified now.
+  // The cached sign-in token keeps saying "not verified" for up to an hour after
+  // the link is clicked, so a fresh one is fetched as soon as Firebase says yes.
+  async checkVerified() {
+    const u = auth.currentUser;
+    if (!u) throw Object.assign(new Error("Sign in first."), { code: "auth/no-current-user" });
+    await u.reload(); // throws if the account was deleted or the session ended
+    const fresh = auth.currentUser;
+    if (fresh.emailVerified) {
+      const token = await fresh.getIdTokenResult(true);
+      return { verified: token.claims.email_verified === true, email: fresh.email };
+    }
+    return { verified: false, email: fresh.email };
+  },
   async reloadUser() {
-    await auth.currentUser?.reload();
-    await auth.currentUser?.getIdToken(true); // so the server sees the verified email
+    return this.checkVerified();
   },
 
   async remember(keep) {
-    await A.setPersistence(auth, keep ? A.browserLocalPersistence : A.browserSessionPersistence);
+    // IndexedDB is Firebase's default: any other tab (like the one a verification link
+    // opens) uses it too. With localStorage here, that tab would move the sign-in to
+    // IndexedDB and this tab would be signed out.
+    await A.setPersistence(auth, keep ? A.indexedDBLocalPersistence : A.browserSessionPersistence);
   },
 
   signIn: (email, password) => A.signInWithEmailAndPassword(auth, email, password),

@@ -1057,6 +1057,8 @@ function showApp() {
   $("#login").hidden = true;
   $("#app").hidden = false;
   animateNext = true;
+  // "Use on this device only" with a Job Radar server: the public job list, as before
+  if (!JRAccount.enabled() && !data.jobs.length && !session) load({ quiet: true });
   render();
 }
 

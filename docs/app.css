@@ -713,3 +713,6 @@ dialog.sheet[open] { animation: rise .2s ease-out; }
 .login-brand .tagline { margin: -6px 0 6px; font-size: 12px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: #8B6B3D; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .login-brand .tagline { color: #C9A063; } }
 :root[data-theme="dark"] .login-brand .tagline { color: #C9A063; }
+.verify-box { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+.verify-box .row { flex-wrap: wrap; }
+.st-chip.st-pending { background: var(--pending-soft); color: var(--pending); }

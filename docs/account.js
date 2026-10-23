@@ -32,7 +32,21 @@ const JRAccount = (() => {
   const profile = () => me?.profile || {};
   const draftsOn = () => enabled() && me?.features?.gmail && me?.gmail?.connected && profile().drafts_enabled !== false;
 
-  async function api(path, { method = "GET", body, raw, headers = {} } = {}) {
+  const NEEDS_VERIFY = /verify your email/i;
+
+  async function api(path, opts = {}, retried = false) {
+    try {
+      return await call(path, opts);
+    } catch (e) {
+      // The server read "not verified" from a cached token: ask Firebase again, retry once
+      if (!retried && e.status === 403 && NEEDS_VERIFY.test(e.message) && (await checkVerification({ quiet: true }))) {
+        return api(path, opts, true);
+      }
+      throw e;
+    }
+  }
+
+  async function call(path, { method = "GET", body, raw, headers = {} } = {}) {
     const token = await JRCloud.idToken();
     const opts = { method, headers: { Authorization: `Bearer ${token}`, ...headers } };
     if (raw !== undefined) opts.body = raw;
@@ -65,33 +79,119 @@ const JRAccount = (() => {
       toast(e.message);
       return;
     }
+    // Back from the verification link (or the token is just stale): ask Firebase once
+    if (!me.email_verified) await checkVerification({ quiet: true });
     renderBanner();
     handleReturn();
     if (me.email_verified && me.missing?.length) openOnboarding();
     load({ quiet: true });
   }
 
+  // ------------------------------------------------------ email verification
+  // Firebase is the only source of truth: the app never marks anyone verified itself.
+  let verify = { state: "idle", checkedAt: 0, sentAt: 0, note: "" };
+  const isVerified = () => !!me?.email_verified;
+
+  async function checkVerification({ quiet = false } = {}) {
+    if (!enabled() || verify.state === "checking") return isVerified();
+    verify = { ...verify, state: "checking", note: "" };
+    renderVerify();
+    let fb = null;
+    try {
+      fb = await JRCloud.checkVerified();
+      if (fb.email && session?.email && fb.email.toLowerCase() !== session.email.toLowerCase()) {
+        verify.note = `This device is signed in as ${fb.email}. Open the link sent to that address.`;
+      }
+      me = await call("/api/me"); // what the server sees with the fresh token
+      if (fb.verified && !me.email_verified) verify.note = "Firebase says verified, but the server didn't get the update yet. Tap Check again in a few seconds.";
+    } catch (e) {
+      if (/user-token-expired|user-not-found|user-disabled|no-current-user/.test(e.code || "")) {
+        verify.note = "Your sign-in ended. Sign in again with the same email.";
+      } else {
+        verify.note = navigator.onLine ? "Couldn't check right now. Try again." : "You're offline.";
+      }
+    }
+    verify.state = "idle";
+    verify.checkedAt = Date.now();
+    const ok = isVerified();
+    if (ok) {
+      verify.note = "";
+      if (!quiet) toast("Email verified ✓");
+    } else if (!quiet && !verify.note) {
+      verify.note = "Not verified yet. Open the newest link we emailed you (check spam), then come back here.";
+    }
+    renderBanner();
+    renderVerify();
+    if (ok) unlockAfterVerify();
+    return ok;
+  }
+
+  function unlockAfterVerify() {
+    if ($("#onboard").open) openOnboarding();      // redraw: upload and save are now allowed
+    else if (me?.missing?.length) openOnboarding();
+    if ($("#settings").open) renderSettings();
+  }
+
+  async function resendVerification(button) {
+    if (Date.now() - verify.sentAt < 60e3) return toast("A link was just sent. Wait a minute before asking for another.");
+    button.disabled = true;
+    try {
+      await JRCloud.sendVerification();
+      verify.sentAt = Date.now();
+      verify.note = `New link sent to ${me?.email || session?.email}. Use the newest email if you got several.`;
+      toast("Verification email sent. Check your inbox (and spam).");
+    } catch (e) {
+      verify.note = e?.code === "auth/too-many-requests" ? "Too many emails sent. Wait a few minutes, then try again." : authMessage(e) || "Couldn't send it. Try again in a minute.";
+    } finally {
+      button.disabled = false;
+      renderVerify();
+    }
+  }
+
+  // A status box, shown in the banner, the profile sheet and settings while pending
+  function verifyBox() {
+    const box = el("div", { className: "verify-box" });
+    box.dataset.verify = "1";
+    fillVerifyBox(box);
+    return box;
+  }
+  function fillVerifyBox(box) {
+    if (isVerified()) {
+      box.replaceChildren(el("span", { className: "st-chip st-applied", textContent: "Email verified" }));
+      return;
+    }
+    const checking = verify.state === "checking";
+    const check = el("button", { className: "btn btn-primary", type: "button", textContent: checking ? "Checking…" : "I've verified my email — Check again" });
+    check.disabled = checking;
+    check.addEventListener("click", () => checkVerification());
+    const resend = el("button", { className: "btn", type: "button", textContent: "Send a new link" });
+    resend.addEventListener("click", () => resendVerification(resend));
+    box.replaceChildren(...[
+      el("div", { className: "panel-top" }, el("b", { textContent: me?.email || session?.email || "" }),
+        el("span", { className: "st-chip st-pending", textContent: checking ? "checking…" : "Email verification pending" })),
+      el("p", { className: "muted", textContent: "Open the link we emailed you, then come back to this page. Resume upload, Gmail and drafts unlock once your email is verified." }),
+      verify.note ? el("p", { className: "note", role: "status", textContent: verify.note }) : null,
+      el("div", { className: "row" }, check, resend)].filter(Boolean));
+  }
+  function renderVerify() {
+    for (const box of document.querySelectorAll("[data-verify]")) fillVerifyBox(box);
+  }
+
+  // Coming back to the tab (e.g. from the email) re-checks; "focus" and "visibilitychange"
+  // usually fire together, so the second one within 1.5 seconds is skipped
+  function onReturnToApp() {
+    if (document.visibilityState !== "visible" || !enabled() || !me || isVerified()) return;
+    if (Date.now() - verify.checkedAt < 1500) return;
+    checkVerification({ quiet: true }).then((ok) => ok && toast("Email verified ✓"));
+  }
+  document.addEventListener("visibilitychange", onReturnToApp);
+  window.addEventListener("focus", onReturnToApp);
+
   function renderBanner() {
     const bar = $("#acct-banner");
     if (!enabled() || !me) return (bar.hidden = true);
     if (!me.email_verified) {
-      const resend = el("button", { className: "link-btn", type: "button", textContent: "Send the link again" });
-      resend.addEventListener("click", async () => {
-        try {
-          await JRCloud.sendVerification();
-          toast("Verification email sent. Check your inbox (and spam).");
-        } catch (e) {
-          toast(authMessage(e) || "Couldn't send it. Try again in a minute.");
-        }
-      });
-      const done = el("button", { className: "link-btn", type: "button", textContent: "I've verified" });
-      done.addEventListener("click", async () => {
-        await JRCloud.reloadUser();
-        await refreshMe().catch(() => null);
-        renderBanner();
-        if (me?.email_verified && me.missing?.length) openOnboarding();
-      });
-      bar.replaceChildren(el("span", { textContent: `Verify ${me.email} to finish setting up: open the link we emailed you.` }), resend, done);
+      bar.replaceChildren(verifyBox());
       return (bar.hidden = false);
     }
     if (me.missing?.length) {
@@ -423,6 +523,10 @@ const JRAccount = (() => {
         degree_levels: p.degree_levels || [], projects: p.projects || [],
         threshold: Number(threshold.value), drafts_enabled: f.get("drafts_enabled") === "on", notify: f.get("notify") === "on",
       };
+      if (!isVerified() && !(await checkVerification())) {
+        err.textContent = "Verify your email first: open the link we emailed you, then tap \u201cI've verified my email — Check again\u201d.";
+        return;
+      }
       await withBusy(save, "Saving…", async () => {
         try {
           await api("/api/profile", { method: "PUT", body });
@@ -445,6 +549,10 @@ const JRAccount = (() => {
     const pick = el("button", { className: "btn btn-primary", type: "button", textContent: file ? "Replace resume" : "Upload resume (PDF or Word)" });
     pick.addEventListener("click", () => input.click());
     const msg = el("p", { className: "muted", role: "status" });
+    if (!isVerified()) {
+      pick.disabled = true;
+      msg.textContent = "Verify your email to upload a resume.";
+    }
     input.addEventListener("change", async () => {
       const f = input.files[0];
       input.value = "";
@@ -492,13 +600,14 @@ const JRAccount = (() => {
     let draft = { ...profile() };
     const formHolder = el("div");
     const drawForm = (intro) => formHolder.replaceChildren(profileForm(draft, { intro, onSaved: () => closeOverlay(dlg) }));
-    body.replaceChildren(
+    body.replaceChildren(...[
+      isVerified() ? null : verifyBox(),
       el("p", { className: "muted", textContent: "Upload your resume and Job Radar suggests your details. Nothing is used until you confirm it. You can also fill it in by hand." }),
       resumeBlock((s) => {
         draft = mergeSuggested(draft, s);
         drawForm(s.years_source === "dates" ? "Years of experience were estimated from the dates in your resume. Check them." : "Check every field: suggestions can be wrong.");
       }),
-      formHolder);
+      formHolder].filter(Boolean));
     drawForm();
     if (!dlg.open) openOverlay(dlg);
   }
@@ -523,6 +632,7 @@ const JRAccount = (() => {
     const del = el("button", { className: "btn danger", type: "button", textContent: "Delete my account" });
     del.addEventListener("click", deleteAccount);
     body.replaceChildren(
+      el("h4", { textContent: "Email" }), verifyBox(),
       el("h4", { textContent: "Profile" }),
       el("p", { className: "muted", textContent: p.full_name
         ? `${p.full_name} · ${p.current_role || "role not set"} · ${p.years_experience ?? "?"} yrs · showing jobs scoring ${p.threshold ?? 70}+ · ${(p.skills || []).length} skills`
@@ -572,5 +682,5 @@ const JRAccount = (() => {
   }
 
   return { enabled, api, refreshMe, onSignedIn, loadMatches, decorateCard, renderInbox, renderDrafts, renderSettings,
-    openOnboarding, pushKey, savePush, signedOut, profile, handleReturn, get me() { return me; } };
+    openOnboarding, pushKey, savePush, signedOut, profile, handleReturn, checkVerification, get me() { return me; } };
 })();
