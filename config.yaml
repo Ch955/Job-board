@@ -57,30 +57,50 @@ title:
 # Total skill points are capped at `max_points`.
 # ---------------------------------------------------------------------------
 skills:
+  # Weights follow your resume: what you do every day at Capgemini scores
+  # highest, things you've used scores medium, and tools not on your resume
+  # (Snowflake, BigQuery, Airflow...) get a token point.
   max_points: 35
   keywords:
-    - { name: ADF,             weight: 6, patterns: ['azure data factory', '\badf\b'] }
-    - { name: Databricks,      weight: 6, patterns: ['databricks'] }
-    - { name: PySpark,         weight: 6, patterns: ['pyspark'] }
-    - { name: Spark,           weight: 4, patterns: ['\bspark\b', 'spark sql'] }
-    - { name: ADLS Gen2,       weight: 5, patterns: ['\badls\b', 'adls gen ?2', 'azure data lake'] }
-    - { name: Azure,           weight: 5, patterns: ['\bazure\b'] }
-    - { name: Snowflake,       weight: 5, patterns: ['snowflake'] }
-    - { name: BigQuery,        weight: 4, patterns: ['bigquery', 'big query'] }
-    - { name: Azure DevOps,    weight: 3, patterns: ['azure devops', '\bado\b pipelines'] }
-    - { name: Synapse,         weight: 3, patterns: ['synapse'] }
-    - { name: Delta Lake,      weight: 3, patterns: ['delta lake', 'delta tables?', 'lakehouse'] }
-    - { name: SQL,             weight: 3, patterns: ['\bsql\b', 't-sql', 'tsql'] }
-    - { name: Python,          weight: 3, patterns: ['\bpython\b'] }
-    - { name: Airflow,         weight: 2, patterns: ['airflow'] }
-    - { name: dbt,             weight: 2, patterns: ['\bdbt\b'] }
-    - { name: Kafka,           weight: 2, patterns: ['kafka', 'event ?hubs?'] }
-    - { name: ETL/ELT,         weight: 2, patterns: ['\betl\b', '\belt\b'] }
-    - { name: Data Modeling,   weight: 2, patterns: ['data model(l)?ing', 'dimensional model', 'star schema'] }
-    - { name: CI/CD,           weight: 2, patterns: ['ci ?/ ?cd'] }
-    - { name: Unity Catalog,   weight: 2, patterns: ['unity catalog'] }
-    - { name: GCP,             weight: 1, patterns: ['\bgcp\b', 'google cloud'] }
-    - { name: Terraform,       weight: 1, patterns: ['terraform'] }
+    # Core: your daily stack
+    - { name: ADF,              weight: 6, patterns: ['azure data factory', '\badf\b'] }
+    - { name: Databricks,       weight: 6, patterns: ['databricks'] }
+    - { name: PySpark,          weight: 5, patterns: ['pyspark'] }
+    - { name: ADLS Gen2,        weight: 5, patterns: ['\badls\b', 'adls gen ?2', 'azure data lake', 'blob storage'] }
+    - { name: Azure,            weight: 4, patterns: ['\bazure\b'] }
+    - { name: SQL,              weight: 4, patterns: ['\bsql\b', 't-sql', 'tsql', 'sql server', 'azure sql'] }
+    # Strong: named on your resume
+    - { name: SCD,              weight: 3, patterns: ['\bscd\b', 'slowly changing dimension'] }
+    - { name: Incremental Load, weight: 3, patterns: ['incremental (load|data|ingestion|refresh)', 'change data capture', '\bcdc\b', 'delta load', 'watermark'] }
+    - { name: Metadata-driven,  weight: 3, patterns: ['metadata[- ]driven', 'config(uration)?[- ]driven', 'parameteri[sz]ed pipelines?'] }
+    - { name: ETL/ELT,          weight: 3, patterns: ['\betl\b', '\belt\b'] }
+    - { name: Python,           weight: 3, patterns: ['\bpython\b'] }
+    - { name: Spark,            weight: 3, patterns: ['\bspark\b', 'spark sql'] }
+    - { name: Azure DevOps,     weight: 3, patterns: ['azure devops', '\bado\b', 'ci ?/ ?cd'] }
+    - { name: Data Warehousing, weight: 3, patterns: ['data ?warehous', '\bdwh?\b', '\bedw\b'] }
+    - { name: SHIR / Hybrid,    weight: 3, patterns: ['self[- ]hosted integration runtime', '\bshir\b', 'integration runtime', 'on[- ]prem(ise)?s?'] }
+    - { name: Data Modeling,    weight: 2, patterns: ['data model(l)?ing', 'dimensional model', 'star schema', 'dimension tables?'] }
+    - { name: Data Migration,   weight: 2, patterns: ['(data|cloud) migration', 'migrat(e|ing) .{0,30}(azure|cloud)'] }
+    - { name: Power BI,         weight: 2, patterns: ['power ?bi'] }
+    - { name: Azure Security,   weight: 2, patterns: ['key ?vault', 'entra', 'azure (ad|active directory)', '\brbac\b'] }
+    - { name: Data Governance,  weight: 1, patterns: ['data governance', 'unity catalog', 'purview'] }
+    - { name: Git,              weight: 1, patterns: ['\bgit\b', 'github'] }
+    # Azure-adjacent, easy to pick up from your stack
+    - { name: Synapse,          weight: 2, patterns: ['synapse'] }
+    - { name: Delta Lake,       weight: 2, patterns: ['delta lake', 'delta tables?', 'lakehouse'] }
+    - { name: Fabric,           weight: 2, patterns: ['microsoft fabric', '\bfabric\b'] }
+    # Not on your resume: a token point so the match still shows on the card
+    - { name: Snowflake,        weight: 1, patterns: ['snowflake'] }
+    - { name: BigQuery,         weight: 1, patterns: ['bigquery', 'big query'] }
+    - { name: Airflow,          weight: 1, patterns: ['airflow'] }
+    - { name: dbt,              weight: 1, patterns: ['\bdbt\b'] }
+    - { name: Kafka,            weight: 1, patterns: ['kafka', 'event ?hubs?'] }
+  # A job built on another cloud's data stack, never mentioning Azure, is a
+  # weak fit for an Azure profile even if the title matches.
+  stack_mismatch:
+    points: -12
+    patterns: ['aws glue', 'redshift', '\bemr\b', 'kinesis', 'athena', 'dataproc', 'dataflow', 'cloud composer']
+    unless: ['\bazure\b', 'databricks', '\badf\b']
 
 # ---------------------------------------------------------------------------
 # Location: India only. Any Indian city is fine; remote counts only when the
@@ -111,11 +131,16 @@ location:
 
 experience:
   points: 10
-  my_years: 3
-  # Parsed "X+ years" / "X-Y years" from the description. Required minimum years:
-  full_if_min_at_most: 4     # min <= 4 -> full points
-  half_if_min_at_most: 6     # min <= 6 -> half points, above that -> 0
-  unknown_points: 5          # no years mentioned
+  # Your band: jobs asking for anything from 2 to 4 years. Parsed from the
+  # description ("3+ years", "2-5 years", Naukri's "3-6 Yrs"):
+  #   "5+ years", "6-8 years"  -> dropped (asks for more than max_years)
+  #   "0-1 years"              -> dropped (tops out below min_years)
+  #   "1-3", "3-6", "4-7"      -> kept: the range overlaps yours
+  #   no years mentioned       -> kept, with unknown_points
+  min_years: 2
+  max_years: 4
+  drop_outside_range: true
+  unknown_points: 5
 
 recency:                     # days since posted -> points (first match wins)
   - { max_days: 1,  points: 10 }

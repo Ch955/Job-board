@@ -200,16 +200,18 @@ All rules live in `config.yaml`. No code changes are needed to tune them.
 | Part | Max | Rule |
 |---|---|---|
 | Title | 25 | Best matching `title.rules` pattern (e.g. "data engineer" = 25, "ETL" = 18) |
-| Skills | 35 | Sum of matched `skills.keywords` weights (ADF, Databricks, PySpark = 6 each...), capped |
+| Skills | 35 | Sum of matched `skills.keywords` weights, capped. Weighted from your resume: ADF/Databricks 6, PySpark/ADLS 5, Azure/SQL 4, SCD, incremental load, metadata-driven, SHIR, DevOps... 3; Snowflake/BigQuery/Airflow 1 |
 | Location | 20 | Anywhere in India 20, remote open to India 20. Abroad, or remote without India: dropped |
-| Experience | 10 | Required years parsed from the description: ≤4 → 10, ≤6 → 5, more → 0, not stated → 5 |
+| Experience | 10 | Your band is **2–4 years**. A job fits if its range overlaps it ("1-3", "3-6", "4+" are kept; "5+", "6-8", "0-1" are dropped). Fits → 10, not stated → 5 |
 | Recency | 10 | ≤1 day 10, ≤3 days 8, ≤7 days 6, ≤14 days 3, ≤30 days 1 |
-| Penalty | | Staff/Principal −15, Lead/Architect −8 |
+| Penalty | | Staff/Principal −15, Lead/Architect −8, AWS/GCP-only stack with no Azure mention −12 |
 
 Before scoring, a job must pass the **title gate**: its title has to match a `title.rules` pattern and
 none of `title.exclude` (intern, manager, director, sales, data scientist/analyst...).
 
-After scoring, a job is dropped if it is older than 30 days, scores below 40, or isn't in India.
+After scoring, a job is dropped if it is older than 30 days, scores below 40, isn't in India, or asks for
+experience outside 2–4 years. When a posting mentions several numbers, the largest requirement counts
+("5+ years overall, 2+ with Databricks" means 5).
 **India only:** a job is kept only if its location names an Indian city or state, or "India". A remote
 job is kept only if it says India (e.g. "Remote - India"). "Remote (Worldwide)", "Remote - EMEA",
 a bare "Remote", and every city abroad are dropped. Jobs already in `jobs.json` are re-checked

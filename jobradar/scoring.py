@@ -36,6 +36,10 @@ class Scorer:
         self.skills = [
             (k["name"], int(k["weight"]), [_rx(p) for p in k["patterns"]]) for k in s["keywords"]
         ]
+        mm = s.get("stack_mismatch") or {}
+        self.mismatch_points = int(mm.get("points", 0))
+        self.mismatch = [_rx(p) for p in mm.get("patterns", [])]
+        self.mismatch_unless = [_rx(p) for p in mm.get("unless", [])]
 
         loc = config["location"]
         self.loc_cfg = loc
@@ -67,6 +71,12 @@ class Scorer:
                 total += weight
         return min(total, self.skill_max), matched
 
+    def stack_penalty(self, text: str) -> int:
+        """Negative points when the job is on another cloud's stack with no Azure in sight."""
+        if self.mismatch and _any(self.mismatch, text) and not _any(self.mismatch_unless, text):
+            return self.mismatch_points
+        return 0
+
     def location_points(self, job: Job) -> tuple[int, str, bool]:
         """Return (points, label, eligible). Only India, or remote open to India, is eligible."""
         loc = job.location
@@ -85,27 +95,52 @@ class Scorer:
         return 0, "Abroad" if not remote else "Remote (not India)", False
 
     @staticmethod
-    def required_years(text: str) -> int | None:
-        """Smallest 'N years' requirement mentioned near the word experience."""
-        found = []
-        for rx in (_YEARS_RANGE, _YEARS_MIN):
-            for m in rx.finditer(text):
-                window = text[max(0, m.start() - 60) : m.end() + 60]
-                n = int(m.group(1))
-                if n <= 20 and _EXPERIENCE_NEAR.search(window):
-                    found.append(n)
-        return min(found) if found else None
+    def required_range(text: str) -> tuple[int | None, int | None]:
+        """The experience a job asks for, as (min, max-or-None).
 
-    def experience_points(self, text: str) -> tuple[int, int | None]:
-        years = self.required_years(text)
+        "2-5 years" -> (2, 5), "5+ years" -> (5, None). With several mentions the
+        largest minimum wins, so "5+ years overall, 2+ with Databricks" -> 5.
+        Numbers above 15 are ignored: they're almost always company boilerplate
+        ("20 years of experience serving clients"), not a requirement.
+        """
+        best: tuple[int, int | None] | None = None
+        spans = []
+        for m in _YEARS_RANGE.finditer(text):
+            window = text[max(0, m.start() - 60) : m.end() + 60]
+            lo, hi = sorted((int(m.group(1)), int(m.group(2))))
+            spans.append(m.span())
+            if lo <= 15 and _EXPERIENCE_NEAR.search(window) and (best is None or lo > best[0]):
+                best = (lo, hi)
+        for m in _YEARS_MIN.finditer(text):
+            if any(a <= m.start(1) < b for a, b in spans):
+                continue  # the "5 years" inside "2-5 years"
+            window = text[max(0, m.start() - 60) : m.end() + 60]
+            n = int(m.group(1))
+            if n <= 15 and _EXPERIENCE_NEAR.search(window) and (best is None or n > best[0]):
+                best = (n, None)
+        return best if best else (None, None)
+
+    @classmethod
+    def required_years(cls, text: str) -> int | None:
+        return cls.required_range(text)[0]
+
+    def experience_points(self, text: str) -> tuple[int, int | None, int | None, bool]:
+        """Return (points, min_years, max_years, eligible) against your min_years..max_years band."""
+        lo, hi = self.required_range(text)
         full = int(self.exp["points"])
-        if years is None:
-            return int(self.exp.get("unknown_points", full // 2)), None
-        if years <= int(self.exp["full_if_min_at_most"]):
-            return full, years
-        if years <= int(self.exp["half_if_min_at_most"]):
-            return full // 2, years
-        return 0, years
+        if lo is None:
+            return int(self.exp.get("unknown_points", full // 2)), None, None, True
+        eligible = self.experience_eligible(lo, hi)
+        return (full if eligible else 0), lo, hi, eligible
+
+    def experience_eligible(self, lo: int | None, hi: int | None) -> bool:
+        """A job fits if its range overlaps yours: it asks for at most max_years,
+        and doesn't top out below min_years (e.g. "0-1 years")."""
+        if lo is None:
+            return True
+        if lo > int(self.exp["max_years"]):
+            return False
+        return hi is None or hi >= int(self.exp["min_years"])
 
     def recency_points(self, job: Job, now: datetime | None = None) -> tuple[int, int | None]:
         days = age_days(job, now)
@@ -120,10 +155,10 @@ class Scorer:
     def score(self, job: Job, now: datetime | None = None) -> Job:
         text = f"{job.title} {job.description}"
         title = self.title_points(job.title)
-        penalty = self.title_penalty(job.title)
+        penalty = self.title_penalty(job.title) + self.stack_penalty(text)
         skills, matched = self.skill_points(text)
         loc, loc_label, eligible = self.location_points(job)
-        exp, years = self.experience_points(job.description)
+        exp, years, years_max, exp_ok = self.experience_points(job.description)
         rec, days = self.recency_points(job, now)
 
         job.score = max(0, min(100, title + skills + loc + exp + rec + penalty))
@@ -138,6 +173,8 @@ class Scorer:
             "location_label": loc_label,
             "location_eligible": eligible,
             "years_required": years,
+            "years_max": years_max,
+            "experience_eligible": exp_ok,
             "age_days": days,
         }
         return job

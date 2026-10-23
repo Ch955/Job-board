@@ -115,7 +115,8 @@ def process(
     snippet_chars = int(p.get("snippet_chars", 300))
     drop_ineligible = config.get("location", {}).get("drop_ineligible", True)
     scorer = Scorer(config)
-    dropped = {"irrelevant_title": 0, "location": 0, "too_old": 0, "low_score": 0, "duplicates": 0}
+    drop_experience = config.get("experience", {}).get("drop_outside_range", True)
+    dropped = {"irrelevant_title": 0, "location": 0, "experience": 0, "too_old": 0, "low_score": 0, "duplicates": 0}
 
     relevant = []
     for job in fetched:
@@ -140,6 +141,9 @@ def process(
             if drop_ineligible and not job.score_breakdown["location_eligible"]:
                 dropped["location"] += 1
                 continue
+            if drop_experience and not job.score_breakdown["experience_eligible"]:
+                dropped["experience"] += 1
+                continue
             if (age_days(job, now) or 0) > max_age:
                 dropped["too_old"] += 1
                 continue
@@ -160,6 +164,10 @@ def process(
             continue
         # Re-check location so a rule change (e.g. India-only) cleans up old entries too
         if not keep and drop_ineligible and not scorer.location_points(old)[2]:
+            continue
+        bd_old = old.score_breakdown or {}
+        if not keep and drop_experience and not scorer.experience_eligible(
+                bd_old.get("years_required"), bd_old.get("years_max")):
             continue
         bd = old.score_breakdown or {}
         old.score = max(0, min(100, old.score - int(bd.get("recency", 0)) + new_rec))

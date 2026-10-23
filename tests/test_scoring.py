@@ -60,23 +60,36 @@ def test_location(scorer, location, remote, label, eligible):
     assert (got_label, got_eligible) == (label, eligible)
 
 
-@pytest.mark.parametrize("text,years", [
-    ("3+ years of experience in Spark", 3),
-    ("Experience: 2-5 years", 2),
-    ("5 to 8 yrs experience", 5),
-    ("minimum of 7 years of relevant experience", 7),
-    ("We were founded 12 years ago", None),
-    ("No numbers here", None),
+@pytest.mark.parametrize("text,expected", [
+    ("3+ years of experience in Spark", (3, None)),
+    ("Experience: 2-5 years", (2, 5)),
+    ("5 to 8 yrs experience", (5, 8)),
+    ("Experience: 3-6 Yrs", (3, 6)),          # Naukri's format via JobSpy
+    ("minimum of 7 years of relevant experience", (7, None)),
+    ("5+ years of experience overall, 2+ years of experience with Databricks", (5, None)),  # largest wins
+    ("We have 20 years of experience serving clients. 3+ years experience required.", (3, None)),
+    ("We were founded 12 years ago", (None, None)),   # no 'experience' nearby
+    ("No numbers here", (None, None)),
 ])
-def test_required_years(text, years):
-    assert Scorer.required_years(text) == years
+def test_required_range(text, expected):
+    assert Scorer.required_range(text) == expected
 
 
-def test_experience_points(scorer):
-    assert scorer.experience_points("3+ years experience")[0] == 10
-    assert scorer.experience_points("6+ years experience")[0] == 5
-    assert scorer.experience_points("10+ years experience")[0] == 0
-    assert scorer.experience_points("")[0] == 5
+@pytest.mark.parametrize("text,eligible", [
+    ("2+ years of experience", True),
+    ("3-5 years of experience", True),
+    ("4+ years experience", True),
+    ("Experience: 1-3 years", True),     # overlaps 2-4
+    ("4-7 years of experience", True),   # you meet the minimum
+    ("5+ years of experience", False),
+    ("6-8 years experience", False),
+    ("Experience: 0-1 years", False),    # fresher role
+    ("no experience stated", True),
+])
+def test_experience_band_2_to_4(scorer, text, eligible):
+    points, _, _, ok = scorer.experience_points(text)
+    assert ok is eligible
+    assert points == (10 if eligible and "years" in text else 5 if eligible else 0)
 
 
 def test_recency(scorer):
@@ -115,3 +128,24 @@ def test_senior_titles_penalized(scorer):
 def test_score_is_clamped(scorer):
     j = scorer.score(job("Principal Data Engineer", "Toronto", "", days_ago=60), NOW)
     assert 0 <= j.score <= 100
+
+
+def test_resume_skills_score_high(scorer):
+    """Text lifted from a typical Azure DE posting that matches the resume."""
+    pts, matched = scorer.skill_points(
+        "Build metadata-driven ADF pipelines into ADLS Gen2, SCD Type 2 in Databricks, incremental loads, "
+        "Self-Hosted Integration Runtime for on-prem sources, Azure SQL, Key Vault, Azure DevOps CI/CD.")
+    assert pts == scorer.skill_max
+    assert {"ADF", "SCD", "Incremental Load", "Metadata-driven", "SHIR / Hybrid", "Azure Security"} <= set(matched)
+
+
+def test_non_resume_tools_only_get_token_points(scorer):
+    pts, matched = scorer.skill_points("Snowflake, BigQuery, Airflow, dbt and Kafka")
+    assert pts == 5 and len(matched) == 5
+
+
+def test_aws_only_stack_is_penalised(scorer):
+    aws = scorer.score(job("Data Engineer", description="AWS Glue, Redshift, EMR, PySpark, SQL"), NOW)
+    azure = scorer.score(job("Data Engineer", description="Azure Databricks, Redshift migration, PySpark, SQL"), NOW)
+    assert aws.score_breakdown["penalty"] == -12
+    assert azure.score_breakdown["penalty"] == 0

@@ -117,3 +117,28 @@ def test_carry_over_drops_jobs_abroad_after_rule_change(config):
     previous = {j.id: j for j in (old("Remote (Worldwide)"), old("Berlin"), old("Pune"), old("London", "applied"))}
     jobs, _, _ = pipeline.process([], previous, config, now)
     assert {j.location for j in jobs} == {"Pune", "London"}  # applied jobs are never removed
+
+
+def test_jobs_asking_5_plus_years_are_dropped(config):
+    now = datetime(2026, 10, 23, tzinfo=timezone.utc)
+    def job(title, desc):
+        return Job(title=title, company="Acme", location="Pune", url="u", source="naukri",
+                   description=f"Azure Data Factory, Databricks, PySpark, SQL. {desc}", posted_date=now.isoformat())
+    fetched = [job("Data Engineer", "Experience: 3-6 Yrs"), job("Azure Data Engineer", "5+ years of experience"),
+               job("Big Data Engineer", "Experience: 0-1 years")]
+    jobs, _, dropped = pipeline.process(fetched, {}, config, now)
+    assert [j.title for j in jobs] == ["Data Engineer"]
+    assert dropped["experience"] == 2
+
+
+def test_carry_over_drops_old_5_plus_year_jobs(config):
+    now = datetime(2026, 10, 23, tzinfo=timezone.utc)
+    def old(title, years, status="new"):
+        j = Job(title=title, company="C", location="Pune", url="u", source="naukri",
+                posted_date=(now - timedelta(days=1)).isoformat(), status=status)
+        j.score, j.score_breakdown = 80, {"recency": 10, "years_required": years}
+        return j
+    previous = {j.id: j for j in (old("Data Engineer", 3), old("ETL Developer", 6),
+                                   old("Big Data Engineer", 8, "applied"))}
+    jobs, _, _ = pipeline.process([], previous, config, now)
+    assert {j.title for j in jobs} == {"Data Engineer", "Big Data Engineer"}
