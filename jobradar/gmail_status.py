@@ -93,8 +93,11 @@ def classify_ex(subject: str, snippet: str, sender: str, body: str = "") -> tupl
 
 
 # --------------------------------------------------------------------- match
+TITLE_STOP = {"the", "and", "for", "with", "role", "job", "position", "opening", "senior", "junior", "india"}
+
+
 def _words(s: str) -> set[str]:
-    return {w for w in re.findall(r"[a-z0-9]+", s.lower()) if len(w) > 2 and w not in STOP}
+    return {w for w in re.findall(r"[a-z0-9]+", s.lower()) if len(w) > 2 and w not in TITLE_STOP}
 
 
 def company_key(company: str) -> str:

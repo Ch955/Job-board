@@ -1,14 +1,16 @@
 """Document storage used by the backend: Firestore in production, memory in tests.
 
 Collections (see firestore.rules for who may read what):
-  users/{uid}        the app's synced state (client read/write own)          [existing]
-  profiles/{uid}     profile, preferences, resume facts, push subscriptions  (client read own)
-  matches/{uid}      the user's scored jobs + explanations                    (client read own)
-  gmail/{uid}        Gmail status, events, review queue, draft ledger         (client read own)
-  secrets/{uid}      encrypted Gmail refresh token                            (server only)
-  resumes/{uid}      encrypted resume file, in chunks                         (server only)
-  oauth_states/{id}  pending Gmail connections (state + PKCE verifier)        (server only)
-  pool/{id}          the shared job pool                                      (signed-in read)
+  users/{uid}            the app's synced state: statuses, Gmail events + review
+                         list, review answers, draft records    (client read/write own)
+  profiles/{uid}         confirmed profile + preferences (threshold...)   (client read own)
+  matches/{uid}          the user's scored jobs + explanations            (client read own)
+  gmail/{uid}            Gmail connection + last sync status, no secrets  (client read own)
+  secrets/{uid}          encrypted Gmail refresh token                    (server only)
+  resumes/{uid}          resume file info; resume_chunks/{uid}_{n} the encrypted file (server only)
+  push/{uid}             web push subscriptions                           (server only)
+  oauth_states/{id}      pending Gmail connections (state + PKCE verifier) (server only)
+  pool/{n}               the shared job pool, in chunks                   (server only)
 """
 
 from __future__ import annotations

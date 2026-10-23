@@ -1,6 +1,5 @@
 """GitHub Actions -> Firebase: service-account auth, user lookup, conditional writes, gmail-sync."""
 
-import base64
 import json
 
 import pytest
