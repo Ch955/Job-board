@@ -935,9 +935,12 @@ function authMessage(e) {
     "auth/network-request-failed": "No internet connection.",
     "auth/popup-closed-by-user": "",
     "auth/cancelled-popup-request": "",
+    "auth/popup-blocked": "Your browser blocked the Google window. Allow pop-ups for this site (icon at the right of the address bar), then try again.",
+    "auth/web-storage-unsupported": "This browser is blocking the storage Google sign-in needs (often in private/incognito windows). Use a normal window, or sign in with email and password.",
+    "auth/internal-error": "Google sign-in failed inside Firebase. Try again; if it repeats, use email and password and tell the app owner.",
     "auth/unauthorized-domain": "This site isn't allowed in Firebase yet: Authentication → Settings → Authorized domains → add it.",
     "auth/operation-not-allowed": "Turn this sign-in method on in Firebase → Authentication → Sign-in method.",
-  })[code] ?? (e?.message || "Sign-in failed.");
+  })[code] ?? `${e?.message || "Sign-in failed."}${code ? ` (${code})` : ""}`;
 }
 
 function setLoginMode(mode) {
@@ -1013,13 +1016,19 @@ async function onLogin(e) {
 
 async function onGoogle() {
   $("#lg-error").textContent = "";
+  const started = Date.now();
   try {
     await JRCloud.remember($("#lg-remember").checked);
     freshSignIn = true;
     await JRCloud.google();
   } catch (ex) {
     freshSignIn = false;
-    $("#lg-error").textContent = authMessage(ex);
+    // A window that closes by itself within seconds is Firebase refusing, not you cancelling
+    const selfClosed = ex?.code === "auth/popup-closed-by-user" && Date.now() - started < 4000;
+    $("#lg-error").textContent = selfClosed
+      ? "The Google window closed before you could pick an account. Pop-ups or cookies for this site may be blocked (common in incognito). Try a normal window, or sign in with email and password. (auth/popup-closed-by-user)"
+      : authMessage(ex);
+    console.warn("Google sign-in:", ex?.code, ex?.message);
   }
 }
 
