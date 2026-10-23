@@ -69,14 +69,26 @@ run log says so.
 
 ## The app
 
-- Job cards sorted by score, with the matched skills and a tap-the-score breakdown.
-- Filters: minimum score, status, location, source, remote / on-site, plus a search box.
-- **Apply** opens the original posting and then asks if you applied. **Applied**, **Interview** and **Skip** mark a card (tap again to undo).
-- Counters: applied today / this week, new in the last 24 hours.
+- **Sections:** tap **›** (top left) or the section title to open the drawer. Each job is in exactly one section:
+
+  | Section | Buttons on each card |
+  |---|---|
+  | 🎯 To apply | Apply · **Applied** · Later · Skip |
+  | ⏳ Apply later | Apply · Applied · Skip · ↩ To apply |
+  | ✅ Applied (newest first, shows "Applied 2d ago") | Interview · Rejected · ↩ Undo |
+  | 🗓️ Interview | Offer · Rejected · ↩ Applied |
+  | 🎉 Offers / ✖️ Rejected / 🙈 Skipped | move back if you tapped by mistake |
+  | ✉️ Recruiter emails / 💬 Needs your reply | filled by the Gmail step (phase 5); links to Gmail for now |
+
+  Tapping **Applied** moves the job out of *To apply* and into *Applied* straight away, with an **Undo** toast.
+- Job cards are sorted by score, with the matched skills and a tap-the-score breakdown.
+- Filters: minimum score, location, source, remote / on-site, plus a search box.
+- **Apply** opens the original posting and then asks "Did you apply?".
+- Counters: applied today / this week, jobs to apply, interviews.
 - Your statuses are saved on the phone (localStorage). ☰ → **Export JSON** makes a backup file; **Import JSON**
-  restores it or moves it to another device. Jobs you applied to stay in the app even after they age out of `jobs.json`.
+  restores it or moves it to another device. Jobs you've acted on stay in the app even after they age out of `jobs.json`.
 - Dark / light mode follows your phone. The moon button cycles auto → light → dark.
-- Works offline with the last jobs it loaded, and refreshes when you reopen it.
+- Works offline with the last jobs it loaded, refreshes when you reopen it, and updates itself when a new version is deployed.
 
 Preview it on your laptop with your local data:
 ```bash

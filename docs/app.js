@@ -5,13 +5,43 @@
 const STORE_KEY = "jobradar.v1";
 const FILTER_KEY = "jobradar.filters";
 const THEME_KEY = "jobradar.theme";
-const KEEP_STATUSES = ["applied", "interview", "offer"];
-const DEFAULT_FILTERS = { q: "", minScore: 40, status: "active", location: "", source: "", remote: "" };
+const SECTION_KEY = "jobradar.section";
+// Statuses whose jobs are snapshotted on the device so they survive aging out of jobs.json
+const KEEP_STATUSES = ["later", "applied", "interview", "offer", "rejected"];
+const DEFAULT_FILTERS = { q: "", minScore: 40, location: "", source: "", remote: "" };
+
+// Each job lives in exactly one section, decided by its status
+const SECTIONS = [
+  { id: "new", label: "To apply", icon: "🎯", hint: "New matches. Tap Applied once you've submitted and it moves to Applied." },
+  { id: "later", label: "Apply later", icon: "⏳", hint: "Parked: company sites, account issues, or apply from the laptop." },
+  { id: "applied", label: "Applied", icon: "✅", hint: "Newest first. Move a job on when you hear back." },
+  { id: "interview", label: "Interview", icon: "🗓️", hint: "In process: tests and interview rounds." },
+  { id: "offer", label: "Offers", icon: "🎉", hint: "" },
+  { id: "rejected", label: "Rejected", icon: "✖️", hint: "Kept for your records." },
+  { id: "skipped", label: "Skipped", icon: "🙈", hint: "Not for you. Restore one with ↩ To apply." },
+];
+const GMAIL_SECTIONS = [
+  { id: "mail", label: "Recruiter emails", icon: "✉️" },
+  { id: "reply", label: "Needs your reply", icon: "💬" },
+];
+// The buttons a card shows in each section: [target status, label]
+const ACTIONS = {
+  new: [["applied", "Applied"], ["later", "Later"], ["skipped", "Skip"]],
+  later: [["applied", "Applied"], ["skipped", "Skip"], ["new", "↩ To apply"]],
+  applied: [["interview", "Interview"], ["rejected", "Rejected"], ["new", "↩ Undo"]],
+  interview: [["offer", "Offer"], ["rejected", "Rejected"], ["applied", "↩ Applied"]],
+  offer: [["interview", "↩ Interview"]],
+  rejected: [["applied", "↩ Applied"]],
+  skipped: [["new", "↩ To apply"]],
+};
+const sectionLabel = (id) => [...SECTIONS, ...GMAIL_SECTIONS].find((x) => x.id === id)?.label || id;
 
 const $ = (sel, root = document) => root.querySelector(sel);
 
 let data = { jobs: [] };
 let filters = { ...DEFAULT_FILTERS };
+let section = "new";
+let reloading = false;
 let lastFetch = 0;
 
 // ------------------------------------------------------------------ storage
@@ -173,21 +203,19 @@ function applyFiltersToInputs() {
   $("#f-search").value = filters.q;
   $("#f-score").value = filters.minScore;
   $("#f-score-val").textContent = filters.minScore;
-  $("#f-status").value = filters.status;
   $("#f-location").value = filters.location;
   $("#f-source").value = filters.source;
   $("#f-remote").value = filters.remote;
 }
 
 function activeFilterCount() {
-  return ["minScore", "status", "location", "source", "remote"].filter((k) => filters[k] !== DEFAULT_FILTERS[k]).length;
+  return ["minScore", "location", "source", "remote"].filter((k) => filters[k] !== DEFAULT_FILTERS[k]).length;
 }
 
-function matches(job) {
+function matchesFilters(job) {
   const status = statusOf(job);
-  if ((job.score || 0) < filters.minScore && !KEEP_STATUSES.includes(status)) return false;
-  if (filters.status === "active" && (status === "skipped" || status === "rejected")) return false;
-  if (!["active", "all"].includes(filters.status) && status !== filters.status) return false;
+  // The score floor only hides jobs you haven't acted on
+  if ((job.score || 0) < filters.minScore && (status === "new" || status === "skipped")) return false;
   if (filters.location && locationLabel(job) !== filters.location) return false;
   if (filters.source && job.source !== filters.source) return false;
   if (filters.remote === "remote" && !job.remote) return false;
@@ -200,21 +228,42 @@ function matches(job) {
 }
 
 // ------------------------------------------------------------------- render
+function sectionJobs(id, jobs = allJobs()) {
+  return jobs.filter((j) => statusOf(j) === id && matchesFilters(j));
+}
+
+function sortFor(id) {
+  const at = (j) => store.statuses[j.id]?.at || "";
+  if (id === "applied") return (a, b) => (store.statuses[b.id]?.appliedAt || "").localeCompare(store.statuses[a.id]?.appliedAt || "");
+  if (["interview", "offer", "rejected", "later"].includes(id)) return (a, b) => at(b).localeCompare(at(a));
+  return (a, b) => (b.score || 0) - (a.score || 0) ||
+    String(b.posted_date || b.first_seen || "").localeCompare(String(a.posted_date || a.first_seen || ""));
+}
+
 function render() {
   const jobs = allJobs();
-  const shown = jobs.filter(matches).sort((a, b) =>
-    (b.score || 0) - (a.score || 0) ||
-    String(b.posted_date || b.first_seen || "").localeCompare(String(a.posted_date || a.first_seen || "")));
-
   const list = $("#list");
-  if (!shown.length) {
+  const isGmail = GMAIL_SECTIONS.some((g) => g.id === section);
+  const shown = isGmail ? [] : sectionJobs(section, jobs).sort(sortFor(section));
+
+  $("#section-name").textContent = sectionLabel(section);
+  $("#section-count").textContent = isGmail ? "–" : shown.length;
+  $("#section-hint").textContent = isGmail ? "" : SECTIONS.find((x) => x.id === section)?.hint || "";
+  document.querySelector(".filters").hidden = isGmail;
+
+  if (isGmail) {
+    list.replaceChildren(renderGmailPanel(section));
+  } else if (!shown.length) {
     const empty = document.createElement("div");
     empty.className = "empty";
     const b = document.createElement("b");
-    b.textContent = data.jobs.length ? "No jobs match these filters" : "No jobs yet";
+    const anyInSection = jobs.some((j) => statusOf(j) === section);
+    b.textContent = anyInSection ? "No jobs match these filters" : section === "new" && !data.jobs.length ? "No jobs yet" : `Nothing in ${sectionLabel(section)} yet`;
     empty.append(b, document.createTextNode(
-      data.jobs.length ? "Try lowering the minimum score or resetting filters."
-                       : "The next run (every 3 hours) will fill this in."));
+      anyInSection ? "Try lowering the minimum score or resetting filters."
+        : section === "new" ? "The next run (every 3 hours) will fill this in."
+        : section === "applied" ? "Tap Applied on a job in To apply and it moves here."
+        : ""));
     list.replaceChildren(empty);
   } else {
     list.replaceChildren(...shown.map(renderCard));
@@ -225,9 +274,8 @@ function render() {
   const appliedTimes = Object.values(store.statuses).map((s) => s.appliedAt && new Date(s.appliedAt)).filter(Boolean);
   $("#stat-today").textContent = appliedTimes.filter((d) => d >= today).length;
   $("#stat-week").textContent = appliedTimes.filter((d) => d >= week).length;
-  const dayAgo = Date.now() - 86400e3;
-  $("#stat-new").textContent = data.jobs.filter((j) => new Date(j.first_seen).getTime() >= dayAgo).length;
-  $("#stat-shown").textContent = shown.length;
+  $("#stat-toapply").textContent = sectionJobs("new", jobs).length;
+  $("#stat-interview").textContent = jobs.filter((j) => statusOf(j) === "interview").length;
 
   $("#updated").textContent = data.generated_at
     ? `Updated ${ago(data.generated_at)} · ${data.jobs.length} jobs`
@@ -237,6 +285,61 @@ function render() {
   const tf = $("#toggle-filters");
   tf.textContent = n ? `Filters (${n})` : "Filters";
   tf.classList.toggle("has-filters", n > 0);
+  renderNav(jobs);
+}
+
+function renderNav(jobs = allJobs()) {
+  const item = (sec, count) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "nav-item";
+    b.setAttribute("aria-current", String(sec.id === section));
+    const icon = el("span", { className: "nav-icon", textContent: sec.icon });
+    const label = el("span", { className: "nav-label", textContent: sec.label });
+    b.append(icon, label);
+    if (count !== null) b.append(el("span", { className: "count-pill", textContent: count }));
+    b.addEventListener("click", () => {
+      setSection(sec.id);
+      $("#nav").close();
+    });
+    return b;
+  };
+  const counts = {};
+  for (const j of jobs) {
+    const st = statusOf(j);
+    if (st === "new" && !matchesFilters(j)) continue;
+    counts[st] = (counts[st] || 0) + 1;
+  }
+  $("#nav-list").replaceChildren(
+    el("p", { className: "nav-group", textContent: "Jobs" }),
+    ...SECTIONS.map((sec) => item(sec, counts[sec.id] || 0)),
+    el("p", { className: "nav-group", textContent: "Gmail" }),
+    ...GMAIL_SECTIONS.map((sec) => item(sec, null)),
+  );
+}
+
+function setSection(id) {
+  section = id;
+  writeJSON(SECTION_KEY, id);
+  render();
+  window.scrollTo({ top: 0 });
+}
+
+function renderGmailPanel(id) {
+  const panel = el("div", { className: "gmail-panel" });
+  const title = id === "mail" ? "Recruiter emails" : "Needs your reply";
+  const what = id === "mail"
+    ? "Drafted emails to recruiters, with your resume attached, will be listed here."
+    : "Interview invites, assessments, recruiter replies and rejections from your Gmail will be listed here, and the matching job moves to Interview or Rejected by itself.";
+  panel.append(
+    el("h3", { textContent: title }),
+    el("p", { textContent: what }),
+    el("p", { className: "note", textContent: "Coming with the Gmail step (phase 5). Until then, use Gmail directly:" }),
+    el("div", { className: "row" },
+      el("a", { className: "btn btn-primary", href: "https://mail.google.com/mail/u/0/#drafts", target: "_blank", rel: "noopener", textContent: "Open Gmail drafts ↗" }),
+      el("a", { className: "btn", href: "https://mail.google.com/mail/u/0/#inbox", target: "_blank", rel: "noopener", textContent: "Open inbox ↗" })),
+  );
+  return panel;
 }
 
 function renderCard(job) {
@@ -256,7 +359,6 @@ function renderCard(job) {
   const isNew = status === "new" && new Date(job.first_seen).getTime() >= Date.now() - 86400e3;
   const parts = [job.location, job.remote ? "Remote" : null, job.source, ago(job.posted_date || job.first_seen)];
   if (isNew) meta.append(badge("new", "new"));
-  if (status !== "new") meta.append(badge(status, status));
   for (const p of parts.filter(Boolean)) {
     const s = document.createElement("span");
     s.textContent = p;
@@ -300,7 +402,7 @@ function renderCard(job) {
     apply.href = url;
     apply.addEventListener("click", () => {
       if (statusOf(job) === "new") {
-        setTimeout(() => toast("Did you apply?", { label: "Mark applied", run: () => { setStatus(job, "applied"); render(); } }), 600);
+        setTimeout(() => toast("Did you apply?", { label: "Mark applied", run: () => moveJob(job, "applied") }), 600);
       }
     });
   } else {
@@ -308,20 +410,40 @@ function renderCard(job) {
     apply.setAttribute("aria-disabled", "true");
   }
 
-  for (const btn of card.querySelectorAll(".status-btn")) {
-    const s = btn.dataset.status;
-    btn.setAttribute("aria-pressed", String(status === s));
-    btn.addEventListener("click", () => {
-      const before = statusOf(job);
-      const next = before === s ? "new" : s;
-      setStatus(job, next);
-      render();
-      if (next === "skipped") {
-        toast("Skipped", { label: "Undo", run: () => { setStatus(job, before); render(); } });
-      }
-    });
+  const rec = store.statuses[job.id];
+  const line = $(".status-line", card);
+  if (rec?.appliedAt && status !== "new") line.textContent = `Applied ${ago(rec.appliedAt)}` +
+    (status !== "applied" && status !== "later" ? ` · ${sectionLabel(status)} ${ago(rec.at)}` : "");
+  else if (status === "later" && rec) line.textContent = `Parked ${ago(rec.at)}`;
+  else line.remove();
+
+  const actions = $(".card-actions", card);
+  for (const [to, label] of ACTIONS[status] || ACTIONS.new) {
+    const btn = el("button", { className: "btn", type: "button", textContent: label });
+    btn.dataset.to = to;
+    btn.addEventListener("click", () => moveJob(job, to));
+    actions.append(btn);
   }
   return card;
+}
+
+function moveJob(job, to) {
+  const before = statusOf(job);
+  const beforeRec = store.statuses[job.id] ? { ...store.statuses[job.id] } : null;
+  const beforeSaved = store.saved[job.id];
+  setStatus(job, to);
+  render();
+  const msg = to === "new" ? `Back in To apply` : `Moved to ${sectionLabel(to)}`;
+  toast(msg, {
+    label: "Undo",
+    run: () => {
+      // Restore exactly, including the original applied time
+      if (beforeRec) store.statuses[job.id] = beforeRec; else delete store.statuses[job.id];
+      if (beforeSaved) store.saved[job.id] = beforeSaved; else if (!KEEP_STATUSES.includes(before)) delete store.saved[job.id];
+      saveStore();
+      render();
+    },
+  });
 }
 
 function badge(text, cls) {
@@ -334,17 +456,18 @@ function badge(text, cls) {
 function focusJobFromHash() {
   const m = location.hash.match(/^#job=([\w-]+)/);
   if (!m) return;
-  let el = document.getElementById(`job-${m[1]}`);
-  if (!el && allJobs().some((j) => j.id === m[1])) {
-    filters = { ...DEFAULT_FILTERS, status: "all" };
+  let card = document.getElementById(`job-${m[1]}`);
+  const job = allJobs().find((j) => j.id === m[1]);
+  if (!card && job) {
+    filters = { ...DEFAULT_FILTERS };
     applyFiltersToInputs();
-    render();
-    el = document.getElementById(`job-${m[1]}`);
+    setSection(statusOf(job));
+    card = document.getElementById(`job-${m[1]}`);
   }
-  if (el) {
-    el.scrollIntoView({ behavior: "smooth", block: "start" });
-    el.classList.add("highlight");
-    setTimeout(() => el.classList.remove("highlight"), 4000);
+  if (card) {
+    card.scrollIntoView({ behavior: "smooth", block: "start" });
+    card.classList.add("highlight");
+    setTimeout(() => card.classList.remove("highlight"), 4000);
   }
   history.replaceState(null, "", location.pathname + location.search);
 }
@@ -510,7 +633,16 @@ function bind() {
     $("#f-score-val").textContent = e.target.value;
     update({ minScore: Number(e.target.value) });
   });
-  $("#f-status").addEventListener("change", (e) => update({ status: e.target.value }));
+  const openNav = () => {
+    renderNav();
+    $("#nav").showModal();
+  };
+  $("#open-nav").addEventListener("click", openNav);
+  $("#section-title").addEventListener("click", openNav);
+  // Tap outside the drawer to close it
+  $("#nav").addEventListener("click", (e) => {
+    if (e.target === $("#nav")) $("#nav").close();
+  });
   $("#f-location").addEventListener("change", (e) => update({ location: e.target.value }));
   $("#f-source").addEventListener("change", (e) => update({ source: e.target.value }));
   $("#f-remote").addEventListener("change", (e) => update({ remote: e.target.value }));
@@ -560,11 +692,23 @@ function bind() {
 
 async function init() {
   applyTheme(readJSON(THEME_KEY, "auto"));
-  filters = { ...DEFAULT_FILTERS, ...readJSON(FILTER_KEY, {}) };
+  const savedFilters = readJSON(FILTER_KEY, {});
+  delete savedFilters.status; // replaced by sections
+  filters = { ...DEFAULT_FILTERS, ...savedFilters };
+  const savedSection = readJSON(SECTION_KEY, "new");
+  section = [...SECTIONS, ...GMAIL_SECTIONS].some((x) => x.id === savedSection) ? savedSection : "new";
   bind();
   applyFiltersToInputs();
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("sw.js").catch(() => {});
+    // A new version of the app was installed: reload once to use it
+    const hadController = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (hadController && !reloading) {
+        reloading = true;
+        location.reload();
+      }
+    });
   }
   await load({ quiet: true });
   focusJobFromHash();

@@ -18,8 +18,11 @@
 </head>
 <body>
   <header class="topbar">
+    <button id="open-nav" class="icon-btn nav-btn" aria-label="Open sections" aria-haspopup="dialog" title="Sections">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+    </button>
     <div class="brand">
-      <img src="icons/icon.svg" alt="" width="32" height="32">
+      <img src="icons/icon.svg" alt="" width="28" height="28">
       <div>
         <h1>Job Radar</h1>
         <p id="updated" class="muted">Loading…</p>
@@ -41,8 +44,8 @@
   <section class="stats" aria-label="Your activity">
     <div class="stat"><b id="stat-today">0</b><span>applied today</span></div>
     <div class="stat"><b id="stat-week">0</b><span>this week</span></div>
-    <div class="stat"><b id="stat-new">0</b><span>new (24h)</span></div>
-    <div class="stat"><b id="stat-shown">0</b><span>showing</span></div>
+    <div class="stat"><b id="stat-toapply">0</b><span>to apply</span></div>
+    <div class="stat"><b id="stat-interview">0</b><span>interviews</span></div>
   </section>
 
   <section class="filters" aria-label="Filters">
@@ -54,16 +57,6 @@
       <label class="field">
         <span>Min score <output id="f-score-val">40</output></span>
         <input id="f-score" type="range" min="40" max="100" step="5" value="40">
-      </label>
-      <label class="field"><span>Status</span>
-        <select id="f-status">
-          <option value="active">Active (hide skipped)</option>
-          <option value="new">New only</option>
-          <option value="applied">Applied</option>
-          <option value="interview">Interview</option>
-          <option value="skipped">Skipped</option>
-          <option value="all">All</option>
-        </select>
       </label>
       <label class="field"><span>Location</span><select id="f-location"><option value="">All of India</option></select></label>
       <label class="field"><span>Source</span><select id="f-source"><option value="">All sources</option></select></label>
@@ -77,6 +70,14 @@
       <button id="reset-filters" class="link-btn" type="button">Reset filters</button>
     </div>
   </section>
+
+  <div class="section-head">
+    <button id="section-title" class="section-title" type="button" aria-haspopup="dialog">
+      <span id="section-name">To apply</span> <span id="section-count" class="count-pill">0</span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+    </button>
+    <p id="section-hint" class="muted"></p>
+  </div>
 
   <main id="list" aria-live="polite"></main>
 
@@ -93,14 +94,21 @@
       <div class="breakdown" hidden></div>
       <ul class="keywords"></ul>
       <p class="snippet"></p>
+      <p class="status-line muted"></p>
       <div class="card-actions">
         <a class="btn btn-primary apply" target="_blank" rel="noopener noreferrer">Apply</a>
-        <button class="btn status-btn" data-status="applied" type="button">Applied</button>
-        <button class="btn status-btn" data-status="interview" type="button">Interview</button>
-        <button class="btn status-btn" data-status="skipped" type="button">Skip</button>
       </div>
     </article>
   </template>
+
+  <dialog id="nav" class="drawer" aria-label="Sections">
+    <div class="drawer-head">
+      <img src="icons/icon.svg" alt="" width="28" height="28">
+      <b>Job Radar</b>
+      <form method="dialog"><button class="icon-btn" aria-label="Close">✕</button></form>
+    </div>
+    <nav id="nav-list"></nav>
+  </dialog>
 
   <dialog id="menu">
     <form method="dialog" class="menu-head">
