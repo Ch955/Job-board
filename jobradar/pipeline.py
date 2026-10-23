@@ -9,8 +9,8 @@ from pathlib import Path
 
 import requests
 
-from . import store
-from .config import ROOT
+from . import push, store
+from .config import ROOT, env
 from .http import make_session
 from .models import Job
 from .scoring import Scorer, age_days
@@ -194,6 +194,14 @@ def run(
     fetched, runs = fetch_all(config, session, state, only, now, ignore_throttle)
     jobs, new_jobs, dropped = process(fetched, previous, config, now)
 
+    # The app needs the VAPID *public* key to subscribe; derive it from the secret.
+    push_info = data.get("push") or {}
+    if env("VAPID_PRIVATE_KEY"):
+        try:
+            push_info = {"public_key": push.public_key_for(env("VAPID_PRIVATE_KEY"))}
+        except Exception:  # noqa: BLE001
+            log.warning("VAPID_PRIVATE_KEY is malformed; regenerate with `python -m jobradar push-keys`")
+
     if write:
         by_source: dict[str, int] = {}
         for j in jobs:
@@ -216,6 +224,8 @@ def run(
                     "source_runs": runs,
                 },
                 "state": state,
+                "push": push_info,
+                "alert_score": int(p.get("alert_score", 70)),
                 "jobs": [j.to_dict() for j in jobs],
             },
         )

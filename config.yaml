@@ -14,7 +14,8 @@ profile:
 pipeline:
   max_age_days: 30          # drop jobs posted (or first seen) more than N days ago
   min_score: 40             # drop jobs scoring below this
-  alert_score: 70           # Telegram alert threshold (phase 2)
+  alert_score: 70           # phone notification for every new job at or above this
+  max_alerts_per_run: 5     # beyond this, one "+N more" notification instead
   snippet_chars: 300
   http_timeout_s: 20
   max_workers: 8            # parallel requests to company boards

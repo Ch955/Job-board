@@ -1,0 +1,104 @@
+name: Job Radar
+
+# Free-tier notes: this repo is public, so GitHub Actions minutes are free and
+# unlimited on standard runners. Each fetch run takes a few minutes; the daily
+# summary run takes under a minute.
+
+on:
+  schedule:
+    - cron: "17 */3 * * *"   # fetch every 3 hours (UTC; minute 17 avoids the busy top of the hour)
+    - cron: "25 3 * * *"     # daily summary, 08:55 IST
+  workflow_dispatch:          # "Run workflow" button in the Actions tab
+    inputs:
+      mode:
+        description: What to run
+        type: choice
+        default: fetch
+        options: [fetch, summary, test-notification]
+  push:                       # redeploy the app when you change it
+    branches: [ccr-2ca82853-eyb6vc]
+    paths: ["docs/**", "!docs/jobs.json"]
+
+permissions:
+  contents: write   # commit docs/jobs.json
+  pages: write      # deploy the app
+  id-token: write   # required by deploy-pages
+
+concurrency:
+  group: job-radar
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    if: >-
+      (github.event_name == 'schedule' && github.event.schedule != '25 3 * * *') ||
+      (github.event_name == 'workflow_dispatch' && inputs.mode == 'fetch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Fetch, score, alert
+        env:
+          ADZUNA_APP_ID: ${{ secrets.ADZUNA_APP_ID }}
+          ADZUNA_APP_KEY: ${{ secrets.ADZUNA_APP_KEY }}
+          JOOBLE_API_KEY: ${{ secrets.JOOBLE_API_KEY }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          WEBPUSH_SUBSCRIPTIONS: ${{ secrets.WEBPUSH_SUBSCRIPTIONS }}
+        run: python -m jobradar run --notify --top 10
+      - name: Commit jobs.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/jobs.json
+          if git diff --cached --quiet; then echo "No changes"; exit 0; fi
+          git commit -m "Update jobs $(date -u +'%Y-%m-%d %H:%M') UTC"
+          for i in 1 2 3; do git pull --rebase origin "${GITHUB_REF_NAME}" && git push && exit 0; sleep $((i*5)); done
+          exit 1
+
+  deploy:
+    needs: fetch
+    if: >-
+      always() && needs.fetch.result != 'failure' && needs.fetch.result != 'cancelled' &&
+      (needs.fetch.result == 'success' || github.event_name == 'push')
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}   # pick up the jobs.json just committed
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+      - id: deployment
+        uses: actions/deploy-pages@v4
+
+  notify:
+    if: >-
+      (github.event_name == 'schedule' && github.event.schedule == '25 3 * * *') ||
+      (github.event_name == 'workflow_dispatch' && inputs.mode != 'fetch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install PyYAML requests cryptography
+      - name: Send notification
+        env:
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+          WEBPUSH_SUBSCRIPTIONS: ${{ secrets.WEBPUSH_SUBSCRIPTIONS }}
+        run: |
+          if [ "${{ inputs.mode }}" = "test-notification" ]; then
+            python -m jobradar notify --test
+          else
+            python -m jobradar notify --summary
+          fi

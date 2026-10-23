@@ -1,11 +1,14 @@
 # Job Radar
 
 A personal job-alert system that costs ₹0 to run: a Python fetcher and scorer run by
-GitHub Actions, a `docs/jobs.json` data file, a mobile PWA on GitHub Pages, and Telegram alerts.
+GitHub Actions every 3 hours, a `docs/jobs.json` data file, your own mobile web app on GitHub Pages,
+and phone notifications sent straight from that app.
 No paid APIs, no paid hosting, no LLM calls.
 
-> **Status:** Phase 1 (fetchers + scoring, run locally) is done. Telegram, GitHub Actions, the PWA
-> and Gmail are coming in phases 2 to 5. This README grows with each phase.
+> **Status:** done: fetchers + scoring, GitHub Actions, the app and phone alerts.
+> Next: Gmail (recruiter replies, interview invites, rejections and offers).
+
+**Your app:** <https://ch955.github.io/job-board/> (live after the one-time setup below)
 
 ## How it works
 
@@ -22,6 +25,83 @@ Gmail job-alert emails (phase 5)     ─┘    merge with history (keep status)
 Every source runs in its own `try` block. A dead API, a bad company slug or a missing key
 logs a warning in the run report and the rest carry on.
 
+## One-time setup on GitHub (about 10 minutes)
+
+Do these once, in order. Everything is free because the repo is public.
+
+### 1. Turn on GitHub Pages
+Repo → **Settings** → **Pages** → under *Build and deployment*, set **Source** to **GitHub Actions**.
+
+### 2. Add your secrets
+Repo → **Settings** → **Secrets and variables** → **Actions** → **New repository secret**. Add the ones you have:
+
+| Secret | Where it comes from | Needed? |
+|---|---|---|
+| `VAPID_PRIVATE_KEY` | run `python -m jobradar push-keys` on your laptop and copy the private key | for phone alerts |
+| `WEBPUSH_SUBSCRIPTIONS` | the app's ☰ menu, after you tap *Enable alerts* (step 4) | for phone alerts |
+| `ADZUNA_APP_ID`, `ADZUNA_APP_KEY` | [Adzuna](#adzuna) | optional |
+| `JOOBLE_API_KEY` | [Jooble](#jooble) | optional |
+
+Secrets are encrypted by GitHub and never appear in the code, the logs or `jobs.json`.
+
+### 3. Run it once
+Repo → **Actions** tab. If GitHub asks, click **I understand my workflows, go ahead and enable them**. Then
+**Job Radar** → **Run workflow** → mode **fetch** → **Run workflow**. After a few minutes it
+commits `docs/jobs.json` and deploys the app. Open <https://ch955.github.io/job-board/>.
+
+From now on it runs by itself every 3 hours.
+
+### 4. Turn on phone alerts
+1. On your phone, open the app and install it:
+   - **Android (Chrome):** ⋮ menu → **Install app** (or *Add to Home screen*).
+   - **iPhone (Safari):** Share button → **Add to Home Screen**. On iPhone, alerts *only* work from the installed app (iOS 16.4+).
+2. Open Job Radar from your home screen → ☰ menu → **Enable alerts on this device** → allow notifications.
+3. Tap **Copy code**, and save it on GitHub as the secret `WEBPUSH_SUBSCRIPTIONS`.
+   For a second phone, put each device's code on its own line in the same secret.
+4. **Actions** → **Job Radar** → **Run workflow** → mode **test-notification**. Your phone should buzz.
+
+You'll now get a notification for every new job scoring 70+ (at most 5 per run, then one "+N more"),
+and a daily summary at 9 AM IST. Tap a notification to open that job in the app, or tap **Apply** to
+go straight to the posting.
+
+If you ever reinstall the app or clear its data, repeat step 4. The old code stops working, and the
+run log says so.
+
+## The app
+
+- Job cards sorted by score, with the matched skills and a tap-the-score breakdown.
+- Filters: minimum score, status, location, source, remote / on-site, plus a search box.
+- **Apply** opens the original posting and then asks if you applied. **Applied**, **Interview** and **Skip** mark a card (tap again to undo).
+- Counters: applied today / this week, new in the last 24 hours.
+- Your statuses are saved on the phone (localStorage). ☰ → **Export JSON** makes a backup file; **Import JSON**
+  restores it or moves it to another device. Jobs you applied to stay in the app even after they age out of `jobs.json`.
+- Dark / light mode follows your phone. The moon button cycles auto → light → dark.
+- Works offline with the last jobs it loaded, and refreshes when you reopen it.
+
+Preview it on your laptop with your local data:
+```bash
+python -m jobradar run
+python -m http.server 8000 -d docs     # then open http://localhost:8000
+```
+
+## GitHub Actions and free limits
+
+`.github/workflows/job-radar.yml` has three jobs:
+
+| Job | When | What |
+|---|---|---|
+| fetch | every 3 hours (minute 17, UTC) | fetch + score, alert on strong new jobs, commit `docs/jobs.json` |
+| deploy | after each fetch, or when you change files in `docs/` | publish `docs/` to GitHub Pages |
+| notify | 08:55 IST daily, or by hand | daily summary, or a test notification |
+
+- **Minutes:** public repos get unlimited free Actions minutes on standard runners. A fetch run takes a
+  few minutes, so this would also fit easily in a private repo's 2,000 free minutes a month.
+- **GitHub Pages** is free for public repos.
+- **Scheduled runs** can start a few minutes late when GitHub is busy. That's normal.
+- GitHub pauses schedules in repos with no activity for 60 days. The workflow's own commits count as
+  activity, so this shouldn't happen. If it does, the Actions tab shows a button to re-enable it.
+- If a run fails, GitHub emails you, and the run log shows each source's status.
+
 ## Quick start (local)
 
 Needs Python 3.11+.
@@ -32,6 +112,7 @@ source .venv/bin/activate            # Windows: .venv\Scripts\activate
 pip install -r requirements-dev.txt
 
 python -m jobradar run --offline     # demo on bundled sample data, no network, no keys
+python -m jobradar push-keys         # once: keys for phone alerts
 python -m jobradar run               # the real thing: fetch everything once
 python -m pytest                     # tests
 ```
@@ -48,6 +129,9 @@ Other useful flags:
 | `python -m jobradar run --force` | ignore `min_interval_hours` throttles |
 | `python -m jobradar -v run` | verbose logging |
 | `python -m jobradar check-companies` | test every company slug in `config.yaml` |
+| `python -m jobradar run --notify` | also send phone alerts (needs the two push values in `.env`) |
+| `python -m jobradar notify --test` | send a test notification |
+| `python -m jobradar notify --summary` | send the daily summary now |
 
 ### First thing to do: check the company list
 
@@ -91,7 +175,7 @@ The four company-board APIs, JobSpy and Remotive need no key. Adzuna and Jooble 
 Without one, that source is skipped and the rest still run.
 
 For local runs, copy `.env.example` to `.env` and fill it in. `.env` is git-ignored.
-(In phase 3 the same values go into GitHub Secrets.)
+(On GitHub the same values go into Secrets: see the one-time setup.)
 
 ### Adzuna
 1. Go to <https://developer.adzuna.com/> and click **Register**.
@@ -169,13 +253,17 @@ jobradar/
   sources/             one module per source (jobspy_boards.py = LinkedIn/Naukri/Indeed)
   offline.py           fixture-backed fake HTTP session for --offline and tests
 tests/                 pytest suite + API-shaped fixtures
-docs/                  GitHub Pages root: jobs.json now, the PWA in phase 4
+  push.py              Web Push encryption + VAPID signing (no third-party service)
+  notify.py            which notifications to send, and sending them
+docs/                  the app (GitHub Pages root): index.html, app.js, app.css, sw.js, jobs.json
+.github/workflows/     the 3-hourly schedule
+scripts/make_icons.py  regenerates the app icons
 ```
 
 ## Roadmap
 
-1. ✅ Fetchers + scoring, run locally
-2. ⏳ Telegram alerts (score ≥ 70) + 9 AM IST daily summary
-3. ⏳ GitHub Actions cron every 3 hours, commits `docs/jobs.json`
-4. ⏳ PWA on GitHub Pages
+1. ✅ Fetchers + scoring, run locally (+ LinkedIn, Naukri, Indeed; India-only)
+2. ✅ Phone alerts from your own app (replaces the original Telegram plan)
+3. ✅ GitHub Actions every 3 hours
+4. ✅ The app on GitHub Pages
 5. ⏳ Gmail: LinkedIn/Naukri alert emails + recruiter reply / interview / rejection / offer detection
