@@ -1,54 +1,54 @@
 {
  "version": 1,
- "generated_at": "2026-10-23T10:18:06+00:00",
+ "generated_at": "2026-10-23T10:30:06+00:00",
  "profile": {
   "name": "Chakri",
   "role": "Azure Data Engineer"
  },
  "stats": {
-  "total": 73,
-  "new_this_run": 4,
+  "total": 66,
+  "new_this_run": 66,
   "fetched_raw": 6655,
   "by_source": {
-   "naukri": 23,
+   "naukri": 22,
    "linkedin": 19,
-   "indeed": 30,
+   "indeed": 24,
    "smartrecruiters": 1
   },
   "dropped": {
-   "irrelevant_title": 6311,
+   "irrelevant_title": 6306,
    "location": 92,
-   "experience": 88,
+   "experience": 89,
    "walk_in": 3,
    "too_old": 0,
    "low_score": 0,
-   "duplicates": 96
+   "duplicates": 99
   },
   "source_runs": {
    "greenhouse": {
     "status": "ok",
     "count": 5298,
-    "seconds": 4.1
+    "seconds": 2.8
    },
    "lever": {
     "status": "ok",
     "count": 473,
-    "seconds": 0.7
+    "seconds": 1.4
    },
    "ashby": {
     "status": "ok",
     "count": 579,
-    "seconds": 0.5
+    "seconds": 0.4
    },
    "smartrecruiters": {
     "status": "ok",
     "count": 35,
-    "seconds": 7.4
+    "seconds": 8.0
    },
    "jobspy": {
     "status": "ok",
     "count": 270,
-    "seconds": 145.9
+    "seconds": 148.0
    },
    "adzuna": {
     "status": "skipped",
@@ -70,15 +70,21 @@
     "status": "disabled",
     "count": 0
    }
+  },
+  "drafts": {
+   "created": 0,
+   "skipped": "GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN not set",
+   "errors": 0,
+   "candidates": 0
   }
  },
  "state": {
   "last_fetched": {
-   "greenhouse": "2026-10-23T10:18:06+00:00",
-   "lever": "2026-10-23T10:18:06+00:00",
-   "ashby": "2026-10-23T10:18:06+00:00",
-   "smartrecruiters": "2026-10-23T10:18:06+00:00",
-   "jobspy": "2026-10-23T10:18:06+00:00",
+   "greenhouse": "2026-10-23T10:30:06+00:00",
+   "lever": "2026-10-23T10:30:06+00:00",
+   "ashby": "2026-10-23T10:30:06+00:00",
+   "smartrecruiters": "2026-10-23T10:30:06+00:00",
+   "jobspy": "2026-10-23T10:30:06+00:00",
    "remotive": "2026-10-23T10:10:19+00:00"
   }
  },
@@ -86,6 +92,19 @@
   "public_key": "BNTus1MBin3_XGhteuWPat0NYlay35ZDK42PNv0xL8fYHYQ65giOZ665sakYdCoyiB6NU02dLl6XFgmfRc3l8W8"
  },
  "alert_score": 70,
+ "outreach": {
+  "linkedin_note": "Hi! I'm an Azure Data Engineer ({years}+ yrs: ADF, Databricks, PySpark), {notice_lower}. I've applied for {title} at {company} and would love to connect. Thanks, {name}",
+  "email_subject": "Application: {title} | {role}, {years}+ yrs | {notice}",
+  "email_body": "Hi,\n\nI came across the {title} opening at {company} ({location}) and would like to be considered.\n\nI'm an Azure Data Engineer with {years}+ years at Capgemini, building metadata-driven ADF pipelines into ADLS Gen2, PySpark and SCD Type 1/2 in Azure Databricks, incremental loads, and SHIR-based hybrid integration, with Azure DevOps CI/CD. The role's focus on {skills} matches my day-to-day work closely.\n\nI'm an {notice_lower} and my resume is attached. I'd be glad to talk whenever suits you.\n\nThanks,\n{full_name}\n{email}\n{linkedin}\n",
+  "profile": {
+   "name": "Chakri",
+   "full_name": "Chakravardhana Rao Edupulapati",
+   "role": "Azure Data Engineer",
+   "years_experience": 3,
+   "notice": "Immediate joiner",
+   "linkedin": "https://www.linkedin.com/in/chakravardhanarao-edupulapati-6765b11a3"
+  }
+ },
  "jobs": [
   {
    "title": "Data Engineer",
@@ -128,8 +147,10 @@
     "experience_eligible": true,
     "age_days": 0
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "5017a94e895c"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "5017a94e895c",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Data Engineer",
@@ -173,8 +194,10 @@
     "experience_eligible": true,
     "age_days": 0
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "4638bf233958"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "4638bf233958",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Data Engineer – Azure Databricks",
@@ -219,8 +242,12 @@
     "experience_eligible": true,
     "age_days": 0
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "3f58ad6bb64b"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "3f58ad6bb64b",
+   "contact_emails": [
+    "rajesh@reveilletechnologies.com"
+   ],
+   "outreach": {}
   },
   {
    "title": "Data Engineer – Azure Databricks",
@@ -265,8 +292,12 @@
     "experience_eligible": true,
     "age_days": 0
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "308d64e5aecf"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "308d64e5aecf",
+   "contact_emails": [
+    "rajesh@reveilletechnologies.com"
+   ],
+   "outreach": {}
   },
   {
    "title": "Data Engineer",
@@ -312,8 +343,10 @@
     "experience_eligible": true,
     "age_days": 0
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "f16a294e3c86"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "f16a294e3c86",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Walk-in Drive - Data Engineer (Virtual)",
@@ -361,8 +394,10 @@
     "experience_eligible": true,
     "age_days": 0
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "7991710e7d47"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "7991710e7d47",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Data Engineer - Python",
@@ -408,8 +443,10 @@
     "experience_eligible": true,
     "age_days": 0
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "e049d76cf15b"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "e049d76cf15b",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Data Engineer",
@@ -457,8 +494,10 @@
     "experience_eligible": true,
     "age_days": 1
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "6e868421faec"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "6e868421faec",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Data Engineer With Fabric",
@@ -505,8 +544,12 @@
     "experience_eligible": true,
     "age_days": 1
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "169ec25d928d"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "169ec25d928d",
+   "contact_emails": [
+    "sulabh.tailang@celebaltech.com"
+   ],
+   "outreach": {}
   },
   {
    "title": "Data Engineer – Azure Databricks | 4–6 Years | Mumabi | Onsite | Immediate Joiner",
@@ -549,8 +592,10 @@
     "experience_eligible": true,
     "age_days": 1
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "7f477562f699"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "7f477562f699",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Junior Data Engineer",
@@ -596,8 +641,58 @@
     "experience_eligible": true,
     "age_days": 1
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "1cbe97532b89"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "1cbe97532b89",
+   "contact_emails": [],
+   "outreach": {}
+  },
+  {
+   "title": "Data Engineer",
+   "company": "Unknown",
+   "location": "RJ, IN",
+   "url": "https://in.indeed.com/viewjob?jk=8f1df00dd429bda5",
+   "source": "indeed",
+   "remote": true,
+   "posted_date": "2026-10-22T00:00:00+00:00",
+   "description_snippet": "Job Title: Data Engineer (Python, PySpark, Databricks) Company: Pratham Software Location: Jaipur, Rajasthan (Jaipur-based candidates preferred) Job Type: Full-time, Permanent Salary: Up to ₹20 LPA (based on skills and experience) Experience: 3-6 years About the Role Pratham Software is looking for",
+   "score": 100,
+   "status": "new",
+   "matched_keywords": [
+    "ADF",
+    "Databricks",
+    "PySpark",
+    "Azure",
+    "SQL",
+    "ETL/ELT",
+    "Python",
+    "Spark",
+    "Azure DevOps",
+    "Data Warehousing",
+    "Data Modeling",
+    "Git",
+    "Delta Lake",
+    "Airflow"
+   ],
+   "score_breakdown": {
+    "title": 25,
+    "skills": 35,
+    "location": 20,
+    "experience": 10,
+    "recency": 10,
+    "penalty": 0,
+    "location_label": "Remote (India)",
+    "location_eligible": true,
+    "walk_in": false,
+    "walk_in_eligible": true,
+    "years_required": 3,
+    "years_max": 6,
+    "experience_eligible": true,
+    "age_days": 1
+   },
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "b1467509410a",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Junior Data Engineer",
@@ -643,54 +738,10 @@
     "experience_eligible": true,
     "age_days": 1
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "8a6037469bb3"
-  },
-  {
-   "title": "Data Engineer",
-   "company": "Unknown",
-   "location": "RJ, IN",
-   "url": "https://in.indeed.com/viewjob?jk=8f1df00dd429bda5",
-   "source": "indeed",
-   "remote": true,
-   "posted_date": "2026-10-22T00:00:00+00:00",
-   "description_snippet": "Job Title: Data Engineer (Python, PySpark, Databricks) Company: Pratham Software Location: Jaipur, Rajasthan (Jaipur-based candidates preferred) Job Type: Full-time, Permanent Salary: Up to ₹20 LPA (based on skills and experience) Experience: 3-6 years About the Role Pratham Software is looking for",
-   "score": 100,
-   "status": "new",
-   "matched_keywords": [
-    "ADF",
-    "Databricks",
-    "PySpark",
-    "Azure",
-    "SQL",
-    "ETL/ELT",
-    "Python",
-    "Spark",
-    "Azure DevOps",
-    "Data Warehousing",
-    "Data Modeling",
-    "Git",
-    "Delta Lake",
-    "Airflow"
-   ],
-   "score_breakdown": {
-    "title": 25,
-    "skills": 35,
-    "location": 20,
-    "experience": 10,
-    "recency": 10,
-    "penalty": 0,
-    "location_label": "Remote (India)",
-    "location_eligible": true,
-    "walk_in": false,
-    "walk_in_eligible": true,
-    "years_required": 3,
-    "years_max": 6,
-    "experience_eligible": true,
-    "age_days": 1
-   },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "b1467509410a"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "8a6037469bb3",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Data Engineer - AI and Data Science Engineer II",
@@ -735,8 +786,10 @@
     "experience_eligible": true,
     "age_days": 1
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "623e55815b75"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "623e55815b75",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Azure Data Engineer",
@@ -774,8 +827,10 @@
     "experience_eligible": true,
     "age_days": 0
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "e37c367e4ac7"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "e37c367e4ac7",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Databricks Azure - Data Engineer",
@@ -819,8 +874,10 @@
     "experience_eligible": true,
     "age_days": 2
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "4e97119bac6c"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "4e97119bac6c",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Azure Data Engineer",
@@ -864,8 +921,10 @@
     "experience_eligible": true,
     "age_days": 2
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "b726282b5127"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "b726282b5127",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Azure Databricks-Data Engineer (Female Hiring)",
@@ -908,8 +967,10 @@
     "experience_eligible": true,
     "age_days": 2
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "05ea08c5c46b"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "05ea08c5c46b",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Data Engineer",
@@ -958,8 +1019,10 @@
     "experience_eligible": true,
     "age_days": 2
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "a8c781be021d"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "a8c781be021d",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Data Engineer -Azure",
@@ -1006,8 +1069,10 @@
     "experience_eligible": true,
     "age_days": 2
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "82eed1e729d9"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "82eed1e729d9",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Data Engineer II",
@@ -1051,36 +1116,34 @@
     "experience_eligible": true,
     "age_days": 2
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "bada5b01265d"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "bada5b01265d",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
-   "title": "Data Engineer",
-   "company": "ZecData Technology",
-   "location": "MP, IN",
-   "url": "https://in.indeed.com/viewjob?jk=6e0bdb32dff3661a",
-   "source": "indeed",
+   "title": "Data Engineer | PySpark | Databricks | Azure Data Factory (Pan India)",
+   "company": "Infosys",
+   "location": "Hyderabad, Pune, Bengaluru, India",
+   "url": "https://www.naukri.com/job-listings-data-engineer-pyspark-databricks-azure-data-factory-pan-india-infosys-hyderabad-pune-bengaluru-2-to-5-years-201026011406",
+   "source": "naukri",
    "remote": false,
-   "posted_date": "2026-10-21T00:00:00+00:00",
-   "description_snippet": "Job Description: Data Engineer Walk in interviews only Experience: 1–3 Years (Freshers with relevant internships and projects may also apply) Location: Indore, Madhya Pradesh Work Mode: Onsite (Work From Office) Roles & Responsibilities Design, develop, and maintain scalable data pipelines for data",
+   "posted_date": "2026-10-20T00:00:00+00:00",
+   "description_snippet": "Roles & Responsibilities Design, develop, and maintain data pipelines using Azure Data Factory (ADF). Build scalable data processing solutions using Azure Databricks, Python, and PySpark. Develop ETL/ELT workflows for data ingestion, transformation, and loading. Work with Azure Data Lake Storage (AD",
    "score": 98,
    "status": "new",
    "matched_keywords": [
     "ADF",
     "Databricks",
+    "PySpark",
     "ADLS Gen2",
     "Azure",
     "SQL",
     "ETL/ELT",
     "Python",
     "Spark",
-    "Data Warehousing",
-    "Data Modeling",
-    "Azure Security",
-    "Data Governance",
-    "Snowflake",
-    "Airflow",
-    "Kafka"
+    "Azure DevOps",
+    "Data Warehousing"
    ],
    "score_breakdown": {
     "title": 25,
@@ -1089,15 +1152,19 @@
     "experience": 10,
     "recency": 8,
     "penalty": 0,
-    "location_label": "India",
+    "location_label": "Hyderabad",
     "location_eligible": true,
-    "years_required": 1,
-    "years_max": 3,
+    "walk_in": false,
+    "walk_in_eligible": true,
+    "years_required": 2,
+    "years_max": 5,
     "experience_eligible": true,
-    "age_days": 2
+    "age_days": 3
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "80f0b5f4075a"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "a1dd47af35cd",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Data Engineer | PySpark | Databricks | Azure Data Factory",
@@ -1139,8 +1206,10 @@
     "experience_eligible": true,
     "age_days": 3
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "a5470aeaa40e"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "a5470aeaa40e",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Data Engineer - PySpark | Spark | SQL",
@@ -1183,22 +1252,23 @@
     "experience_eligible": true,
     "age_days": 3
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "fee34fa0ee2d"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "fee34fa0ee2d",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
-   "title": "Data Engineer | PySpark | Databricks | Azure Data Factory (Pan India)",
-   "company": "Infosys",
-   "location": "Hyderabad, Pune, Bengaluru, India",
-   "url": "https://www.naukri.com/job-listings-data-engineer-pyspark-databricks-azure-data-factory-pan-india-infosys-hyderabad-pune-bengaluru-2-to-5-years-201026011406",
-   "source": "naukri",
+   "title": "Senior Data Engineer",
+   "company": "Quantiphi",
+   "location": "KA, IN",
+   "url": "https://in.indeed.com/viewjob?jk=76009356012b0b06",
+   "source": "indeed",
    "remote": false,
    "posted_date": "2026-10-20T00:00:00+00:00",
-   "description_snippet": "Roles & Responsibilities Design, develop, and maintain data pipelines using Azure Data Factory (ADF). Build scalable data processing solutions using Azure Databricks, Python, and PySpark. Develop ETL/ELT workflows for data ingestion, transformation, and loading. Work with Azure Data Lake Storage (AD",
+   "description_snippet": "While technology is the heart of our business, a global and diverse culture is the heart of our success. We love our people and we take pride in catering them to a culture built on transparency, diversity, integrity, learning and growth. If working in an environment that encourages you to innovate a",
    "score": 98,
    "status": "new",
    "matched_keywords": [
-    "ADF",
     "Databricks",
     "PySpark",
     "ADLS Gen2",
@@ -1208,7 +1278,12 @@
     "Python",
     "Spark",
     "Azure DevOps",
-    "Data Warehousing"
+    "Data Migration",
+    "Azure Security",
+    "Data Governance",
+    "Git",
+    "Delta Lake",
+    "Snowflake"
    ],
    "score_breakdown": {
     "title": 25,
@@ -1217,17 +1292,19 @@
     "experience": 10,
     "recency": 8,
     "penalty": 0,
-    "location_label": "Hyderabad",
+    "location_label": "India",
     "location_eligible": true,
     "walk_in": false,
     "walk_in_eligible": true,
-    "years_required": 2,
-    "years_max": 5,
+    "years_required": 4,
+    "years_max": 7,
     "experience_eligible": true,
     "age_days": 3
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "a1dd47af35cd"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "89e6edf41148",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Azure Databricks | PySpark | Python | SQL | Delta Lake",
@@ -1270,8 +1347,12 @@
     "experience_eligible": true,
     "age_days": 0
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "c952b5e57038"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "c952b5e57038",
+   "contact_emails": [
+    "vishwajit.mandal@qloron.com"
+   ],
+   "outreach": {}
   },
   {
    "title": "Databricks Developer",
@@ -1320,8 +1401,10 @@
     "experience_eligible": true,
     "age_days": 0
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "c2d347d287f6"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "c2d347d287f6",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Azure Data Engineer (BPO Mandatory)",
@@ -1360,8 +1443,10 @@
     "experience_eligible": true,
     "age_days": 1
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "d565b5b412ec"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "d565b5b412ec",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Data Engineer",
@@ -1405,8 +1490,10 @@
     "experience_eligible": true,
     "age_days": 1
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "3058f676d4b5"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "3058f676d4b5",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Azure AI - Data Engineer",
@@ -1451,57 +1538,10 @@
     "experience_eligible": true,
     "age_days": 1
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "0bf9b477a5fd"
-  },
-  {
-   "title": "Data Engineer- GCP/Azure",
-   "company": "Innovantes IT Solutions LLP",
-   "location": "CH, IN",
-   "url": "https://in.indeed.com/viewjob?jk=e9d393bf09091c31",
-   "source": "indeed",
-   "remote": false,
-   "posted_date": "2026-10-22T00:00:00+00:00",
-   "description_snippet": "Key Responsibilities 1. Data Architecture and Pipeline Design Architect end-to-end data pipelines supporting enterprise BI, reporting, analytics, and data warehousing requirements. Design scalable data ingestion, transformation, storage, and serving architectures across multiple data sources and des",
-   "score": 95,
-   "status": "new",
-   "matched_keywords": [
-    "ADF",
-    "Databricks",
-    "PySpark",
-    "ADLS Gen2",
-    "Azure",
-    "SQL",
-    "Incremental Load",
-    "ETL/ELT",
-    "Python",
-    "Spark",
-    "Azure DevOps",
-    "Data Warehousing",
-    "Data Modeling",
-    "Power BI",
-    "Delta Lake",
-    "Fabric",
-    "BigQuery"
-   ],
-   "score_breakdown": {
-    "title": 25,
-    "skills": 35,
-    "location": 20,
-    "experience": 5,
-    "recency": 10,
-    "penalty": 0,
-    "location_label": "India",
-    "location_eligible": true,
-    "walk_in": false,
-    "walk_in_eligible": true,
-    "years_required": null,
-    "years_max": null,
-    "experience_eligible": true,
-    "age_days": 1
-   },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "d2b973c6147f"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "0bf9b477a5fd",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Data Engineer - ETL, SQL, Databricks",
@@ -1544,8 +1584,10 @@
     "experience_eligible": true,
     "age_days": 1
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "9aebd5d7fbf2"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "9aebd5d7fbf2",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Junior Databricks Platform Engineer",
@@ -1580,13 +1622,17 @@
     "penalty": 0,
     "location_label": "India",
     "location_eligible": true,
+    "walk_in": false,
+    "walk_in_eligible": true,
     "years_required": 2,
     "years_max": 3,
     "experience_eligible": true,
     "age_days": 2
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "0408e75f3d51"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "0408e75f3d51",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Data Engineer",
@@ -1628,8 +1674,10 @@
     "experience_eligible": true,
     "age_days": 0
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "451e6e6903a9"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "451e6e6903a9",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Data Engineer",
@@ -1670,8 +1718,10 @@
     "experience_eligible": true,
     "age_days": 1
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "6f958ca2f7c5"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "6f958ca2f7c5",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Azure Data Engineer",
@@ -1715,53 +1765,10 @@
     "experience_eligible": true,
     "age_days": 2
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "99232c7a9ce8"
-  },
-  {
-   "title": "SQL Data Engineer",
-   "company": "Techila Global Services",
-   "location": "MH, IN",
-   "url": "https://in.indeed.com/viewjob?jk=4c616705e47faaff",
-   "source": "indeed",
-   "remote": false,
-   "posted_date": "2026-10-21T00:00:00+00:00",
-   "description_snippet": "Onsite Pune 6–0 yrs Apply by Nov 5, 2026 SQL Data Engineer Join Techila's team of Salesforce experts. We build senior-led transformations that deliver measurable outcomes for clients worldwide. Experience 6–0 yrs Employment Type Full-time Openings 1 position Apply By Nov 5, 2026 Required Skills SQL",
-   "score": 93,
-   "status": "new",
-   "matched_keywords": [
-    "Azure",
-    "SQL",
-    "ETL/ELT",
-    "Python",
-    "Spark",
-    "Data Warehousing",
-    "Data Modeling",
-    "Data Migration",
-    "Power BI",
-    "Git",
-    "Snowflake",
-    "BigQuery",
-    "Kafka"
-   ],
-   "score_breakdown": {
-    "title": 25,
-    "skills": 30,
-    "location": 20,
-    "experience": 10,
-    "recency": 8,
-    "penalty": 0,
-    "location_label": "India",
-    "location_eligible": true,
-    "walk_in": false,
-    "walk_in_eligible": true,
-    "years_required": 0,
-    "years_max": 6,
-    "experience_eligible": true,
-    "age_days": 2
-   },
-   "first_seen": "2026-10-23T10:18:06+00:00",
-   "id": "4238f7d29f7f"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "99232c7a9ce8",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Data Engineer III - Databricks, Pyspark, Python, AWS",
@@ -1800,8 +1807,10 @@
     "experience_eligible": true,
     "age_days": 0
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "07f0dcfcb05f"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "07f0dcfcb05f",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Databricks - Technical Specialist-Data Engg",
@@ -1847,8 +1856,10 @@
     "experience_eligible": true,
     "age_days": 1
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "1b4ff7162fba"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "1b4ff7162fba",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Data Engineer III - Databricks, Pyspark, Python, AWS",
@@ -1880,13 +1891,17 @@
     "penalty": 0,
     "location_label": "India",
     "location_eligible": true,
+    "walk_in": false,
+    "walk_in_eligible": true,
     "years_required": 3,
     "years_max": null,
     "experience_eligible": true,
     "age_days": 1
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "dca5db7c2304"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "dca5db7c2304",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Senior Data Engineer",
@@ -1926,8 +1941,10 @@
     "experience_eligible": true,
     "age_days": 1
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "52033016f34a"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "52033016f34a",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Senior Data Engineer",
@@ -1967,8 +1984,10 @@
     "experience_eligible": true,
     "age_days": 1
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "17e3c08b1f8a"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "17e3c08b1f8a",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Opening position For Data Engineer",
@@ -2005,8 +2024,10 @@
     "experience_eligible": true,
     "age_days": 1
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "0090b539e804"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "0090b539e804",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Databricks + PySpark - Technical Lead-Data Engg",
@@ -2044,8 +2065,10 @@
     "experience_eligible": true,
     "age_days": 1
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "27e128d751d7"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "27e128d751d7",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Lead Azure Data Engineer ( 8+ years)",
@@ -2088,8 +2111,10 @@
     "experience_eligible": true,
     "age_days": 1
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "065cd8534811"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "065cd8534811",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "PySpark Data Engineer",
@@ -2126,8 +2151,10 @@
     "experience_eligible": true,
     "age_days": 3
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "46b5bf8c7645"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "46b5bf8c7645",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "PySpark Data Engineer",
@@ -2164,14 +2191,16 @@
     "experience_eligible": true,
     "age_days": 3
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "53be7100746a"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "53be7100746a",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Data Engineer",
    "company": "Siemens",
-   "location": "MH, IN",
-   "url": "https://in.indeed.com/viewjob?jk=0b1a734034e23240",
+   "location": "KA, IN",
+   "url": "https://in.indeed.com/viewjob?jk=6f4754e22378058c",
    "source": "indeed",
    "remote": false,
    "posted_date": "2026-10-21T00:00:00+00:00",
@@ -2205,8 +2234,10 @@
     "experience_eligible": true,
     "age_days": 2
    },
-   "first_seen": "2026-10-23T10:18:06+00:00",
-   "id": "47c1fc92e827"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "e291f9eae038",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Data Engineer & AI Tech Lead - Contract Role",
@@ -2250,47 +2281,10 @@
     "experience_eligible": true,
     "age_days": 2
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "8c0fbb8f63c8"
-  },
-  {
-   "title": "Data Engineer",
-   "company": "Siemens",
-   "location": "KA, IN",
-   "url": "https://in.indeed.com/viewjob?jk=6f4754e22378058c",
-   "source": "indeed",
-   "remote": false,
-   "posted_date": "2026-10-21T00:00:00+00:00",
-   "description_snippet": "Hello Visionary! We empower our people to stay resilient and relevant in a constantly changing world. We’re looking for people who are always searching for creative ways to grow and learn. People who want to make a real impact, now and in the future. Does that sound like you? Then it seems like you’",
-   "score": 85,
-   "status": "new",
-   "matched_keywords": [
-    "Azure",
-    "SQL",
-    "ETL/ELT",
-    "Python",
-    "Azure DevOps",
-    "Azure Security",
-    "Data Governance",
-    "Snowflake",
-    "Kafka"
-   ],
-   "score_breakdown": {
-    "title": 25,
-    "skills": 22,
-    "location": 20,
-    "experience": 10,
-    "recency": 8,
-    "penalty": 0,
-    "location_label": "India",
-    "location_eligible": true,
-    "years_required": 3,
-    "years_max": null,
-    "experience_eligible": true,
-    "age_days": 2
-   },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "e291f9eae038"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "8c0fbb8f63c8",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Data Engineer",
@@ -2333,8 +2327,12 @@
     "experience_eligible": true,
     "age_days": 0
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "01299614d7ad"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "01299614d7ad",
+   "contact_emails": [
+    "lokesh.sachdeva@smartims.com"
+   ],
+   "outreach": {}
   },
   {
    "title": "Databricks Data Engineering Lead",
@@ -2374,8 +2372,10 @@
     "experience_eligible": true,
     "age_days": 1
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "dbb4cefbdb19"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "dbb4cefbdb19",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Data Engineer",
@@ -2411,8 +2411,10 @@
     "experience_eligible": true,
     "age_days": 1
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "2ec69921bb84"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "2ec69921bb84",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Databricks & PySpark - Sr Technical Lead-Data Engg",
@@ -2458,50 +2460,10 @@
     "experience_eligible": true,
     "age_days": 1
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "ee129d668ca3"
-  },
-  {
-   "title": "Data Platform Engineer",
-   "company": "Johnson Controls",
-   "location": "MH, IN",
-   "url": "https://in.indeed.com/viewjob?jk=ae21543fe0b73841",
-   "source": "indeed",
-   "remote": false,
-   "posted_date": "2026-10-22T00:00:00+00:00",
-   "description_snippet": "Data Platform Engineer At Johnson Controls, you will help build and operate the data platform behind Open Blue, our smart-building platform. In this role, you will build the streaming and lakehouse pipelines that deliver trusted building and energy data to the applications our customers rely on. Rol",
-   "score": 84,
-   "status": "new",
-   "matched_keywords": [
-    "Azure",
-    "SQL",
-    "Python",
-    "Spark",
-    "Azure DevOps",
-    "Azure Security",
-    "Git",
-    "Delta Lake",
-    "Snowflake",
-    "Kafka"
-   ],
-   "score_breakdown": {
-    "title": 20,
-    "skills": 24,
-    "location": 20,
-    "experience": 10,
-    "recency": 10,
-    "penalty": 0,
-    "location_label": "India",
-    "location_eligible": true,
-    "walk_in": false,
-    "walk_in_eligible": true,
-    "years_required": 3,
-    "years_max": null,
-    "experience_eligible": true,
-    "age_days": 1
-   },
-   "first_seen": "2026-10-23T10:18:06+00:00",
-   "id": "16b3a4ccbb20"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "ee129d668ca3",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "EY - GDS Consulting - AI and DATA - Azure Data Engineer - Staff",
@@ -2541,46 +2503,10 @@
     "experience_eligible": true,
     "age_days": 0
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "8b68ff785bfc"
-  },
-  {
-   "title": "Data Engineer",
-   "company": "Greif",
-   "location": "TN, IN",
-   "url": "https://in.indeed.com/viewjob?jk=4e562fc761f21c89",
-   "source": "indeed",
-   "remote": false,
-   "posted_date": "2026-10-22T00:00:00+00:00",
-   "description_snippet": "Greif is a global leader in performance packaging located in 40 countries. The company delivers trusted, innovative, and tailored solutions that support some of the world's most in demand and fastest-growing industries. With a commitment to legendary customer service, operational excellence, and glo",
-   "score": 82,
-   "status": "new",
-   "matched_keywords": [
-    "Azure",
-    "SQL",
-    "Python",
-    "Data Warehousing",
-    "Power BI",
-    "Snowflake"
-   ],
-   "score_breakdown": {
-    "title": 25,
-    "skills": 17,
-    "location": 20,
-    "experience": 10,
-    "recency": 10,
-    "penalty": 0,
-    "location_label": "India",
-    "location_eligible": true,
-    "walk_in": false,
-    "walk_in_eligible": true,
-    "years_required": 2,
-    "years_max": 3,
-    "experience_eligible": true,
-    "age_days": 1
-   },
-   "first_seen": "2026-10-23T10:18:06+00:00",
-   "id": "ad16f55a36e1"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "8b68ff785bfc",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Data Engineer / Senior Data Engineer",
@@ -2618,8 +2544,10 @@
     "experience_eligible": true,
     "age_days": 2
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "6e78bfb69a3c"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "6e78bfb69a3c",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Databricks Data Engineering Lead",
@@ -2659,8 +2587,10 @@
     "experience_eligible": true,
     "age_days": 2
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "df4a757c6eeb"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "df4a757c6eeb",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Looking For Business Analyst , Azure Data Engineer",
@@ -2694,8 +2624,10 @@
     "experience_eligible": true,
     "age_days": 1
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "60ab6ec2d2f8"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "60ab6ec2d2f8",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Looking For Azure Data Engineer Role",
@@ -2729,8 +2661,10 @@
     "experience_eligible": true,
     "age_days": 1
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "86cb9f128197"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "86cb9f128197",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Senior PL/SQL & ETL Developer",
@@ -2765,49 +2699,17 @@
     "penalty": 0,
     "location_label": "India",
     "location_eligible": true,
+    "walk_in": false,
+    "walk_in_eligible": true,
     "years_required": null,
     "years_max": null,
     "experience_eligible": true,
     "age_days": 2
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "f37279f27cd3"
-  },
-  {
-   "title": "Senior Data Engineer",
-   "company": "Quantiphi",
-   "location": "KA, IN",
-   "url": "https://in.indeed.com/viewjob?jk=5c782197b06b97b7",
-   "source": "indeed",
-   "remote": false,
-   "posted_date": "2026-10-20T00:00:00+00:00",
-   "description_snippet": "While technology is the heart of our business, a global and diverse culture is the heart of our success. We love our people and we take pride in catering them to a culture built on transparency, diversity, integrity, learning and growth. If working in an environment that encourages you to innovate a",
-   "score": 80,
-   "status": "new",
-   "matched_keywords": [
-    "Databricks",
-    "Azure",
-    "SQL",
-    "Python"
-   ],
-   "score_breakdown": {
-    "title": 25,
-    "skills": 17,
-    "location": 20,
-    "experience": 10,
-    "recency": 8,
-    "penalty": 0,
-    "location_label": "India",
-    "location_eligible": true,
-    "walk_in": false,
-    "walk_in_eligible": true,
-    "years_required": 3,
-    "years_max": 7,
-    "experience_eligible": true,
-    "age_days": 3
-   },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "89e6edf41148"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "f37279f27cd3",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "AWS Data Engineer",
@@ -2835,13 +2737,17 @@
     "penalty": 0,
     "location_label": "India",
     "location_eligible": true,
+    "walk_in": false,
+    "walk_in_eligible": true,
     "years_required": 4,
     "years_max": 6,
     "experience_eligible": true,
     "age_days": 2
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "6cbdde1afe14"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "6cbdde1afe14",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Data Engineer",
@@ -2876,43 +2782,10 @@
     "experience_eligible": true,
     "age_days": 1
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "3a17dd339e13"
-  },
-  {
-   "title": "Data Engineer - Databricks | PySpark | Azure",
-   "company": "Infosys",
-   "location": "Hyderabad, Pune, Bengaluru, India",
-   "url": "https://www.naukri.com/job-listings-data-engineer-databricks-pyspark-azure-infosys-hyderabad-pune-bengaluru-2-to-5-years-201026011362",
-   "source": "naukri",
-   "remote": false,
-   "posted_date": "2026-10-20T00:00:00+00:00",
-   "description_snippet": "Job description Hiring for Data Bricks Developer Mandatory Skills: Databricks Responsibilities A day in the life of an Infoscion As part of the Infosys consulting team, your primary role would be to actively aid the consulting team in different phases of the project including problem definition, eff",
-   "score": 78,
-   "status": "new",
-   "matched_keywords": [
-    "Databricks",
-    "PySpark",
-    "Azure"
-   ],
-   "score_breakdown": {
-    "title": 25,
-    "skills": 15,
-    "location": 20,
-    "experience": 10,
-    "recency": 8,
-    "penalty": 0,
-    "location_label": "Hyderabad",
-    "location_eligible": true,
-    "walk_in": false,
-    "walk_in_eligible": true,
-    "years_required": 2,
-    "years_max": 5,
-    "experience_eligible": true,
-    "age_days": 3
-   },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "9b571ac40d34"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "3a17dd339e13",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Specialist - Data Engineer (Azure Databricks)",
@@ -2948,8 +2821,10 @@
     "experience_eligible": true,
     "age_days": 1
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "6caf5d0a947a"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "6caf5d0a947a",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Data Engineer",
@@ -2991,8 +2866,10 @@
     "experience_eligible": true,
     "age_days": 1
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "47f9e9d0d7b9"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "47f9e9d0d7b9",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Senior ETL Developer 3rd",
@@ -3023,13 +2900,17 @@
     "penalty": 0,
     "location_label": "India",
     "location_eligible": true,
+    "walk_in": false,
+    "walk_in_eligible": true,
     "years_required": 3,
     "years_max": null,
     "experience_eligible": true,
     "age_days": 2
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "774511a5ecec"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "774511a5ecec",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Data Engineer",
@@ -3065,8 +2946,10 @@
     "experience_eligible": true,
     "age_days": 1
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "c65c554899d4"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "c65c554899d4",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Lead I - Data Engineering",
@@ -3102,8 +2985,10 @@
     "experience_eligible": true,
     "age_days": 1
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "713582b12431"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "713582b12431",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Data Platform Engineer",
@@ -3142,8 +3027,10 @@
     "experience_eligible": true,
     "age_days": 20
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "f467be47633c"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "f467be47633c",
+   "contact_emails": [],
+   "outreach": {}
   },
   {
    "title": "Data QA Engineer",
@@ -3170,13 +3057,19 @@
     "penalty": 0,
     "location_label": "India",
     "location_eligible": true,
+    "walk_in": false,
+    "walk_in_eligible": true,
     "years_required": 1,
     "years_max": 3,
     "experience_eligible": true,
     "age_days": 2
    },
-   "first_seen": "2026-10-23T10:10:19+00:00",
-   "id": "b8d8e7abeddb"
+   "first_seen": "2026-10-23T10:30:06+00:00",
+   "id": "b8d8e7abeddb",
+   "contact_emails": [
+    "anamika.p@zecdata.com"
+   ],
+   "outreach": {}
   }
  ]
 }
