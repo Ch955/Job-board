@@ -1,8 +1,8 @@
 {
   "firebase": {
-    "apiKey": "",
-    "authDomain": "",
-    "projectId": "",
-    "appId": ""
+    "apiKey": "AIzaSyDhsnd-w6aYLO3QFM7SNuE_fOKL-i7l5U8",
+    "authDomain": "jobradar-70bc7.firebaseapp.com",
+    "projectId": "jobradar-70bc7",
+    "appId": "1:979341312634:web:ea2f5bbae4d09b9e74b1c3"
   }
 }
