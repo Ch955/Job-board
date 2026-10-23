@@ -1,0 +1,4 @@
+{
+  "projects": { "default": "jobradar-70bc7" },
+  "targets": { "jobradar-70bc7": { "hosting": { "app": ["jobradar"] } } }
+}
