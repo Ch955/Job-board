@@ -1,0 +1,5 @@
+# The API server and the multi-user scheduled run (on top of the fetcher's requirements)
+-r requirements.txt
+fastapi>=0.115,<1
+uvicorn[standard]>=0.30,<1
+pypdf>=5,<7

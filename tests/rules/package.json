@@ -1,0 +1,7 @@
+{
+  "name": "jobradar-rules-tests",
+  "private": true,
+  "description": "Firestore security rules tests. Run: npx firebase emulators:exec --only firestore 'node --test'",
+  "scripts": { "test": "firebase emulators:exec --project demo-jobradar --only firestore 'node --test rules.test.mjs'" },
+  "devDependencies": { "@firebase/rules-unit-testing": "4.0.1", "firebase": "11.10.0", "firebase-tools": "14.11.0" }
+}

@@ -1,2 +1,4 @@
--r requirements.txt
+-r requirements-server.txt
 pytest>=8
+httpx>=0.27
+pyflakes>=3

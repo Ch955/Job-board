@@ -14,3 +14,8 @@ out/
 *.pdf
 # Firebase service account key (goes in GitHub Secrets only)
 *firebase-adminsdk*.json
+# Rules-test tooling
+node_modules/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log

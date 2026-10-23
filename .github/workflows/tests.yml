@@ -1,0 +1,33 @@
+name: Tests
+
+on:
+  push:
+    branches-ignore: [gh-pages]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11", cache: pip }
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - run: pip install -r requirements-dev.txt
+      - run: python -m pyflakes jobradar tests
+      - run: python -m pytest -q
+
+  firestore-rules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22", cache: npm, cache-dependency-path: tests/rules/package-lock.json }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: "21" }
+      - run: npm ci --prefix tests/rules
+      - run: tests/rules/node_modules/.bin/firebase emulators:exec --project demo-jobradar --only firestore "node --test tests/rules/rules.test.mjs"
