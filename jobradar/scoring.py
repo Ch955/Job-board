@@ -48,6 +48,11 @@ class Scorer:
         self.not_india = [_rx(p) for p in loc.get("not_india_terms", [])]
         self.remote_terms = [_rx(p) for p in loc.get("remote_terms", [])]
 
+        wi = config.get("walk_in") or {}
+        self.walk_in = [_rx(p) for p in wi.get("patterns", [])]
+        self.walk_in_allowed = [_rx(p) for p in wi.get("allowed_locations", [])]
+        self.walk_in_virtual = [_rx(p) for p in wi.get("virtual_terms", [])]
+
         self.exp = config["experience"]
         self.recency = config["recency"]
 
@@ -70,6 +75,15 @@ class Scorer:
                 matched.append(name)
                 total += weight
         return min(total, self.skill_max), matched
+
+    def walk_in_status(self, job: Job) -> tuple[bool, bool]:
+        """Return (is_walk_in, eligible). Walk-ins only count where you can attend in person."""
+        text = f"{job.title} {job.description}"
+        if not self.walk_in or not _any(self.walk_in, text):
+            return False, True
+        if _any(self.walk_in_virtual, text):
+            return True, True
+        return True, (not self.walk_in_allowed) or _any(self.walk_in_allowed, job.location)
 
     def stack_penalty(self, text: str) -> int:
         """Negative points when the job is on another cloud's stack with no Azure in sight."""
@@ -160,6 +174,7 @@ class Scorer:
         loc, loc_label, eligible = self.location_points(job)
         exp, years, years_max, exp_ok = self.experience_points(job.description)
         rec, days = self.recency_points(job, now)
+        walk_in, walk_in_ok = self.walk_in_status(job)
 
         job.score = max(0, min(100, title + skills + loc + exp + rec + penalty))
         job.matched_keywords = matched
@@ -172,6 +187,8 @@ class Scorer:
             "penalty": penalty,
             "location_label": loc_label,
             "location_eligible": eligible,
+            "walk_in": walk_in,
+            "walk_in_eligible": walk_in_ok,
             "years_required": years,
             "years_max": years_max,
             "experience_eligible": exp_ok,

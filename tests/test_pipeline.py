@@ -142,3 +142,17 @@ def test_carry_over_drops_old_5_plus_year_jobs(config):
                                    old("Big Data Engineer", 8, "applied"))}
     jobs, _, _ = pipeline.process([], previous, config, now)
     assert {j.title for j in jobs} == {"Data Engineer", "Big Data Engineer"}
+
+
+def test_walk_in_outside_hyderabad_dropped(config):
+    now = datetime(2026, 10, 23, tzinfo=timezone.utc)
+    def job(title, loc):
+        return Job(title=title, company="Acme " + loc, location=loc, url="u", source="naukri",
+                   description="Azure Data Factory, Databricks, PySpark, SQL. 3+ years of experience.",
+                   posted_date=now.isoformat())
+    fetched = [job("Walk-in || Azure Data Engineer", "Pune, Bengaluru, India"),
+               job("Walk-in || Azure Data Engineer", "Hyderabad, India"),
+               job("Azure Data Engineer", "Pune, India")]
+    jobs, _, dropped = pipeline.process(fetched, {}, config, now)
+    assert sorted(j.location for j in jobs) == ["Hyderabad, India", "Pune, India"]
+    assert dropped["walk_in"] == 1

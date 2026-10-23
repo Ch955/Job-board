@@ -149,3 +149,15 @@ def test_aws_only_stack_is_penalised(scorer):
     azure = scorer.score(job("Data Engineer", description="Azure Databricks, Redshift migration, PySpark, SQL"), NOW)
     assert aws.score_breakdown["penalty"] == -12
     assert azure.score_breakdown["penalty"] == 0
+
+
+@pytest.mark.parametrize("title,desc,location,walk_in,ok", [
+    ("Walk-in || Azure Data Engineer", "", "Pune, Bengaluru, India", True, False),
+    ("Azure Data Engineer", "Walk in interview on Saturday 10am", "Chennai", True, False),
+    ("Data Engineer - Walkin Drive", "", "Hyderabad, Telangana", True, True),
+    ("Data Engineer", "Weekend drive for Azure roles", "Hyderabad / Pune", True, True),
+    ("Data Engineer", "Hybrid role, 3 days in office", "Pune", False, True),
+    ("Walk-in Drive - Data Engineer (Virtual)", "", "GJ, IN", True, True),  # online: attend from anywhere
+])
+def test_walk_ins_only_in_hyderabad(scorer, title, desc, location, walk_in, ok):
+    assert scorer.walk_in_status(job(title, location, desc)) == (walk_in, ok)

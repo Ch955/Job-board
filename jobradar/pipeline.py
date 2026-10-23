@@ -116,7 +116,7 @@ def process(
     drop_ineligible = config.get("location", {}).get("drop_ineligible", True)
     scorer = Scorer(config)
     drop_experience = config.get("experience", {}).get("drop_outside_range", True)
-    dropped = {"irrelevant_title": 0, "location": 0, "experience": 0, "too_old": 0, "low_score": 0, "duplicates": 0}
+    dropped = {"irrelevant_title": 0, "location": 0, "experience": 0, "walk_in": 0, "too_old": 0, "low_score": 0, "duplicates": 0}
 
     relevant = []
     for job in fetched:
@@ -144,6 +144,9 @@ def process(
             if drop_experience and not job.score_breakdown["experience_eligible"]:
                 dropped["experience"] += 1
                 continue
+            if not job.score_breakdown["walk_in_eligible"]:
+                dropped["walk_in"] += 1
+                continue
             if (age_days(job, now) or 0) > max_age:
                 dropped["too_old"] += 1
                 continue
@@ -166,6 +169,8 @@ def process(
         if not keep and drop_ineligible and not scorer.location_points(old)[2]:
             continue
         bd_old = old.score_breakdown or {}
+        if not keep and not scorer.walk_in_status(old)[1]:
+            continue
         if not keep and drop_experience and not scorer.experience_eligible(
                 bd_old.get("years_required"), bd_old.get("years_max")):
             continue

@@ -222,7 +222,8 @@ Before scoring, a job must pass the **title gate**: its title has to match a `ti
 none of `title.exclude` (intern, manager, director, sales, data scientist/analyst...).
 
 After scoring, a job is dropped if it is older than 30 days, scores below 40, isn't in India, or asks for
-experience outside 2–4 years. When a posting mentions several numbers, the largest requirement counts
+experience outside 2–4 years. **Walk-in drives** are kept only in Hyderabad (or when they're virtual/online),
+and show a "walk-in" badge in the app. When a posting mentions several numbers, the largest requirement counts
 ("5+ years overall, 2+ with Databricks" means 5).
 **India only:** a job is kept only if its location names an Indian city or state, or "India". A remote
 job is kept only if it says India (e.g. "Remote - India"). "Remote (Worldwide)", "Remote - EMEA",

@@ -250,6 +250,7 @@ main { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
 .badge.applied { background: color-mix(in srgb, var(--applied) 16%, transparent); color: var(--applied); }
 .badge.interview { background: color-mix(in srgb, var(--interview) 16%, transparent); color: var(--interview); }
 .badge.skipped { background: color-mix(in srgb, var(--skipped) 16%, transparent); color: var(--skipped); }
+.badge.walkin { background: color-mix(in srgb, var(--s-low) 18%, transparent); color: var(--s-low); }
 .badge.offer { background: var(--accent-soft); color: var(--accent); }
 .badge.rejected { background: color-mix(in srgb, var(--skipped) 16%, transparent); color: var(--skipped); }
 

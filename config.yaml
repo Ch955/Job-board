@@ -129,6 +129,14 @@ location:
   # Drop everything that isn't in India or remote-open-to-India.
   drop_ineligible: true
 
+# Walk-in drives need you there in person, so they're kept only when the
+# location includes Hyderabad. Regular jobs elsewhere in India are unaffected.
+walk_in:
+  patterns: ['walk[- ]?ins?\b', '\bwalkin', '(face[- ]to[- ]face|f2f|in[- ]person|weekend|hiring) (interview )?drive\b']
+  allowed_locations: ['hyderabad', 'secunderabad', 'hitec city', 'gachibowli']
+  # Online drives you can attend from anywhere
+  virtual_terms: ['virtual', 'online', 'video (call|interview)', 'teams interview', 'zoom']
+
 experience:
   points: 10
   # Your band: jobs asking for anything from 2 to 4 years. Parsed from the

@@ -359,6 +359,7 @@ function renderCard(job) {
   const isNew = status === "new" && new Date(job.first_seen).getTime() >= Date.now() - 86400e3;
   const parts = [job.location, job.remote ? "Remote" : null, job.source, ago(job.posted_date || job.first_seen)];
   if (isNew) meta.append(badge("new", "new"));
+  if (job.score_breakdown?.walk_in) meta.append(badge("walk-in", "walkin"));
   for (const p of parts.filter(Boolean)) {
     const s = document.createElement("span");
     s.textContent = p;
