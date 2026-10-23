@@ -8,7 +8,7 @@ No paid APIs, no paid hosting, no LLM calls.
 > **Status:** done: fetchers + scoring, GitHub Actions, the app and phone alerts.
 > Next: Gmail (recruiter replies, interview invites, rejections and offers).
 
-**Your app:** <https://ch955.github.io/job-board/> (live after the one-time setup below)
+**Your app:** <https://ch955.github.io/Job-board/> (live after the one-time setup below)
 
 
 > **Multi-user version:** Job Radar can now serve many people, each with their own resume,
@@ -57,7 +57,7 @@ Secrets are encrypted by GitHub and never appear in the code, the logs or `jobs.
 ### 3. Run it once
 Repo → **Actions** tab. If GitHub asks, click **I understand my workflows, go ahead and enable them**. Then
 **Job Radar** → **Run workflow** → mode **fetch** → **Run workflow**. After a few minutes it
-commits `docs/jobs.json` and deploys the app. Open <https://ch955.github.io/job-board/>.
+commits `docs/jobs.json` and deploys the app. Open <https://ch955.github.io/Job-board/>.
 
 From now on it runs by itself every 3 hours.
 
