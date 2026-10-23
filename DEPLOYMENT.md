@@ -125,12 +125,12 @@ step and needs your approval. Everything else in Job Radar works without Gmail.
 
 ## 7. Job sources, application types and walk-ins
 
-**Sources in use (permitted):** company career boards via their public APIs (Greenhouse, Lever, Ashby,
-SmartRecruiters), Remotive, and, with free API keys, **Adzuna** and **Jooble**, which carry many Indian jobs.
-**LinkedIn, Naukri and Indeed are switched off** (`config.yaml → sources.jobspy`: `enabled: false`,
-`permitted: false`): the JobSpy library scrapes their pages, which their terms don't allow. Jobs you had already
-tracked from them stay in your lists; untracked ones drop out of the shared list. The app's Job Source filter
-lists only enabled, permitted sources (plus "saved only" for your own tracked history).
+**Sources in use:** company career boards via their public APIs (Greenhouse, Lever, Ashby, SmartRecruiters),
+Remotive, Adzuna and Jooble (with free API keys), and **LinkedIn, Naukri and Indeed via JobSpy**. JobSpy reads
+those sites' public search pages without logging in, which their terms of use don't allow; it is on by the app
+owner's decision for this private group. To stop it, set `sources.jobspy.enabled` and `permitted` to `false` in
+`config.yaml`: untracked listings from it then drop out, tracked ones stay. Naukri tends to refuse requests from
+Render's servers, so most Naukri jobs arrive through the GitHub Actions run.
 
 To get more Indian jobs, add the free keys (developer.adzuna.com, jooble.org/api/about) as `ADZUNA_APP_ID`,
 `ADZUNA_APP_KEY` and `JOOBLE_API_KEY` in **both** GitHub Secrets and Render's Environment.

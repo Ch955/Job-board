@@ -206,11 +206,11 @@ sources:
   smartrecruiters: { enabled: true, query: data, max_details_per_company: 15 }
   jobspy:
     # LinkedIn, Naukri and Indeed India via the open-source JobSpy library
-    # (github.com/speedyapply/JobSpy). It scrapes those sites' public search pages,
-    # which their terms don't allow, so it is OFF for the shared app. Turn it on only
-    # with authorized access to those sites (then set permitted: true as well).
-    enabled: false
-    permitted: false
+    # (github.com/speedyapply/JobSpy). It reads those sites' public search pages without
+    # logging in, which their terms of use don't allow. Switched on by the app owner's
+    # decision (Oct 2026) for this private group. Set both to false to stop it.
+    enabled: true
+    permitted: true
     sites: [naukri, linkedin, indeed]
     queries: ['azure data engineer', 'databricks data engineer', 'data engineer pyspark']
     location: India

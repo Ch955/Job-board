@@ -172,8 +172,8 @@ def test_fresh_run_rebuilds_list_but_keeps_state(config, out):
     assert after["state"]["emailed"] == {"a@b.in": "2026-10-23T00:00:00+00:00"}
 
 
-def test_production_config_doesnt_scrape_linkedin_naukri_indeed(config, out):
-    assert config["sources"]["jobspy"]["enabled"] is False and config["sources"]["jobspy"]["permitted"] is False
+def test_switching_linkedin_naukri_indeed_off_stops_them(config, out):
+    config["sources"]["jobspy"].update(enabled=False, permitted=False)
     result = run(config, out)
     assert result.source_runs["jobspy"]["status"] == "disabled"
     assert not {"naukri", "linkedin", "indeed"} & {j["source"] for j in json.loads(out.read_text())["jobs"]}
@@ -181,12 +181,18 @@ def test_production_config_doesnt_scrape_linkedin_naukri_indeed(config, out):
 
 
 def test_enabled_but_not_permitted_source_is_never_fetched(config, out):
-    config["sources"]["jobspy"]["enabled"] = True       # someone flips only the switch
+    config["sources"]["jobspy"].update(enabled=True, permitted=False)   # someone flips only one switch
     result = run(config, out)
     assert result.source_runs["jobspy"]["status"] == "not permitted"
 
 
+def test_owner_turned_linkedin_naukri_indeed_on(config):
+    assert config["sources"]["jobspy"]["enabled"] and config["sources"]["jobspy"]["permitted"]
+    assert {"naukri", "linkedin", "indeed"} <= set(pipeline.permitted_sources(config))
+
+
 def test_switched_off_source_listings_are_dropped_but_tracked_ones_stay(config):
+    config["sources"]["jobspy"].update(enabled=False, permitted=False)
     now = datetime(2026, 10, 23, tzinfo=timezone.utc)
     def j(src, status="new"):
         x = Job(title="Data Engineer", company=f"C {src} {status}", location="Pune, India", url="u", source=src,
