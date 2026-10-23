@@ -11,6 +11,7 @@
     python -m jobradar gmail-auth --client-file client_secret.json   # one-time Gmail sign-in
     python -m jobradar encrypt-resume resume.pdf                     # one-time: resume for drafts
     python -m jobradar gmail-test          # put a test draft in your Gmail
+    python -m jobradar gmail-sync          # Gmail confirmations -> Applied / Interview / Rejected
 """
 
 from __future__ import annotations
@@ -200,6 +201,30 @@ def cmd_gmail_test(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_gmail_sync(args: argparse.Namespace) -> int:
+    """Never fails the workflow for a missing setup: it says what's missing and exits 0."""
+    from . import gmail_status, sync
+    from .config import env
+    passphrase = env("SYNC_PASSPHRASE")
+    missing = [k for k in ("SYNC_PASSPHRASE",) if not env(k)] + ([outreach.gmail_configured()] if outreach.gmail_configured() else [])
+    if missing:
+        print(f"Gmail status sync skipped: {'; '.join(missing)}")
+        return 0
+    state, envelope, key = sync.load(passphrase)
+    if envelope is None:
+        print("Gmail status sync skipped: sign in to the app once first (it creates sync/state.enc.json)")
+        return 0
+    config = load_config(args.config)
+    path = ROOT / config.get("pipeline", {}).get("output", "docs/jobs.json")
+    jobs = json.loads(path.read_text(encoding="utf-8")).get("jobs", []) if path.exists() else []
+    session = make_session()
+    token = gmail.access_token(session, env("GMAIL_CLIENT_ID"), env("GMAIL_CLIENT_SECRET"), env("GMAIL_REFRESH_TOKEN"))
+    report = gmail_status.run(state, jobs, session, token, days=args.days)
+    sync.save(state, envelope, key)
+    print(f"Gmail status sync: {report}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="jobradar", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--config", help="path to config.yaml")
@@ -239,6 +264,10 @@ def main(argv: list[str] | None = None) -> int:
 
     p_gt = sub.add_parser("gmail-test", help="create a test draft addressed to yourself")
     p_gt.set_defaults(func=cmd_gmail_test)
+
+    p_gs = sub.add_parser("gmail-sync", help="read job emails (read-only) and update statuses in the sync file")
+    p_gs.add_argument("--days", type=int, default=3, help="how far back to look")
+    p_gs.set_defaults(func=cmd_gmail_sync)
 
     p_chk = sub.add_parser("check-companies", help="validate company slugs in config.yaml")
     p_chk.set_defaults(func=cmd_check_companies)

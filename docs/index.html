@@ -6,7 +6,7 @@
   <title>Job Radar</title>
   <meta name="description" content="Personal data engineering job alerts">
   <meta name="theme-color" content="#0b1220" media="(prefers-color-scheme: dark)">
-  <meta name="theme-color" content="#f6f7fb" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#f4f6fb" media="(prefers-color-scheme: light)">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Job Radar">
@@ -17,77 +17,117 @@
   <link rel="stylesheet" href="app.css">
 </head>
 <body>
-  <header class="topbar">
-    <button id="open-nav" class="icon-btn nav-btn" aria-label="Open sections" aria-haspopup="dialog" title="Sections">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
-    </button>
-    <div class="brand">
-      <img src="icons/icon.svg" alt="" width="28" height="28">
-      <div>
+  <!-- ============================================================ login -->
+  <div id="login" class="login" hidden>
+    <div class="login-card">
+      <div class="login-brand">
+        <img src="icons/icon.svg" alt="" width="56" height="56">
         <h1>Job Radar</h1>
-        <p id="updated" class="muted">Loading…</p>
+        <p class="muted" id="lg-sub">Sign in to keep your applications in sync on every device.</p>
       </div>
+      <form id="login-form" autocomplete="on" novalidate>
+        <label class="lg-field">
+          <span>Passphrase</span>
+          <input type="password" id="lg-pass" autocomplete="current-password" minlength="8" required>
+        </label>
+        <label class="lg-field" id="lg-confirm-wrap" hidden>
+          <span>Type it again</span>
+          <input type="password" id="lg-pass2" autocomplete="new-password" minlength="8">
+        </label>
+        <label class="lg-field" id="lg-token-wrap">
+          <span>GitHub token <small class="muted">(once per device)</small></span>
+          <input type="password" id="lg-token" autocomplete="off" spellcheck="false" placeholder="github_pat_…">
+        </label>
+        <details class="lg-help">
+          <summary>How do I get a token?</summary>
+          <ol>
+            <li>Open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">GitHub → new fine-grained token</a>.</li>
+            <li>Name it <b>Job Radar</b>, expiration <b>1 year</b>.</li>
+            <li>Repository access: <b>Only select repositories</b> → your Job-board repo.</li>
+            <li>Permissions → Repository → <b>Contents: Read and write</b>.</li>
+            <li><b>Generate token</b>, copy it, paste it here.</li>
+          </ol>
+          <p class="muted">Your passphrase encrypts your statuses. It never leaves this device, and GitHub can't read the file. Use the same passphrase on every device.</p>
+        </details>
+        <details class="lg-help" id="lg-repo-box">
+          <summary>Repository: <span id="lg-repo-label">…</span></summary>
+          <div class="lg-row">
+            <label class="lg-field"><span>Owner</span><input id="lg-owner" autocomplete="off" spellcheck="false"></label>
+            <label class="lg-field"><span>Repo</span><input id="lg-repo" autocomplete="off" spellcheck="false"></label>
+          </div>
+        </details>
+        <label class="lg-check"><input type="checkbox" id="lg-remember" checked> Keep me signed in on this device</label>
+        <button class="btn btn-primary lg-submit" id="lg-submit" type="submit">Sign in</button>
+        <p id="lg-error" class="lg-error" role="alert"></p>
+      </form>
+      <button class="link-btn" id="lg-skip" type="button">Use on this device only, without sync</button>
     </div>
-    <div class="top-actions">
-      <button id="refresh" class="icon-btn" aria-label="Refresh jobs" title="Refresh">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5"/></svg>
-      </button>
-      <button id="theme" class="icon-btn" aria-label="Theme: auto" title="Theme">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9 7 7 0 0 1-9-9z"/></svg>
-      </button>
-      <button id="open-menu" class="icon-btn" aria-label="Menu" title="Alerts & backup">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
-      </button>
-    </div>
-  </header>
-
-  <section class="stats" aria-label="Your activity">
-    <div class="stat"><b id="stat-today">0</b><span>applied today</span></div>
-    <div class="stat"><b id="stat-week">0</b><span>this week</span></div>
-    <div class="stat"><b id="stat-toapply">0</b><span>to apply</span></div>
-    <div class="stat"><b id="stat-interview">0</b><span>interviews</span></div>
-  </section>
-
-  <section class="filters" aria-label="Filters">
-    <div class="filter-row">
-      <input id="f-search" type="search" placeholder="Search title, company, skill…" autocomplete="off">
-      <button id="toggle-filters" class="chip-btn" aria-expanded="false" aria-controls="filter-panel">Filters</button>
-    </div>
-    <div id="filter-panel" class="filter-panel" hidden>
-      <label class="field">
-        <span>Min score <output id="f-score-val">40</output></span>
-        <input id="f-score" type="range" min="40" max="100" step="5" value="40">
-      </label>
-      <div class="field chip-field" role="group" aria-labelledby="l-source">
-        <span id="l-source">Source <small class="muted">· tap several</small></span>
-        <div id="f-source" class="chips"></div>
-      </div>
-      <div class="field chip-field" role="group" aria-labelledby="l-location">
-        <span id="l-location">Location</span>
-        <div id="f-location" class="chips"></div>
-      </div>
-      <div class="field chip-field" role="group" aria-labelledby="l-remote">
-        <span id="l-remote">Work mode</span>
-        <div id="f-remote" class="chips"></div>
-      </div>
-      <button id="reset-filters" class="link-btn" type="button">Reset filters</button>
-    </div>
-  </section>
-
-  <div class="section-head">
-    <button id="section-title" class="section-title" type="button" aria-haspopup="dialog">
-      <span id="section-name">To apply</span> <span id="section-count" class="count-pill">0</span>
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
-    </button>
-    <p id="section-hint" class="muted"></p>
   </div>
 
-  <main id="list" aria-live="polite"></main>
+  <!-- ============================================================== app -->
+  <div id="app" hidden>
+    <header class="topbar">
+      <button id="open-nav" class="icon-btn nav-btn" aria-label="Open menu" aria-haspopup="dialog" title="Menu">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h11M4 12h16M4 17h9"/></svg>
+      </button>
+      <button class="title-block" id="section-title" type="button" aria-haspopup="dialog">
+        <span class="title-row"><span id="section-name">To apply</span><span id="section-count" class="count-pill">0</span></span>
+        <span id="updated" class="muted">Loading…</span>
+      </button>
+      <button id="sync-dot" class="icon-btn sync-dot" data-state="off" aria-label="Sync status" title="Sync">
+        <span></span>
+      </button>
+      <button id="refresh" class="icon-btn" aria-label="Refresh" title="Refresh">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5"/></svg>
+      </button>
+    </header>
+
+    <div id="ptr" class="ptr" aria-hidden="true"><span></span></div>
+
+    <section class="stats" aria-label="Your activity">
+      <button class="stat" data-go="applied" type="button"><b id="stat-today">0</b><span>applied today</span></button>
+      <button class="stat" data-go="applied" type="button"><b id="stat-week">0</b><span>this week</span></button>
+      <button class="stat" data-go="new" type="button"><b id="stat-toapply">0</b><span>to apply</span></button>
+      <button class="stat" data-go="interview" type="button"><b id="stat-interview">0</b><span>interviews</span></button>
+    </section>
+
+    <section class="filters" aria-label="Filters">
+      <div class="filter-row">
+        <label class="search">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+          <input id="f-search" type="search" placeholder="Search title, company, skill" autocomplete="off" aria-label="Search">
+        </label>
+        <button id="toggle-filters" class="chip-btn" aria-expanded="false" aria-controls="filter-panel">Filters</button>
+      </div>
+      <div id="filter-panel" class="filter-panel" hidden>
+        <label class="field">
+          <span>Min score <output id="f-score-val">40</output></span>
+          <input id="f-score" type="range" min="40" max="100" step="5" value="40">
+        </label>
+        <div class="field chip-field" role="group" aria-labelledby="l-source">
+          <span id="l-source">Source <small class="muted">· tap several</small></span>
+          <div id="f-source" class="chips"></div>
+        </div>
+        <div class="field chip-field" role="group" aria-labelledby="l-location">
+          <span id="l-location">Location</span>
+          <div id="f-location" class="chips"></div>
+        </div>
+        <div class="field chip-field" role="group" aria-labelledby="l-remote">
+          <span id="l-remote">Work mode</span>
+          <div id="f-remote" class="chips"></div>
+        </div>
+        <button id="reset-filters" class="link-btn" type="button">Reset filters</button>
+      </div>
+      <p id="section-hint" class="section-hint muted"></p>
+    </section>
+
+    <main id="list" aria-live="polite"></main>
+  </div>
 
   <template id="card-tpl">
     <article class="card">
       <div class="card-head">
-        <button class="score" type="button" aria-label="Score details"></button>
+        <button class="score" type="button" aria-label="Score details"><span></span></button>
         <div class="card-title">
           <h2 class="title"></h2>
           <p class="company"></p>
@@ -97,53 +137,83 @@
       <div class="breakdown" hidden></div>
       <ul class="keywords"></ul>
       <p class="snippet"></p>
-      <p class="status-line muted"></p>
-      <div class="card-actions">
-        <a class="btn btn-primary apply" target="_blank" rel="noopener noreferrer">Apply</a>
+      <div class="pending-bar" hidden>
+        <span class="pending-text"></span>
+        <button class="pb-yes" type="button">Yes, applied</button>
+        <button class="pb-no" type="button">Not yet</button>
       </div>
+      <div class="card-actions">
+        <a class="btn apply" target="_blank" rel="noopener noreferrer">Apply</a>
+      </div>
+      <div class="move-row"></div>
       <div class="outreach-row"></div>
     </article>
   </template>
 
-  <dialog id="nav" class="drawer" aria-label="Sections">
-    <div class="drawer-head">
-      <img src="icons/icon.svg" alt="" width="28" height="28">
-      <b>Job Radar</b>
-      <form method="dialog"><button class="icon-btn" aria-label="Close">✕</button></form>
+  <!-- =========================================================== drawer -->
+  <dialog id="nav" class="drawer" aria-label="Menu">
+    <div class="drawer-hero">
+      <div class="avatar" id="dr-avatar">JR</div>
+      <div class="hero-text">
+        <b id="dr-name">Job Radar</b>
+        <span id="dr-role"></span>
+      </div>
+      <form method="dialog"><button class="icon-btn hero-close" aria-label="Close">✕</button></form>
+      <div class="hero-stats">
+        <div><b id="dr-week">0</b><span>applied this week</span></div>
+        <div><b id="dr-total">0</b><span>applied in total</span></div>
+        <div><b id="dr-int">0</b><span>interviews</span></div>
+      </div>
+      <button class="sync-pill" id="dr-sync" type="button"><span class="dot"></span><span class="txt">This device only</span></button>
     </div>
-    <nav id="nav-list"></nav>
+    <nav id="nav-list" class="nav-list"></nav>
+    <div class="drawer-foot">
+      <button class="btn" id="dr-signout" type="button">Sign out</button>
+      <span class="muted" id="dr-version">Job Radar</span>
+    </div>
   </dialog>
 
-  <dialog id="menu">
+  <!-- ========================================================= settings -->
+  <dialog id="settings" class="sheet" aria-label="Settings">
     <form method="dialog" class="menu-head">
-      <h2>Alerts &amp; backup</h2>
+      <h2>Settings</h2>
       <button class="icon-btn" aria-label="Close">✕</button>
     </form>
-
+    <section class="menu-section">
+      <h3>Sync</h3>
+      <div id="sync-body"></div>
+    </section>
     <section class="menu-section">
       <h3>Phone alerts</h3>
-      <p class="muted">Get a notification for every new job scoring <b id="alert-score">70</b>+, and a summary every morning at 9.</p>
+      <p class="muted">A notification for every new job scoring <b id="alert-score">70</b>+, and a summary every morning at 9.</p>
       <div id="alerts-body"></div>
     </section>
-
+    <section class="menu-section">
+      <h3>Export</h3>
+      <p class="muted">A spreadsheet of your jobs and statuses. Opens in Excel or Google Sheets.</p>
+      <div class="row">
+        <button class="btn btn-primary" data-export="all" type="button">All jobs (.csv)</button>
+        <button class="btn" data-export="section" type="button">This section (.csv)</button>
+      </div>
+    </section>
     <section class="menu-section">
       <h3>Backup</h3>
-      <p class="muted">Your Applied / Interview / Skip choices are saved on this device only. Export a backup to move them to another phone or keep them safe.</p>
+      <p class="muted">A copy of your statuses you can restore later.</p>
       <div class="row">
-        <button id="export" class="btn" type="button">Export JSON</button>
-        <label class="btn" for="import-file">Import JSON</label>
+        <button id="export" class="btn" type="button">Export backup</button>
+        <label class="btn" for="import-file">Import backup</label>
         <input id="import-file" type="file" accept="application/json,.json" hidden>
       </div>
     </section>
-
     <section class="menu-section">
       <h3>Install</h3>
-      <p class="muted">Android: browser menu → <b>Install app</b> / <b>Add to Home screen</b>. iPhone: Safari Share button → <b>Add to Home Screen</b>.</p>
+      <p class="muted">Android: browser menu → <b>Install app</b>. iPhone: Safari Share → <b>Add to Home Screen</b>.</p>
     </section>
   </dialog>
 
   <div id="toast" class="toast" role="status" hidden></div>
 
+  <script src="sync.js" defer></script>
   <script src="app.js" defer></script>
 </body>
 </html>

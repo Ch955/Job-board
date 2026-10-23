@@ -42,6 +42,7 @@ Repo → **Settings** → **Secrets and variables** → **Actions** → **New re
 | `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN` | `python -m jobradar gmail-auth` ([Gmail setup](#one-time-gmail-setup-about-15-minutes-free)) | for recruiter drafts |
 | `RESUME_KEY` | `python -m jobradar encrypt-resume` | to attach your resume |
 | `EMAIL_SIGNATURE` | your own text, e.g. your phone number | optional |
+| `SYNC_PASSPHRASE` | the passphrase you sign in to the app with | for Gmail status updates |
 | `ADZUNA_APP_ID`, `ADZUNA_APP_KEY` | [Adzuna](#adzuna) | optional |
 | `JOOBLE_API_KEY` | [Jooble](#jooble) | optional |
 
@@ -136,27 +137,45 @@ emails and recruiter replies). It can't send. You can revoke it any time at <htt
 
 ## The app
 
-- **Sections:** tap **›** (top left) or the section title to open the drawer. Each job is in exactly one section:
+### Sign in and sync (phone + laptop show the same thing)
+The first time you open the app it asks you to sign in. That keeps your Applied / Interview / Skip choices identical
+on every device, still for ₹0:
 
-  | Section | Buttons on each card |
+1. **Create a GitHub token** (once per device; the login page has the same steps):
+   <https://github.com/settings/personal-access-tokens/new> → name `Job Radar`, expiration 1 year →
+   *Only select repositories* → your Job-board repo → Permissions → Repository → **Contents: Read and write** → Generate.
+2. **Choose a passphrase** on your first device (8+ characters) and type it twice. Use the same passphrase on every
+   other device. It encrypts your statuses and never leaves the device.
+3. Tick **Keep me signed in** so you don't have to sign in again.
+
+Your statuses are stored in `sync/state.enc.json` in the repo, encrypted with AES-256-GCM (key from your passphrase,
+PBKDF2-SHA256). The repo is public, but the file is unreadable without the passphrase. Changes reach your other
+devices within a minute while the app is open, or straight away with ⟳ / pull down. Prefer not to sign in? Tap
+*Use on this device only*.
+
+### Using it
+- **☰ menu:** your profile and totals, the sections with counts, Gmail sections, Export, Settings, theme, sign out.
+- **Sections:** each job is in exactly one, and **Back** goes to the previous section (or closes the menu) instead
+  of leaving the app.
+
+  | Section | Buttons |
   |---|---|
-  | 🎯 To apply | Apply · **Applied** · Later · Skip |
-  | ⏳ Apply later | Apply · Applied · Skip · ↩ To apply |
-  | ✅ Applied (newest first, shows "Applied 2d ago") | Interview · Rejected · ↩ Undo |
-  | 🗓️ Interview | Offer · Rejected · ↩ Applied |
-  | 🎉 Offers / ✖️ Rejected / 🙈 Skipped | move back if you tapped by mistake |
-  | ✉️ Recruiter emails / 💬 Needs your reply | filled by the Gmail step (phase 5); links to Gmail for now |
+  | 🎯 To apply | Apply · Applied · Later · Skip |
+  | ⏳ Apply later | Apply · Applied · Skip · move back |
+  | 🙈 Skipped | Apply · **Applied** (apply straight from here) · ↩ To apply |
+  | ✅ Applied | View job · ✓ Applied (date) · move to Interview / Rejected / Undo |
+  | 🗓️ Interview · 🎉 Offers · ✖️ Rejected | move on or back |
+  | ✉️ Recruiter emails · 📥 Inbox updates | Gmail drafts, and what Gmail changed |
 
-  Tapping **Applied** moves the job out of *To apply* and into *Applied* straight away, with an **Undo** toast.
-- Job cards are sorted by score, with the matched skills and a tap-the-score breakdown.
-- Filters: minimum score, plus **multi-select** chips for source (e.g. Naukri + LinkedIn together), location and
-  work mode, and a search box. Each chip shows how many jobs it would give.
-- **Apply** opens the original posting and then asks "Did you apply?".
-- Counters: applied today / this week, jobs to apply, interviews.
-- Your statuses are saved on the phone (localStorage). ☰ → **Export JSON** makes a backup file; **Import JSON**
-  restores it or moves it to another device. Jobs you've acted on stay in the app even after they age out of `jobs.json`.
-- Dark / light mode follows your phone. The moon button cycles auto → light → dark.
-- Works offline with the last jobs it loaded, refreshes when you reopen it, and updates itself when a new version is deployed.
+- **Colours:** blue **Apply** = not opened yet · amber **⏳ Pending** = you opened the posting but haven't confirmed
+  (the card asks "Did you apply?") · green **✓ Applied** and a grey **View job** = done.
+- **Gmail (read-only):** every 3 hours GitHub reads recent job emails. Application confirmations move the job to
+  Applied, interview / test invites to Interview, rejections to Rejected, marked "from Gmail". Applications you made
+  elsewhere (e.g. a LinkedIn confirmation for a job not in the list) are added to Applied too. Needs the Gmail setup
+  below plus one more secret, `SYNC_PASSPHRASE` = the passphrase you sign in with.
+- **Export to Excel:** ☰ → *Export to Excel (.csv)* (or Settings → This section). Status, applied date, score, title,
+  company, location, source, skills, recruiter email and link for every job.
+- Filters: minimum score plus multi-select chips (e.g. Naukri + LinkedIn); search; pull down to refresh; dark / light.
 
 Preview it on your laptop with your local data:
 ```bash
@@ -217,6 +236,7 @@ Other useful flags:
 | `python -m jobradar gmail-auth --client-file …json` | one-time Gmail sign-in |
 | `python -m jobradar encrypt-resume resume.pdf` | encrypt your resume for draft attachments |
 | `python -m jobradar gmail-test` | create a test draft to yourself |
+| `python -m jobradar gmail-sync` | read job emails (read-only) and update statuses in the sync file |
 
 ### First thing to do: check the company list
 
@@ -345,8 +365,11 @@ tests/                 pytest suite + API-shaped fixtures
   outreach.py          recruiter emails in postings, email + LinkedIn templates, drafting rules
   gmail.py             Gmail API over plain HTTP: sign-in, drafts
   resume.py            encrypted resume (assets/resume.pdf.enc)
+  sync.py              encrypted status file shared with the app (same format as docs/sync.js)
+  gmail_status.py      Gmail confirmations / interviews / rejections -> statuses
+sync/state.enc.json    your statuses, encrypted (written by the app and by the workflow)
   notify.py            which notifications to send, and sending them
-docs/                  the app (GitHub Pages root): index.html, app.js, app.css, sw.js, jobs.json
+docs/                  the app (GitHub Pages root): index.html, app.js, sync.js, app.css, sw.js, jobs.json
 .github/workflows/     the 3-hourly schedule
 scripts/make_icons.py  regenerates the app icons
 ```
