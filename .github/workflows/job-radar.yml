@@ -62,9 +62,15 @@ jobs:
           git add docs/jobs.json
           if git diff --cached --quiet; then echo "No changes"; exit 0; fi
           git commit -m "Update jobs $(date -u +'%Y-%m-%d %H:%M') UTC"
-          for i in 1 2 3; do git pull --rebase origin "${GITHUB_REF_NAME}" && git push && exit 0; sleep $((i*5)); done
+          # Another run may have saved jobs.json meanwhile: keep this run's copy (it's the newest)
+          for i in 1 2 3; do
+            if git pull --rebase -X theirs origin "${GITHUB_REF_NAME}" && git push; then exit 0; fi
+            git rebase --abort 2>/dev/null || true
+            sleep $((i*5))
+          done
           exit 1
       - name: Gmail statuses (read-only) into your app account
+        if: ${{ !cancelled() }}   # still runs if saving jobs.json failed
         env:
           GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
           GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
@@ -72,6 +78,7 @@ jobs:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: python -m jobradar gmail-sync
       - name: Multi-user run (every signed-up user; skipped until the backend secrets exist)
+        if: ${{ !cancelled() }}   # still runs if saving jobs.json failed
         env:
           FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
