@@ -77,3 +77,9 @@ def test_merge_rules():
     assert m["statuses"]["j"] == {"status": "new", "at": "2026-10-23T09:05:00Z", "appliedAt": "2026-10-23T09:00:00Z"}
     assert m["saved"] == {}  # back in To apply: no snapshot needed
     assert sync.merge(*MERGE_CASES[2])["pending"]["p"]["open"] is False
+
+
+@needs_node
+def test_oauth_worker():
+    out = subprocess.run([NODE, str(ROOT / "tests/js/worker_test.mjs")], capture_output=True, text=True, timeout=60)
+    assert out.returncode == 0, out.stderr

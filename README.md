@@ -139,7 +139,8 @@ emails and recruiter replies). It can't send. You can revoke it any time at <htt
 
 ### Sign in and sync (phone + laptop show the same thing)
 The first time you open the app it asks you to sign in. That keeps your Applied / Interview / Skip choices identical
-on every device, still for ₹0:
+on every device, still for ₹0. Tap **Sign in with GitHub**, then enter your passphrase (first time: choose one and type
+it twice; use the same one on every device). Until GitHub sign-in is set up (below), use **Use a token instead**:
 
 1. **Create a GitHub token** (once per device; the login page has the same steps):
    <https://github.com/settings/personal-access-tokens/new> → name `Job Radar`, expiration 1 year →
@@ -152,6 +153,29 @@ Your statuses are stored in `sync/state.enc.json` in the repo, encrypted with AE
 PBKDF2-SHA256). The repo is public, but the file is unreadable without the passphrase. Changes reach your other
 devices within a minute while the app is open, or straight away with ⟳ / pull down. Prefer not to sign in? Tap
 *Use on this device only*.
+
+### Setting up "Sign in with GitHub" (one time, about 10 minutes, free)
+GitHub's sign-in ends with a step that needs a secret, which can't sit in a public web page. A tiny free
+**Cloudflare Worker** (`oauth/worker.js`, about 40 lines) holds it and does just that step. It stores nothing and only
+answers your app.
+
+1. **GitHub OAuth app.** Open <https://github.com/settings/applications/new>:
+   - Application name: `Job Radar`
+   - Homepage URL and Authorization callback URL: both `https://ch955.github.io/Job-board/`
+   - **Register application**, copy the **Client ID**, then **Generate a new client secret** and copy it (shown once).
+2. **Cloudflare Worker.** Sign up free at <https://dash.cloudflare.com/sign-up> (no card needed). Then:
+   - **Workers & Pages** → **Create** → **Create Worker** → name it `job-radar-login` → **Deploy**.
+   - **Edit code**, replace everything with the contents of `oauth/worker.js`, then **Deploy**.
+   - The worker's **Settings** → **Variables and Secrets** → add `GITHUB_CLIENT_ID` (text), `GITHUB_CLIENT_SECRET`
+     (secret) and `ALLOWED_ORIGIN` = `https://ch955.github.io` (text) → **Deploy**.
+   - Copy the worker's address, like `https://job-radar-login.<your-name>.workers.dev`.
+3. **Tell the app.** Edit `docs/app-config.json` on GitHub, fill in `client_id` and `proxy` (the worker address), and
+   commit. The app redeploys in about a minute and shows the **Sign in with GitHub** button.
+
+Signing in gives the app GitHub's `public_repo` access, which covers all your public repos (OAuth apps can't be
+narrowed to one). The app only ever reads and writes `sync/state.enc.json`. You can revoke it at any time under
+<https://github.com/settings/applications>. If you'd rather limit access to this one repo, keep using a fine-grained
+token (*Use a token instead*).
 
 ### Using it
 - **☰ menu:** your profile and totals, the sections with counts, Gmail sections, Export, Settings, theme, sign out.
@@ -366,6 +390,8 @@ tests/                 pytest suite + API-shaped fixtures
   gmail.py             Gmail API over plain HTTP: sign-in, drafts
   resume.py            encrypted resume (assets/resume.pdf.enc)
   sync.py              encrypted status file shared with the app (same format as docs/sync.js)
+oauth/worker.js        Cloudflare Worker for "Sign in with GitHub" (holds the OAuth client secret)
+docs/app-config.json   GitHub sign-in settings (client id + worker address; nothing secret)
   gmail_status.py      Gmail confirmations / interviews / rejections -> statuses
 sync/state.enc.json    your statuses, encrypted (written by the app and by the workflow)
   notify.py            which notifications to send, and sending them

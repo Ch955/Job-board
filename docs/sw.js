@@ -1,5 +1,5 @@
 /* Job Radar service worker: offline shell, fresh jobs.json, push notifications. */
-const VERSION = "jobradar-v6";
+const VERSION = "jobradar-v7";
 const SHELL = ["./", "index.html", "app.css", "app.js", "sync.js", "manifest.webmanifest",
                "icons/icon.svg", "icons/icon-192.png", "icons/icon-512.png"];
 

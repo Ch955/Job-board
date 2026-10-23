@@ -60,6 +60,8 @@ let lastFetch = 0;
 let animateNext = true;
 let reloading = false;
 let session = null; // {owner, repo, branch, token, key(CryptoKey), salt, iter, gh}
+let appConfig = {};  // docs/app-config.json: GitHub sign-in settings
+let ghLogin = null;  // {token, login, avatar} right after "Sign in with GitHub"
 let syncInfo = { state: "off", at: null, error: "" };
 
 // ------------------------------------------------------------------ storage
@@ -573,9 +575,19 @@ function renderNav(jobs) {
   );
   const p = data.outreach?.profile || {};
   const name = p.full_name || p.name || "Job Radar";
-  $("#dr-avatar").textContent = name.split(/\s+/).filter(Boolean).map((w) => w[0]).join("").slice(0, 2).toUpperCase() || "JR";
+  const av = $("#dr-avatar");
+  if (session?.avatar) {
+    av.textContent = "";
+    av.style.backgroundImage = `url("${encodeURI(session.avatar)}")`;
+    av.classList.add("has-img");
+  } else {
+    av.style.backgroundImage = "";
+    av.classList.remove("has-img");
+    av.textContent = name.split(/\s+/).filter(Boolean).map((w) => w[0]).join("").slice(0, 2).toUpperCase() || "JR";
+  }
   $("#dr-name").textContent = p.name || name;
   $("#dr-role").textContent = [p.role, p.years_experience ? `${p.years_experience}+ yrs` : "", p.notice].filter(Boolean).join(" · ");
+  if (session?.login) $("#dr-role").textContent += ` · @${session.login}`;
   const times = appliedTimes();
   const week = startOfWeek();
   countUp($("#dr-week"), times.filter((d) => d >= week).length);
@@ -867,21 +879,83 @@ function repoFromLocation() {
   return m ? { owner: m[1], repo: repo || `${m[1]}.github.io` } : { owner: "", repo: "" };
 }
 
-function showLogin() {
+const oauthCfg = () => appConfig.github_oauth || {};
+const oauthReady = () => !!(oauthCfg().client_id && oauthCfg().proxy);
+const redirectUri = () => location.origin + location.pathname;
+
+// mode: "github" = the Sign in with GitHub button; "pass" = passphrase step; "token" = paste a token
+function showLogin(mode) {
   $("#app").hidden = true;
   $("#login").hidden = false;
   const saved = readJSON(K.sync, null) || readJSON(K.sync, null, sessionStorage) || {};
+  const user = ghLogin || (saved.login ? { login: saved.login, avatar: saved.avatar } : null);
+  const haveToken = !!(ghLogin?.token || saved.token);
+  mode = mode || (haveToken ? "pass" : oauthReady() ? "github" : "token");
   const guess = repoFromLocation();
-  $("#lg-owner").value = saved.owner || guess.owner;
-  $("#lg-repo").value = saved.repo || guess.repo;
+  $("#lg-owner").value = saved.owner || guess.owner || user?.login || "";
+  $("#lg-repo").value = saved.repo || guess.repo || "Job-board";
   $("#lg-repo-label").textContent = `${$("#lg-owner").value || "?"}/${$("#lg-repo").value || "?"}`;
   $("#lg-repo-box").open = !$("#lg-owner").value;
-  $("#lg-token-wrap").hidden = !!saved.token;
+
+  $("#lg-step-gh").hidden = mode !== "github";
+  $("#login-form").hidden = mode === "github";
+  $("#lg-user").hidden = !(mode === "pass" && user);
+  if (user) {
+    $("#lg-login").textContent = `@${user.login}`;
+    if (user.avatar) $("#lg-avatar").src = user.avatar;
+  }
+  $("#lg-token-wrap").hidden = mode !== "token";
+  $("#lg-token-wrap").nextElementSibling.hidden = mode !== "token"; // "How do I get a token?"
+  $("#lg-back-gh").hidden = !(mode === "token" && oauthReady());
+  $("#lg-use-token").hidden = false;
+  $("#lg-gh-note").textContent = oauthReady() ? "" : "GitHub sign-in isn't set up for this app yet (README: Sign in with GitHub). You can use a token meanwhile.";
+  $("#lg-github").disabled = !oauthReady();
   $("#lg-confirm-wrap").hidden = true;
-  $("#lg-sub").textContent = "Sign in to keep your applications in sync on every device.";
+  $("#lg-sub").textContent = mode === "pass"
+    ? "Enter your passphrase. It unlocks your statuses on this device."
+    : "Sign in to keep your applications in sync on every device.";
   $("#lg-error").textContent = "";
   $("#lg-pass").value = "";
-  setTimeout(() => $("#lg-pass").focus(), 50);
+  if (mode !== "github") setTimeout(() => $("#lg-pass").focus(), 50);
+}
+
+function startGitHubLogin() {
+  if (!oauthReady()) return;
+  const state = JRSync.b64u(crypto.getRandomValues(new Uint8Array(18)));
+  writeJSON("jobradar.oauth", { state, at: Date.now() }, sessionStorage);
+  const q = new URLSearchParams({ client_id: oauthCfg().client_id, redirect_uri: redirectUri(),
+    scope: oauthCfg().scope || "public_repo", state, allow_signup: "false" });
+  location.assign(`https://github.com/login/oauth/authorize?${q}`);
+}
+
+// Back from GitHub with ?code=…&state=…: swap the code for a token through the helper
+async function finishGitHubLogin() {
+  const q = new URLSearchParams(location.search);
+  if (!q.has("code") && !q.has("error")) return false;
+  const expected = readJSON("jobradar.oauth", null, sessionStorage);
+  writeJSON("jobradar.oauth", undefined, sessionStorage);
+  history.replaceState(history.state, "", location.pathname + location.hash); // drop ?code from the address bar
+  const fail = (msg) => {
+    showLogin("github");
+    $("#lg-gh-note").textContent = msg;
+    return true;
+  };
+  if (q.get("error")) return fail(q.get("error") === "access_denied" ? "Sign-in was cancelled." : `GitHub said: ${q.get("error")}`);
+  if (!expected || expected.state !== q.get("state")) return fail("That sign-in link didn't come from this app. Try again.");
+  try {
+    const r = await fetch(oauthCfg().proxy, { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: q.get("code"), redirect_uri: redirectUri() }) });
+    const out = await r.json().catch(() => ({}));
+    if (!r.ok || !out.access_token) throw new Error(out.description || out.error || `helper answered ${r.status}`);
+    const u = await fetch("https://api.github.com/user", { headers: { Authorization: `Bearer ${out.access_token}`, Accept: "application/vnd.github+json" } });
+    if (!u.ok) throw new Error(`GitHub ${u.status}`);
+    const user = await u.json();
+    ghLogin = { token: out.access_token, login: user.login, avatar: user.avatar_url };
+    showLogin("pass");
+  } catch (e) {
+    fail(`GitHub sign-in didn't finish: ${e.message}`);
+  }
+  return true;
 }
 
 async function onLogin(e) {
@@ -891,13 +965,15 @@ async function onLogin(e) {
   err.textContent = "";
   const pass = $("#lg-pass").value;
   const saved = readJSON(K.sync, null) || readJSON(K.sync, null, sessionStorage) || {};
-  const token = ($("#lg-token").value || saved.token || "").trim();
+  const tokenMode = !$("#lg-token-wrap").hidden;
+  const token = ((tokenMode && $("#lg-token").value) || ghLogin?.token || saved.token || "").trim();
   const owner = $("#lg-owner").value.trim();
   const repo = $("#lg-repo").value.trim();
   if (pass.length < 8) return (err.textContent = "Use a passphrase of at least 8 characters.");
   if (!token) {
-    $("#lg-token-wrap").hidden = false;
-    return (err.textContent = "Paste your GitHub token (see “How do I get a token?”).");
+    if (oauthReady() && !tokenMode) return showLogin("github");
+    showLogin("token");
+    return ($("#lg-error").textContent = "Paste your GitHub token (see “How do I get a token?”).");
   }
   if (!owner || !repo) {
     $("#lg-repo-box").open = true;
@@ -933,7 +1009,8 @@ async function onLogin(e) {
       iter = JRSync.ITERATIONS;
       key = await JRSync.deriveKey(pass, salt, iter);
     }
-    const cfg = { owner, repo, branch, token, key: await JRSync.exportKey(key), salt, iter };
+    const who = ghLogin || (saved.token === token ? { login: saved.login, avatar: saved.avatar } : {});
+    const cfg = { owner, repo, branch, token, key: await JRSync.exportKey(key), salt, iter, login: who.login, avatar: who.avatar };
     const remember = $("#lg-remember").checked;
     writeJSON(K.sync, remember ? cfg : undefined);
     writeJSON(K.sync, remember ? undefined : cfg, sessionStorage);
@@ -941,14 +1018,22 @@ async function onLogin(e) {
     await startSession(cfg);
     writeJSON(K.dirty, true); // bring this device's statuses into the shared file
     $("#lg-token").value = "";
+    ghLogin = null;
     showApp();
     await syncNow();
     toast(remote ? "Signed in · statuses synced" : "Sync is on. Sign in on your other devices with the same passphrase.");
   } catch (ex) {
-    if (!ex.quiet) err.textContent = ex.status === 401 ? "GitHub didn't accept that token. Check you copied all of it." : ex.message;
+    if (ex.status === 401 && !tokenMode && oauthReady()) {
+      ghLogin = null;
+      writeJSON(K.sync, undefined);
+      showLogin("github");
+      $("#lg-gh-note").textContent = "Your GitHub sign-in expired. Sign in again.";
+    } else if (!ex.quiet) {
+      err.textContent = ex.status === 401 ? "GitHub didn't accept that token. Check you copied all of it." : ex.message;
+    }
   } finally {
     submit.disabled = false;
-    submit.textContent = "Sign in";
+    submit.textContent = "Continue";
   }
 }
 
@@ -1145,6 +1230,15 @@ function bind() {
   });
   $("#login-form").addEventListener("submit", onLogin);
   for (const id of ["#lg-owner", "#lg-repo"]) $(id).addEventListener("input", () => ($("#lg-repo-label").textContent = `${$("#lg-owner").value}/${$("#lg-repo").value}`));
+  $("#lg-github").addEventListener("click", startGitHubLogin);
+  $("#lg-use-token").addEventListener("click", () => showLogin("token"));
+  $("#lg-back-gh").addEventListener("click", () => showLogin("github"));
+  $("#lg-switch").addEventListener("click", () => {
+    ghLogin = null;
+    const saved = readJSON(K.sync, null);
+    if (saved) writeJSON(K.sync, { ...saved, token: "", login: "", avatar: "", key: "" });
+    showLogin(oauthReady() ? "github" : "token");
+  });
   $("#lg-skip").addEventListener("click", () => {
     writeJSON(K.mode, "local");
     showApp();
@@ -1190,6 +1284,15 @@ async function init() {
     });
   }
 
+  try {
+    appConfig = await (await fetch(`app-config.json?t=${Date.now()}`, { cache: "no-store" })).json();
+  } catch {
+    appConfig = {};
+  }
+  if (await finishGitHubLogin()) {
+    await load({ quiet: true });
+    return;
+  }
   const cfg = readJSON(K.sync, null) || readJSON(K.sync, null, sessionStorage);
   if (cfg?.key && cfg?.token) {
     try {
