@@ -214,12 +214,38 @@ const JRAccount = (() => {
   }
 
   // -------------------------------------------------------------- matches
+  // While the server searches for jobs, check back every 20 seconds and show them when ready
+  let pollTimer = null, wasSearching = false;
+  function watchSearch(m) {
+    clearTimeout(pollTimer);
+    if (m.searching) {
+      wasSearching = true;
+      pollTimer = setTimeout(() => load({ quiet: true }), 20e3);
+    } else if (wasSearching) {
+      wasSearching = false;
+      toast(m.search_error ? "The job search hit a problem; it will try again on the next run."
+        : `Job search finished · ${(m.jobs || []).length} matches for you`);
+    }
+  }
+
+  // ⟳ and pull-to-refresh: re-score against the newest jobs (and search if the list is old)
+  async function refreshNow() {
+    try {
+      await api("/api/matches/refresh", { method: "POST" });
+    } catch (e) {
+      if (![409, 429].includes(e.status)) toast(e.message);
+    }
+    await load({ quiet: true });
+  }
+
   async function loadMatches() {
     const m = await api("/api/matches");
     matchesCache = m;
+    watchSearch(m);
     const p = profile();
     return {
       jobs: m.jobs || [], generated_at: m.updated, alert_score: p.threshold ?? 70,
+      searching: !!m.searching, search_started: m.search_started, pool_count: m.pool_count,
       outreach: { profile: { name: (p.full_name || "").split(" ")[0], full_name: p.full_name, role: p.current_role,
         years_experience: p.years_experience, notice: p.notice, linkedin: p.linkedin }, my_skills: p.skills || [] },
     };
@@ -529,10 +555,11 @@ const JRAccount = (() => {
       }
       await withBusy(save, "Saving…", async () => {
         try {
-          await api("/api/profile", { method: "PUT", body });
+          const saved = await api("/api/profile", { method: "PUT", body });
           await refreshMe();
           renderBanner();
-          toast("Profile saved. Matching jobs for you…");
+          toast(saved.searching ? "Profile saved. Searching for jobs that fit you: usually a few minutes, they'll appear on their own."
+            : `Profile saved · ${saved.count ?? 0} matches at ${body.threshold}+`);
           onSaved?.();
           load({ quiet: true });
         } catch (ex) {
@@ -682,5 +709,5 @@ const JRAccount = (() => {
   }
 
   return { enabled, api, refreshMe, onSignedIn, loadMatches, decorateCard, renderInbox, renderDrafts, renderSettings,
-    openOnboarding, pushKey, savePush, signedOut, profile, handleReturn, checkVerification, get me() { return me; } };
+    openOnboarding, pushKey, savePush, signedOut, profile, handleReturn, checkVerification, refreshNow, get me() { return me; } };
 })();

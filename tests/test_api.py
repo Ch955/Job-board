@@ -52,7 +52,8 @@ def env(monkeypatch):
                             allowed_origins=["https://app.example"], gmail_client_id="cid", gmail_client_secret="csecret",
                             cron_secret="cron-s3cret")
     store, g = MemoryStore(), Google()
-    app = api.create_app(settings, store, g, FakeVerifier(), load_config())
+    quiet = api.PoolSearch(store, load_config(), fetcher=lambda *a, **k: ([], {}), session_factory=lambda: None, background=False)
+    app = api.create_app(settings, store, g, FakeVerifier(), load_config(), search=quiet)
     return TestClient(app), store, g
 
 
@@ -172,3 +173,81 @@ def test_cors_only_for_the_app(env):
     bad = c.options("/api/me", headers={"Origin": "https://evil.example", "Access-Control-Request-Method": "GET"})
     assert ok.headers.get("access-control-allow-origin") == "https://app.example"
     assert "access-control-allow-origin" not in bad.headers
+
+
+# ------------------------------------------------------------------ job search on demand
+from datetime import datetime, timedelta, timezone  # noqa: E402
+
+from jobradar.backend import tasks  # noqa: E402
+from jobradar.models import Job  # noqa: E402
+
+
+def make_search_app(monkeypatch, jobs):
+    monkeypatch.setenv("APP_ENCRYPTION_KEY", secretbox.new_key())
+    calls = []
+
+    def fetcher(cfg, session, state, now=None, **kw):
+        calls.append(cfg["sources"]["jobspy"]["queries"])
+        return [Job(**j.__dict__) for j in jobs], {"greenhouse": {"status": "ok"}}
+
+    store = MemoryStore()
+    search = api.PoolSearch(store, load_config(), fetcher=fetcher, session_factory=lambda: None, background=False)
+    settings = api.Settings(project_id="p", allowed_origins=[])
+    app = api.create_app(settings, store, Google(), FakeVerifier(), load_config(), search=search)
+    return TestClient(app), store, search, calls
+
+
+def J(title, desc):
+    return Job(title=title, company="Northwind", location="Pune, India", url="https://x/1", source="greenhouse",
+               posted_date=datetime.now(timezone.utc).date().isoformat(), description=desc)
+
+
+DE = {**PROFILE, "target_roles": ["Data Engineer"], "skills": ["Airflow", "dbt", "Python", "SQL"], "threshold": 50,
+      "locations": ["Pune"]}
+
+
+def test_saving_a_profile_searches_when_the_pool_is_empty(monkeypatch):
+    c, store, search, calls = make_search_app(monkeypatch, [J("Data Engineer", "Airflow dbt Python SQL, 2-4 years experience")])
+    r = c.put("/api/profile", headers=H("tok-alice"), json=DE).json()
+    assert r["searching"] is True and calls == [["Data Engineer"]]          # searched for her role, right away
+    m = c.get("/api/matches", headers=H("tok-alice")).json()
+    assert [j["title"] for j in m["jobs"]] == ["Data Engineer"] and m["searching"] is False and m["pool_count"] == 1
+
+
+def test_no_new_search_while_the_pool_is_fresh_and_covers_your_roles(monkeypatch):
+    c, store, search, calls = make_search_app(monkeypatch, [J("Data Engineer", "Airflow dbt")])
+    c.put("/api/profile", headers=H("tok-alice"), json=DE)
+    c.post("/api/matches/refresh", headers=H("tok-alice"))
+    assert len(calls) == 1
+    # a new role nobody searched for yet triggers one at once
+    c.put("/api/profile", headers=H("tok-alice"), json={**DE, "target_roles": ["Data Engineer", "Analytics Engineer"]})
+    assert len(calls) == 2 and "Analytics Engineer" in calls[1]
+
+
+def test_refresh_after_an_hour_searches_again(monkeypatch):
+    c, store, search, calls = make_search_app(monkeypatch, [J("Data Engineer", "Airflow dbt")])
+    c.put("/api/profile", headers=H("tok-alice"), json=DE)
+    meta = store.get("pool", "meta")
+    meta["updated"] = (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat(timespec="seconds")
+    store.set("pool", "meta", meta)
+    search.last_started -= search.MIN_GAP + 1
+    r = c.post("/api/matches/refresh", headers=H("tok-alice")).json()
+    assert len(calls) == 2 and r["count"] == 1
+
+
+def test_pool_status_reasons():
+    store = MemoryStore()
+    assert tasks.pool_status(store) == "empty"
+    now = datetime.now(timezone.utc)
+    store.set("pool", "meta", {"count": 3, "updated": now.isoformat(), "roles": ["Data Engineer"]})
+    assert tasks.pool_status(store, {"target_roles": ["data engineer"]}, now) is None
+    assert tasks.pool_status(store, {"target_roles": ["QA Engineer"]}, now) == "new roles"
+    assert tasks.pool_status(store, {"target_roles": ["Data Engineer"]}, now + timedelta(hours=2)) == "stale"
+
+
+def test_a_failed_search_is_reported_and_doesnt_stick(monkeypatch):
+    c, store, search, calls = make_search_app(monkeypatch, [])
+    search.fetcher = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("network"))
+    r = c.put("/api/profile", headers=H("tok-alice"), json=DE).json()
+    m = c.get("/api/matches", headers=H("tok-alice")).json()
+    assert r["searching"] is True and m["searching"] is False and m["search_error"] == "RuntimeError"

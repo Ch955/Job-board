@@ -359,6 +359,7 @@ function render() {
       el("b", { textContent: any ? "No jobs match these filters" : !data.jobs.length && section === "new" ? "No jobs yet" : `Nothing in ${sectionLabel(section)} yet` }),
       any ? "Try lowering the minimum score or resetting filters."
         : section === "new" && JRAccount.enabled() && JRAccount.me?.missing?.length ? "Add your resume or profile (Settings → Your account) and your matches appear here."
+        : section === "new" && data.searching ? "Searching for jobs that fit your profile. This usually takes a few minutes; matches appear here on their own."
         : section === "new" && JRAccount.enabled() ? `Nothing at or above your threshold (${JRAccount.profile().threshold ?? 70}) yet. New jobs are checked every 3 hours; you can lower the threshold in your profile.`
         : section === "new" ? "The next run (every 3 hours) fills this in."
         : section === "applied" ? "Tap Applied on a job and it moves here." : ""));
@@ -373,7 +374,8 @@ function render() {
   countUp($("#stat-week"), times.filter((d) => d >= week).length);
   countUp($("#stat-toapply"), sectionJobs("new", jobs).length);
   countUp($("#stat-interview"), jobs.filter((j) => statusOf(j) === "interview").length);
-  $("#updated").textContent = data.generated_at ? `Jobs updated ${ago(data.generated_at)} · ${data.jobs.length} found` : "Waiting for the first run";
+  $("#updated").textContent = data.searching ? `Searching for new jobs… started ${ago(new Date(data.search_started * 1000).toISOString())}`
+    : data.generated_at ? `Jobs updated ${ago(data.generated_at)} · ${data.jobs.length} found` : "Waiting for the first run";
 
   const n = activeFilterCount();
   $("#toggle-filters").textContent = n ? `Filters (${n})` : "Filters";
@@ -1212,7 +1214,7 @@ function bindPullToRefresh() {
     if (dy > 110) {
       ptr.classList.add("loading");
       ptr.style.height = "44px";
-      await Promise.all([load(), syncNow()]);
+      await Promise.all([JRAccount.enabled() ? JRAccount.refreshNow() : load(), syncNow()]);
       ptr.classList.remove("loading");
     }
     ptr.classList.remove("armed");
@@ -1239,7 +1241,7 @@ function bind() {
     $("#filter-panel").hidden = !open;
   });
   $("#refresh").addEventListener("click", () => {
-    load();
+    JRAccount.enabled() ? JRAccount.refreshNow() : load();
     syncNow();
   });
   $("#open-nav").addEventListener("click", () => openOverlay($("#nav")));

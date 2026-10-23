@@ -46,13 +46,40 @@ def profiles(store: Store) -> dict[str, dict]:
 
 
 # ------------------------------------------------------------------- pool
-def pool_config(base: dict, users: dict[str, dict]) -> dict:
-    """Search for every user's target roles; keep any posting at least one user could want."""
-    roles = []
-    for p in users.values():
-        for r in p.get("target_roles") or [p.get("current_role", "")]:
-            if r and r.lower() not in (x.lower() for x in roles):
+def roles_of(p: dict) -> list[str]:
+    return [r for r in (p.get("target_roles") or [p.get("current_role", "")]) if r]
+
+
+def all_roles(users: dict[str, dict], first: str | None = None) -> list[str]:
+    """Every user's target roles, deduplicated; `first` user's roles go first (searched first)."""
+    roles: list[str] = []
+    order = ([users[first]] if first in users else []) + [p for u, p in users.items() if u != first]
+    for p in order:
+        for r in roles_of(p):
+            if r.lower() not in (x.lower() for x in roles):
                 roles.append(r)
+    return roles
+
+
+def pool_status(store: Store, profile: dict | None = None, now: datetime | None = None,
+                max_age_hours: float = 1.0) -> str | None:
+    """Why the shared pool should be refreshed now (None = it's fine)."""
+    meta = store.get("pool", "meta") or {}
+    if not meta.get("count"):
+        return "empty"
+    try:
+        age = (_now(now) - datetime.fromisoformat(meta["updated"])).total_seconds() / 3600
+    except (KeyError, ValueError):
+        return "empty"
+    covered = {r.lower() for r in meta.get("roles", [])}
+    if profile and any(r.lower() not in covered for r in roles_of(profile)):
+        return "new roles"
+    return "stale" if age >= max_age_hours else None
+
+
+def pool_config(base: dict, users: dict[str, dict], first: str | None = None) -> dict:
+    """Search for every user's target roles; keep any posting at least one user could want."""
+    roles = all_roles(users, first)
     cfg = copy.deepcopy(base)
     if roles:
         queries = roles[:MAX_QUERIES]
@@ -67,10 +94,11 @@ def pool_config(base: dict, users: dict[str, dict]) -> dict:
     return cfg
 
 
-def refresh_pool(store: Store, base: dict, session, now: datetime | None = None, fetcher=fetch_all) -> dict:
+def refresh_pool(store: Store, base: dict, session, now: datetime | None = None, fetcher=fetch_all,
+                 first: str | None = None) -> dict:
     now = _now(now)
     users = profiles(store)
-    cfg = pool_config(base, users)
+    cfg = pool_config(base, users, first)
     meta = store.get("pool", "meta") or {}
     fetch_state = meta.get("fetch_state") or {}
     jobs, runs = fetcher(cfg, session, fetch_state, now=now)
@@ -96,7 +124,10 @@ def refresh_pool(store: Store, base: dict, session, now: datetime | None = None,
     for i in range(len(chunks), int(meta.get("chunks", 0))):
         store.delete("pool", f"c{i}")
     store.set("pool", "meta", {"chunks": len(chunks), "count": len(kept), "updated": _iso(now),
-                               "fetch_state": fetch_state, "sources": runs})
+                               "fetch_state": fetch_state, "sources": runs,
+                               # every role wanted at this point counts as covered, so a role beyond the
+                               # query cap doesn't trigger a new search on every refresh
+                               "roles": all_roles(users, first)})
     return {"jobs": len(kept), "sources": {k: v.get("status") for k, v in runs.items()}}
 
 

@@ -12,6 +12,7 @@ import hmac
 import json
 import logging
 import os
+import threading
 import time
 import urllib.parse
 from dataclasses import dataclass, field
@@ -77,6 +78,70 @@ class RateLimit:
         self.last[key] = now
 
 
+class PoolSearch:
+    """One background job search at a time, started when someone needs fresh jobs.
+
+    The scheduled run (GitHub Actions) refreshes the pool every 3 hours; this covers the
+    gaps: a brand-new profile, new target roles, or a refresh after an hour. When it
+    finishes, every user with a complete profile is re-scored.
+    """
+
+    MIN_GAP = 15 * 60  # seconds between searches, unless the pool is empty or misses someone's roles
+
+    def __init__(self, store: Store, base: dict, fetcher=None, session_factory=make_session, background=True):
+        self.store, self.base, self.fetcher = store, base, fetcher
+        self.session_factory, self.background = session_factory, background
+        self.lock = threading.Lock()
+        self.running_since: float | None = None
+        self.last_started = 0.0
+        self.last_error: str | None = None
+
+    @property
+    def running(self) -> bool:
+        return self.running_since is not None
+
+    def maybe_start(self, uid: str, reason: str | None) -> bool:
+        """Start a search for `reason` (from tasks.pool_status). True if one is running now."""
+        if not reason:
+            return self.running
+        with self.lock:
+            if self.running:
+                return True
+            if reason == "stale" and time.monotonic() - self.last_started < self.MIN_GAP:
+                return False
+            self.running_since = time.time()
+            self.last_started = time.monotonic()
+        if self.background:
+            threading.Thread(target=self._run, args=(uid,), daemon=True, name="pool-search").start()
+        else:
+            self._run(uid)
+        return True
+
+    def _run(self, uid: str) -> None:
+        started = time.monotonic()
+        try:
+            kw = {"fetcher": self.fetcher} if self.fetcher else {}
+            r = tasks.refresh_pool(self.store, self.base, self.session_factory(), first=uid, **kw)
+            pool = tasks.load_pool(self.store)
+            for other, p in tasks.profiles(self.store).items():
+                try:
+                    tasks.match_user(self.store, self.base, other, pool, profile=p)
+                except Exception as e:  # noqa: BLE001 - one bad profile mustn't stop the others
+                    log.warning("matching after search failed for %s: %s", _uid_tag(other), type(e).__name__)
+            self.last_error = None
+            log.info("pool search done: %s jobs in %ds", r.get("jobs"), time.monotonic() - started)
+        except Exception as e:  # noqa: BLE001
+            self.last_error = type(e).__name__
+            log.warning("pool search failed: %s", type(e).__name__)
+        finally:
+            self.running_since = None
+
+    def status(self) -> dict:
+        meta = self.store.get("pool", "meta") or {}
+        return {"searching": self.running, "search_started": self.running_since,
+                "pool_updated": meta.get("updated"), "pool_count": meta.get("count", 0), "search_error": self.last_error}
+
+
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -86,7 +151,8 @@ def _uid_tag(uid: str) -> str:  # for logs: never the uid itself, never tokens o
 
 
 def create_app(settings: Settings | None = None, store: Store | None = None, session=None,
-               verifier: Verifier | None = None, base_config: dict | None = None) -> FastAPI:
+               verifier: Verifier | None = None, base_config: dict | None = None,
+               search: PoolSearch | None = None) -> FastAPI:
     settings = settings or Settings.from_env()
     session = session or make_session()
     if store is None:
@@ -98,6 +164,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None, ses
     verifier = verifier or Verifier(settings.project_id, session)
     base = base_config if base_config is not None else load_config()
     limits = RateLimit()
+    search = search or PoolSearch(store, base)
     app = FastAPI(title="Job Radar API", docs_url=None, redoc_url=None, openapi_url=None)
     app.state.store = store
     app.add_middleware(CORSMiddleware, allow_origins=settings.allowed_origins, allow_credentials=False,
@@ -161,12 +228,15 @@ def create_app(settings: Settings | None = None, store: Store | None = None, ses
         old = store.get("profiles", u["uid"]) or {}
         p["updated"] = _now().isoformat(timespec="seconds")
         store.set("profiles", u["uid"], p)
+        count, searching = None, False
         if not is_complete(p):
             try:
-                tasks.match_user(store, base, u["uid"], profile=p)
+                count = tasks.match_user(store, base, u["uid"], profile=p).get("count")
             except Exception as e:  # noqa: BLE001 - the profile is saved; matches refresh next run
                 log.warning("match after profile save failed: %s", type(e).__name__)
-        return {"profile": p, "missing": is_complete(p), "threshold_changed": old.get("threshold") != p["threshold"]}
+            searching = search.maybe_start(u["uid"], tasks.pool_status(store, p))
+        return {"profile": p, "missing": is_complete(p), "threshold_changed": old.get("threshold") != p["threshold"],
+                "count": count, "searching": searching}
 
     # ---------------------------------------------------------------- resume
     @app.post("/api/resume")
@@ -193,16 +263,18 @@ def create_app(settings: Settings | None = None, store: Store | None = None, ses
     # --------------------------------------------------------------- matches
     @app.post("/api/matches/refresh")
     def refresh_matches(u: dict = Depends(verified)):
-        limits.check(u["uid"], "refreshing", 30)
-        r = tasks.match_user(store, base, u["uid"])
+        limits.check(u["uid"], "refreshing", 10)
+        prof = store.get("profiles", u["uid"])
+        r = tasks.match_user(store, base, u["uid"], profile=prof)
         if r.get("skipped"):
             raise HTTPException(409, "Finish your profile first (skills and target role).")
-        return {"count": r["count"]}
+        searching = search.maybe_start(u["uid"], tasks.pool_status(store, prof))
+        return {"count": r["count"], **search.status(), "searching": searching}
 
     @app.get("/api/matches")
     def get_matches(u: dict = Depends(user)):
         m = store.get("matches", u["uid"]) or {}
-        return {"jobs": m.get("jobs", []), "updated": m.get("updated"), "threshold": m.get("threshold")}
+        return {"jobs": m.get("jobs", []), "updated": m.get("updated"), "threshold": m.get("threshold"), **search.status()}
 
     # ----------------------------------------------------------------- gmail
     @app.post("/api/gmail/connect")
