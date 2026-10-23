@@ -39,6 +39,9 @@ Repo → **Settings** → **Secrets and variables** → **Actions** → **New re
 |---|---|---|
 | `VAPID_PRIVATE_KEY` | run `python -m jobradar push-keys` on your laptop and copy the private key | for phone alerts |
 | `WEBPUSH_SUBSCRIPTIONS` | the app's ☰ menu, after you tap *Enable alerts* (step 4) | for phone alerts |
+| `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN` | `python -m jobradar gmail-auth` ([Gmail setup](#one-time-gmail-setup-about-15-minutes-free)) | for recruiter drafts |
+| `RESUME_KEY` | `python -m jobradar encrypt-resume` | to attach your resume |
+| `EMAIL_SIGNATURE` | your own text, e.g. your phone number | optional |
 | `ADZUNA_APP_ID`, `ADZUNA_APP_KEY` | [Adzuna](#adzuna) | optional |
 | `JOOBLE_API_KEY` | [Jooble](#jooble) | optional |
 
@@ -66,6 +69,70 @@ go straight to the posting.
 
 If you ever reinstall the app or clear its data, repeat step 4. The old code stops working, and the
 run log says so.
+
+## Rerun it yourself
+
+Repo → **Actions** → **Job Radar** (left sidebar) → **Run workflow** (right) → pick a mode → **Run workflow**:
+
+| Mode | What it does |
+|---|---|
+| **fetch** | a normal run now, instead of waiting up to 3 hours |
+| **fresh-fetch** | clears the job list and rebuilds it with the current rules (use after changing `config.yaml`). Your Applied / Interview / Later choices on the phone are kept, and recruiters already emailed aren't drafted again |
+| summary | sends the daily summary notification now |
+| test-notification | sends a test notification to your phone |
+
+A run takes about 5 minutes. Then pull down / tap ⟳ in the app.
+
+## Recruiter outreach
+
+### LinkedIn (on every card in the app)
+- **👤 Find recruiter** opens a LinkedIn people search for recruiters at that company.
+- **📋 Copy note** copies a connection note (under LinkedIn's 200-character limit) written from the job and your
+  profile. On LinkedIn, tap **Connect** → **Add a note** → paste → **Send**.
+
+Nothing is sent on LinkedIn for you. LinkedIn bans accounts that automate messages, and this is your real profile.
+Edit the note's wording under `outreach.linkedin_note` in `config.yaml`.
+
+### Gmail drafts (automatic, never sent)
+When a strong match (score ≥ 70) lists a recruiter's email in the posting, each run creates a **draft** in your
+Gmail, addressed to them, with your resume attached. You open it, adjust if you like, and press Send. Rules:
+- at most 10 drafts per run, best jobs first;
+- never two drafts for the same job, or to the same address within 30 days;
+- the wording lives under `outreach.email` in `config.yaml`.
+
+The app's ☰ › **Recruiter emails** section lists every draft with **Open draft** and **Mark sent**. Jobs that list an
+email but have no draft get a **✉️ Email** button that opens your mail app with the message already written.
+
+#### One-time Gmail setup (about 15 minutes, free)
+1. **Google Cloud project.** Go to <https://console.cloud.google.com>, sign in as chakri.evn@gmail.com, and create a
+   project named `Job Radar`. No billing account is needed.
+2. **Enable the Gmail API.** **APIs & Services** → **Library** → search "Gmail API" → **Enable**.
+3. **Consent screen.** **Google Auth Platform** (or *OAuth consent screen*) → **Get started**. App name `Job Radar`,
+   support email chakri.evn@gmail.com, audience **External**, then finish.
+4. **Publish it.** **Audience** → **Publish app** → confirm. This matters: while an app is in *Testing*, Google
+   expires its sign-in after 7 days. It stays private to you either way.
+5. **Desktop client.** **Clients** → **Create client** → application type **Desktop app** → **Create** →
+   **Download JSON**. Save the `client_secret_….json` file in the project folder. It's git-ignored, so it won't be committed.
+6. **Sign in once,** on your laptop in the project folder:
+   ```bash
+   python -m jobradar gmail-auth --client-file client_secret_XXXX.json
+   ```
+   A browser opens. Pick chakri.evn@gmail.com. Google warns *"Google hasn't verified this app"*. That's expected
+   for a personal app: click **Advanced** → **Go to Job Radar (unsafe)** → allow. It's your own app, used only by you.
+   The terminal prints three values. Add each as a GitHub Secret: `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`.
+7. **Resume.** Encrypt it so the public repo can carry it safely:
+   ```bash
+   python -m jobradar encrypt-resume "C:\path\to\Chakri_Azure_Data_Engineer_3yrs.pdf"
+   git add assets/resume.pdf.enc && git commit -m "Add encrypted resume" && git push
+   ```
+   Add the printed key as the GitHub Secret `RESUME_KEY`. Without the key the file is unreadable.
+8. **Optional:** add a GitHub Secret `EMAIL_SIGNATURE` (e.g. `Phone: +91-XXXXXXXXXX`) to add your phone number to
+   emails, without putting it in the public repo.
+9. **Test:** put the four values in `.env`, then run `python -m jobradar gmail-test`. A test draft addressed to
+   yourself appears in Gmail → Drafts. Delete it afterwards.
+
+The access only lets Job Radar **create drafts** and **read** mail (reading is for the next step: job-alert
+emails and recruiter replies). It can't send. You can revoke it any time at <https://myaccount.google.com/permissions>.
 
 ## The app
 
@@ -144,6 +211,11 @@ Other useful flags:
 | `python -m jobradar run --notify` | also send phone alerts (needs the two push values in `.env`) |
 | `python -m jobradar notify --test` | send a test notification |
 | `python -m jobradar notify --summary` | send the daily summary now |
+| `python -m jobradar run --fresh` | rebuild the job list from scratch |
+| `python -m jobradar run --drafts` | also create Gmail drafts (needs the Gmail values in `.env`) |
+| `python -m jobradar gmail-auth --client-file …json` | one-time Gmail sign-in |
+| `python -m jobradar encrypt-resume resume.pdf` | encrypt your resume for draft attachments |
+| `python -m jobradar gmail-test` | create a test draft to yourself |
 
 ### First thing to do: check the company list
 
@@ -269,6 +341,9 @@ jobradar/
   offline.py           fixture-backed fake HTTP session for --offline and tests
 tests/                 pytest suite + API-shaped fixtures
   push.py              Web Push encryption + VAPID signing (no third-party service)
+  outreach.py          recruiter emails in postings, email + LinkedIn templates, drafting rules
+  gmail.py             Gmail API over plain HTTP: sign-in, drafts
+  resume.py            encrypted resume (assets/resume.pdf.enc)
   notify.py            which notifications to send, and sending them
 docs/                  the app (GitHub Pages root): index.html, app.js, app.css, sw.js, jobs.json
 .github/workflows/     the 3-hourly schedule
@@ -281,4 +356,5 @@ scripts/make_icons.py  regenerates the app icons
 2. ✅ Phone alerts from your own app (replaces the original Telegram plan)
 3. ✅ GitHub Actions every 3 hours
 4. ✅ The app on GitHub Pages
-5. ⏳ Gmail: LinkedIn/Naukri alert emails + recruiter reply / interview / rejection / offer detection
+5. 🟡 Gmail: ✅ recruiter drafts with resume, ✅ LinkedIn recruiter search + notes,
+   ⏳ reading LinkedIn/Naukri alert emails and recruiter replies / interview / rejection / offer detection

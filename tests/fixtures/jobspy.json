@@ -2,7 +2,7 @@
   {"site": "naukri", "title": "Azure Data Engineer - ADF / Databricks", "company": "Example Tech Services",
    "location": "Hyderabad, Telangana, India", "date_posted": "{{DAYS_AGO:0}}", "is_remote": false,
    "job_url": "https://example.com/naukri/1", "job_url_direct": null,
-   "description": "Build ADF pipelines and Databricks notebooks.", "skills": ["Azure Data Factory", "PySpark", "ADLS", "SQL"],
+   "description": "Build ADF pipelines and Databricks notebooks. Share your CV with talent@example-tech.in", "skills": ["Azure Data Factory", "PySpark", "ADLS", "SQL"],
    "experience_range": "3-6 Yrs"},
   {"site": "naukri", "title": "Data Engineer", "company": "Example Retail", "location": null,
    "date_posted": "{{DAYS_AGO:1}}", "is_remote": true, "job_url": "https://example.com/naukri/2",

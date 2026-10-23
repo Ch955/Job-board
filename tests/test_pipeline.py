@@ -156,3 +156,16 @@ def test_walk_in_outside_hyderabad_dropped(config):
     jobs, _, dropped = pipeline.process(fetched, {}, config, now)
     assert sorted(j.location for j in jobs) == ["Hyderabad, India", "Pune, India"]
     assert dropped["walk_in"] == 1
+
+
+def test_fresh_run_rebuilds_list_but_keeps_state(config, out):
+    run(config, out)
+    data = json.loads(out.read_text())
+    ghost = dict(data["jobs"][0], id="ghost123", title="Old Data Engineer", company="Gone Co")
+    data["jobs"].append(ghost)
+    data["state"]["emailed"] = {"a@b.in": "2026-10-23T00:00:00+00:00"}
+    out.write_text(json.dumps(data))
+    pipeline.run(config, session=OfflineSession(), output=out, ignore_throttle=True, fresh=True)
+    after = json.loads(out.read_text())
+    assert "ghost123" not in {j["id"] for j in after["jobs"]}
+    assert after["state"]["emailed"] == {"a@b.in": "2026-10-23T00:00:00+00:00"}

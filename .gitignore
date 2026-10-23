@@ -10,3 +10,5 @@ token.json
 client_secret*.json
 # local run outputs
 out/
+# Never commit a plain resume; only assets/resume.pdf.enc
+*.pdf

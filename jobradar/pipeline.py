@@ -9,7 +9,7 @@ from pathlib import Path
 
 import requests
 
-from . import push, store
+from . import outreach, push, store
 from .config import ROOT, env
 from .http import make_session
 from .models import Job
@@ -33,6 +33,7 @@ class RunResult:
     source_runs: dict
     dropped: dict = field(default_factory=dict)
     output: Path | None = None
+    drafts: dict | None = None
 
 
 def _due(name: str, cfg: dict, state: dict, now: datetime) -> bool:
@@ -133,6 +134,8 @@ def process(
         old = previous.get(job.id)
         job.first_seen = old.first_seen if old and old.first_seen else now_iso
         job.status = old.status if old else "new"
+        job.outreach = old.outreach if old and old.outreach else job.outreach
+        job.contact_emails = outreach.extract_emails(job.description) or (old.contact_emails if old else [])
         if not job.description_snippet:
             job.description_snippet = job.description[:snippet_chars].rstrip()
         scorer.score(job, now)
@@ -195,17 +198,21 @@ def run(
     output: Path | None = None,
     write: bool = True,
     ignore_throttle: bool = False,
+    drafts: bool = False,
+    fresh: bool = False,
 ) -> RunResult:
     now = datetime.now(timezone.utc)
     p = config.get("pipeline", {})
     output = output or ROOT / p.get("output", "docs/jobs.json")
     data = store.load(output)
-    previous = store.existing_jobs(data)
+    # fresh: rebuild the list from scratch, but keep state (throttles, who was already emailed)
+    previous = {} if fresh else store.existing_jobs(data)
     state = data.get("state", {})
     session = session or make_session(float(p.get("http_timeout_s", 20)))
 
     fetched, runs = fetch_all(config, session, state, only, now, ignore_throttle)
     jobs, new_jobs, dropped = process(fetched, previous, config, now)
+    draft_report = outreach.create_drafts(jobs, state, config, session, now) if drafts else None
 
     # The app needs the VAPID *public* key to subscribe; derive it from the secret.
     push_info = data.get("push") or {}
@@ -235,11 +242,15 @@ def run(
                     "by_source": by_source,
                     "dropped": dropped,
                     "source_runs": runs,
+                    "drafts": draft_report,
                 },
                 "state": state,
                 "push": push_info,
                 "alert_score": int(p.get("alert_score", 70)),
+                "outreach": outreach.publish_templates(config),
                 "jobs": [j.to_dict() for j in jobs],
             },
         )
-    return RunResult(jobs=jobs, new_jobs=new_jobs, source_runs=runs, dropped=dropped, output=output if write else None)
+    result = RunResult(jobs=jobs, new_jobs=new_jobs, source_runs=runs, dropped=dropped, output=output if write else None)
+    result.drafts = draft_report
+    return result

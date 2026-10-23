@@ -8,6 +8,9 @@
     python -m jobradar push-keys           # one-time: create keys for phone notifications
     python -m jobradar notify --test       # send a test notification
     python -m jobradar notify --summary    # send the daily summary
+    python -m jobradar gmail-auth --client-file client_secret.json   # one-time Gmail sign-in
+    python -m jobradar encrypt-resume resume.pdf                     # one-time: resume for drafts
+    python -m jobradar gmail-test          # put a test draft in your Gmail
 """
 
 from __future__ import annotations
@@ -20,7 +23,7 @@ from pathlib import Path
 
 import json
 
-from . import notify, pipeline, push
+from . import gmail, notify, outreach, pipeline, push, resume
 from .config import ROOT, load_config, load_dotenv
 from .http import make_session
 from .scoring import Scorer
@@ -75,8 +78,12 @@ def cmd_run(args: argparse.Namespace) -> int:
         output=output,
         write=not args.no_write,
         ignore_throttle=args.offline or args.force,
+        drafts=args.drafts and not args.offline,
+        fresh=args.fresh,
     )
     _print_summary(result, args.top)
+    if result.drafts is not None:
+        print(f"\nGmail drafts: {result.drafts}")
     if args.notify and not args.offline:
         p = config.get("pipeline", {})
         payloads = notify.alert_payloads(result.new_jobs, int(p.get("alert_score", 70)),
@@ -150,6 +157,49 @@ def cmd_notify(args: argparse.Namespace) -> int:
     return 0 if report["sent"] else 1
 
 
+def cmd_gmail_auth(args: argparse.Namespace) -> int:
+    session = make_session()
+    client_id, client_secret = gmail.env_or_file(args.client_file)
+    token = gmail.interactive_auth(client_id, client_secret, session, open_browser=not args.no_browser)
+    print("\nSigned in. Add these three GitHub Secrets (Settings -> Secrets and variables -> Actions):\n")
+    print(f"  GMAIL_CLIENT_ID      {client_id}")
+    print(f"  GMAIL_CLIENT_SECRET  {client_secret}")
+    print(f"  GMAIL_REFRESH_TOKEN  {token}\n")
+    print("For local runs you can put the same three lines in .env (NAME=value). Never commit them.")
+    return 0
+
+
+def cmd_encrypt_resume(args: argparse.Namespace) -> int:
+    key = resume.encrypt_file(Path(args.pdf), attach_name=args.name)
+    print(f"Encrypted resume written to {resume.ENC_PATH.relative_to(ROOT)} (safe to commit: unreadable without the key).\n")
+    print("Add this GitHub Secret named RESUME_KEY (keep it secret):\n")
+    print(f"   {key}\n")
+    print("Then commit and push the .enc file:  git add assets/resume.pdf.enc && git commit -m \"Add resume\" && git push")
+    return 0
+
+
+def cmd_gmail_test(args: argparse.Namespace) -> int:
+    config = load_config(args.config)
+    reason = outreach.gmail_configured()
+    if reason:
+        print(f"Gmail not set up: {reason}. Run `python -m jobradar gmail-auth` first.")
+        return 1
+    from .config import env
+    session = make_session()
+    token = gmail.access_token(session, env("GMAIL_CLIENT_ID"), env("GMAIL_CLIENT_SECRET"), env("GMAIL_REFRESH_TOKEN"))
+    me = config.get("profile", {}).get("apply_email")
+    attachment = resume.load()
+    from .models import Job
+    sample = Job(title="Azure Data Engineer", company="Example Company", location="Hyderabad", url="https://example.com",
+                 source="test", matched_keywords=["ADF", "Databricks", "PySpark"], score_breakdown={"location_label": "Hyderabad"})
+    subject, body = outreach.email_for(sample, config)
+    draft = gmail.create_draft(session, token, to=me, subject="[Job Radar test] " + subject, body=body,
+                               attachment=attachment, sender=me)
+    print(f"Test draft created in {me}: id {draft['id']}. Resume attached: {'yes' if attachment else 'no (run encrypt-resume)'}")
+    print("Open Gmail -> Drafts to see it, then delete it.")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="jobradar", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--config", help="path to config.yaml")
@@ -164,6 +214,8 @@ def main(argv: list[str] | None = None) -> int:
     p_run.add_argument("--output", help="output path (default docs/jobs.json)")
     p_run.add_argument("--top", type=int, default=15, help="how many jobs to print")
     p_run.add_argument("--notify", action="store_true", help="send phone alerts for strong new jobs")
+    p_run.add_argument("--drafts", action="store_true", help="create Gmail drafts to recruiters found in postings")
+    p_run.add_argument("--fresh", action="store_true", help="clear the job list and rebuild it with the current rules")
     p_run.set_defaults(func=cmd_run)
 
     p_keys = sub.add_parser("push-keys", help="create VAPID keys for phone notifications")
@@ -174,6 +226,19 @@ def main(argv: list[str] | None = None) -> int:
     mode.add_argument("--summary", action="store_true", help="last 24h summary from docs/jobs.json")
     mode.add_argument("--test", action="store_true", help="a test notification")
     p_ntf.set_defaults(func=cmd_notify)
+
+    p_ga = sub.add_parser("gmail-auth", help="one-time Gmail sign-in; prints the refresh token")
+    p_ga.add_argument("--client-file", help="client_secret_....json downloaded from Google Cloud")
+    p_ga.add_argument("--no-browser", action="store_true", help="just print the link")
+    p_ga.set_defaults(func=cmd_gmail_auth)
+
+    p_er = sub.add_parser("encrypt-resume", help="encrypt your resume PDF for draft attachments")
+    p_er.add_argument("pdf")
+    p_er.add_argument("--name", help="attachment file name shown to recruiters (default: the PDF's name)")
+    p_er.set_defaults(func=cmd_encrypt_resume)
+
+    p_gt = sub.add_parser("gmail-test", help="create a test draft addressed to yourself")
+    p_gt.set_defaults(func=cmd_gmail_test)
 
     p_chk = sub.add_parser("check-companies", help="validate company slugs in config.yaml")
     p_chk.set_defaults(func=cmd_check_companies)

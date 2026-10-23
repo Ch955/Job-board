@@ -7,6 +7,39 @@ profile:
   years_experience: 3
   apply_email: chakri.evn@gmail.com
   notice: Immediate joiner
+  full_name: Chakravardhana Rao Edupulapati
+  linkedin: https://www.linkedin.com/in/chakravardhanarao-edupulapati-6765b11a3
+  # Your phone number is deliberately NOT here (this repo is public). To sign
+  # emails with it, add a GitHub Secret EMAIL_SIGNATURE, e.g. "Phone: +91-..."
+
+# ---------------------------------------------------------------------------
+# Recruiter outreach. Email drafts are created in your Gmail (never sent).
+# LinkedIn notes are copied in the app; you send them yourself.
+# Placeholders: {title} {company} {location} {skills} {years} {notice} {name}
+#               {full_name} {role} {email} {linkedin} {url}
+# ---------------------------------------------------------------------------
+outreach:
+  drafts_enabled: true
+  min_score: 70              # only draft for jobs at or above this score
+  max_drafts_per_run: 10
+  cooldown_days: 30          # never draft the same address twice within this
+  email:
+    subject: "Application: {title} | {role}, {years}+ yrs | {notice}"
+    body: |
+      Hi,
+
+      I came across the {title} opening at {company} ({location}) and would like to be considered.
+
+      I'm an Azure Data Engineer with {years}+ years at Capgemini, building metadata-driven ADF pipelines into ADLS Gen2, PySpark and SCD Type 1/2 in Azure Databricks, incremental loads, and SHIR-based hybrid integration, with Azure DevOps CI/CD. The role's focus on {skills} matches my day-to-day work closely.
+
+      I'm an {notice_lower} and my resume is attached. I'd be glad to talk whenever suits you.
+
+      Thanks,
+      {full_name}
+      {email}
+      {linkedin}
+  # LinkedIn caps connection notes at 200 characters on free accounts
+  linkedin_note: "Hi! I'm an Azure Data Engineer ({years}+ yrs: ADF, Databricks, PySpark), {notice_lower}. I've applied for {title} at {company} and would love to connect. Thanks, {name}"
 
 # ---------------------------------------------------------------------------
 # Pipeline limits

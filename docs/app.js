@@ -65,7 +65,7 @@ function writeJSON(key, value) {
 // store = { statuses: { [id]: { status, at, appliedAt? } }, saved: { [id]: job snapshot } }
 function loadStore() {
   const s = readJSON(STORE_KEY, {});
-  return { statuses: s.statuses || {}, saved: s.saved || {} };
+  return { statuses: s.statuses || {}, saved: s.saved || {}, sent: s.sent || {} };
 }
 let store = loadStore();
 const saveStore = () => writeJSON(STORE_KEY, store);
@@ -90,9 +90,10 @@ function setStatus(job, status) {
     if (KEEP_STATUSES.includes(status)) {
       // Snapshot so it stays in your list after it ages out of jobs.json
       const { id, title, company, location, url, source, score, matched_keywords, posted_date,
-              first_seen, remote, score_breakdown, description_snippet } = job;
+              first_seen, remote, score_breakdown, description_snippet, outreach, contact_emails } = job;
       store.saved[job.id] = { id, title, company, location, url, source, score, matched_keywords,
-                              posted_date, first_seen, remote, score_breakdown, description_snippet };
+                              posted_date, first_seen, remote, score_breakdown, description_snippet,
+                              outreach, contact_emails };
     } else {
       delete store.saved[job.id];
     }
@@ -325,7 +326,138 @@ function setSection(id) {
   window.scrollTo({ top: 0 });
 }
 
+// ---------------------------------------------------------------- outreach
+const OUTREACH_STATUSES = ["new", "later", "applied", "interview"];
+
+function fillTemplate(tpl, job) {
+  const p = data.outreach?.profile || {};
+  const notice = p.notice || "";
+  const skills = (job.matched_keywords || []).filter((k) => !["Azure", "SQL", "Python"].includes(k)).slice(0, 3);
+  const values = {
+    name: p.name || "", full_name: p.full_name || p.name || "", role: p.role || "", years: p.years_experience ?? "",
+    notice, notice_lower: notice.charAt(0).toLowerCase() + notice.slice(1), linkedin: p.linkedin || "",
+    email: "", title: job.title, company: job.company, url: job.url || "",
+    location: job.score_breakdown?.location_label || job.location,
+    skills: (skills.length ? skills : ["ADF", "Databricks", "PySpark"]).join(", "),
+  };
+  return String(tpl || "").replace(/\{(\w+)\}/g, (_, k) => values[k] ?? "").trim();
+}
+
+function linkedinNote(job) {
+  // LinkedIn allows 200 characters: shorten the job title first so the sign-off survives
+  const tpl = data.outreach?.linkedin_note ||
+    "Hi! I'm a {role} ({years}+ yrs). I've applied for {title} at {company} and would love to connect. Thanks, {name}";
+  let note = fillTemplate(tpl, job);
+  if (note.length > 200 && tpl.includes("{title}")) {
+    const keep = Math.max(10, job.title.length - (note.length - 200) - 1);
+    note = fillTemplate(tpl, { ...job, title: job.title.slice(0, keep).replace(/[\s,|/-]+$/, "") + "…" });
+  }
+  return note.length <= 200 ? note : note.slice(0, 199).trimEnd() + "…";
+}
+
+const recruiterSearch = (job) =>
+  `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(`${job.company} recruiter`)}&origin=GLOBAL_SEARCH_HEADER`;
+
+function draftLink(job) {
+  const id = job.outreach?.message_id;
+  return id ? `https://mail.google.com/mail/u/0/#drafts?compose=${encodeURIComponent(id)}` : "https://mail.google.com/mail/u/0/#drafts";
+}
+
+function mailtoLink(job) {
+  const to = (job.contact_emails || [])[0];
+  if (!to) return null;
+  const subject = fillTemplate(data.outreach?.email_subject || "Application: {title}", job);
+  const body = fillTemplate(data.outreach?.email_body || "", job);
+  return `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
+async function copyText(text, okMessage) {
+  try {
+    await navigator.clipboard.writeText(text);
+    toast(okMessage);
+  } catch {
+    prompt("Copy this:", text);
+  }
+}
+
+function renderOutreach(job, status, row) {
+  if (!OUTREACH_STATUSES.includes(status)) {
+    row.remove();
+    return;
+  }
+  const link = (cls, text, href, title) => {
+    const a = el("a", { className: `mini-btn ${cls}`, textContent: text, href, target: "_blank", rel: "noopener noreferrer" });
+    if (title) a.title = title;
+    return a;
+  };
+  row.append(link("li", "👤 Find recruiter", recruiterSearch(job), "LinkedIn people search for recruiters at this company"));
+  const copy = el("button", { className: "mini-btn", type: "button", textContent: "📋 Copy note" });
+  copy.title = "LinkedIn connection note (200 characters)";
+  copy.addEventListener("click", () => copyText(linkedinNote(job), "Note copied. In LinkedIn tap Connect → Add a note → paste"));
+  row.append(copy);
+  if (job.outreach?.draft_id) {
+    const sent = store.sent?.[job.id];
+    row.append(link("mail", sent ? "✉️ Draft sent" : "✉️ Open draft", draftLink(job), `Draft to ${job.outreach.email}`));
+  } else {
+    const m = mailtoLink(job);
+    if (m) row.append(link("mail", "✉️ Email", m, `Write to ${job.contact_emails[0]}`));
+  }
+}
+
+function renderMailSection() {
+  const jobs = allJobs().filter((j) => j.outreach?.draft_id || (j.contact_emails || []).length)
+    .filter((j) => statusOf(j) !== "skipped")
+    .sort((a, b) => String(b.outreach?.drafted_at || "").localeCompare(String(a.outreach?.drafted_at || "")) || (b.score || 0) - (a.score || 0));
+  const wrap = el("div", { className: "mail-list" });
+  const drafts = data.stats?.drafts;
+  if (drafts?.skipped && !jobs.some((j) => j.outreach?.draft_id)) {
+    wrap.append(el("p", { className: "note", textContent:
+      `Drafts aren't being created yet: ${drafts.skipped}. See the README: Gmail drafts. Until then, the ✉️ Email buttons open your mail app with the message written.` }));
+  }
+  wrap.append(el("div", { className: "row" },
+    el("a", { className: "btn", href: "https://mail.google.com/mail/u/0/#drafts", target: "_blank", rel: "noopener", textContent: "All Gmail drafts ↗" })));
+  if (!jobs.length) {
+    wrap.append(el("div", { className: "empty" }, el("b", { textContent: "No recruiter emails yet" }),
+      "When a strong match lists a recruiter's email, a draft with your resume appears here."));
+    return wrap;
+  }
+  for (const job of jobs) {
+    const item = el("article", { className: "mail-item" });
+    const sent = store.sent?.[job.id];
+    const to = job.outreach?.email || job.contact_emails[0];
+    item.append(
+      el("div", { className: "mail-top" },
+        el("b", { textContent: job.company }),
+        el("span", { className: `badge ${sent ? "applied" : job.outreach?.draft_id ? "new" : "skipped"}`,
+                     textContent: sent ? "sent" : job.outreach?.draft_id ? "draft ready" : "no draft" })),
+      el("p", { className: "mail-title", textContent: `${job.title} · ${job.score}` }),
+      el("p", { className: "muted mail-to", textContent: `To ${to}` +
+        (job.outreach?.drafted_at ? ` · drafted ${ago(job.outreach.drafted_at)}` : "") }),
+    );
+    const row = el("div", { className: "row" });
+    if (job.outreach?.draft_id) {
+      row.append(el("a", { className: "btn btn-primary", href: draftLink(job), target: "_blank", rel: "noopener", textContent: "Open draft ↗" }));
+    } else {
+      row.append(el("a", { className: "btn btn-primary", href: mailtoLink(job), textContent: "Write email" }));
+    }
+    const mark = el("button", { className: "btn", type: "button", textContent: sent ? "↩ Not sent" : "Mark sent" });
+    mark.addEventListener("click", () => {
+      store.sent = store.sent || {};
+      if (sent) delete store.sent[job.id]; else store.sent[job.id] = new Date().toISOString();
+      saveStore();
+      render();
+    });
+    row.append(mark);
+    const url = safeUrl(job.url);
+    if (url) row.append(el("a", { className: "btn", href: url, target: "_blank", rel: "noopener", textContent: "Job ↗" }));
+    item.append(row);
+    wrap.append(item);
+  }
+  return wrap;
+}
+
 function renderGmailPanel(id) {
+  if (id === "mail") return renderMailSection();
   const panel = el("div", { className: "gmail-panel" });
   const title = id === "mail" ? "Recruiter emails" : "Needs your reply";
   const what = id === "mail"
@@ -417,6 +549,8 @@ function renderCard(job) {
     (status !== "applied" && status !== "later" ? ` · ${sectionLabel(status)} ${ago(rec.at)}` : "");
   else if (status === "later" && rec) line.textContent = `Parked ${ago(rec.at)}`;
   else line.remove();
+
+  renderOutreach(job, status, $(".outreach-row", card));
 
   const actions = $(".card-actions", card);
   for (const [to, label] of ACTIONS[status] || ACTIONS.new) {

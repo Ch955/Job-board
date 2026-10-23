@@ -82,6 +82,9 @@ class Job:
     score_breakdown: dict = field(default_factory=dict)
     first_seen: str | None = None
     id: str = ""
+    # Recruiter addresses found in the posting, and the Gmail draft made for it
+    contact_emails: list[str] = field(default_factory=list)
+    outreach: dict = field(default_factory=dict)
     # Full description is used for scoring only and never written to disk
     description: str = field(default="", repr=False, compare=False)
 

@@ -14,7 +14,7 @@ on:
         description: What to run
         type: choice
         default: fetch
-        options: [fetch, summary, test-notification]
+        options: [fetch, fresh-fetch, summary, test-notification]
   push:                       # redeploy the app when you change it
     branches: [ccr-2ca82853-eyb6vc]
     paths: ["docs/**", "!docs/jobs.json"]
@@ -32,7 +32,7 @@ jobs:
   fetch:
     if: >-
       (github.event_name == 'schedule' && github.event.schedule != '25 3 * * *') ||
-      (github.event_name == 'workflow_dispatch' && inputs.mode == 'fetch')
+      (github.event_name == 'workflow_dispatch' && (inputs.mode == 'fetch' || inputs.mode == 'fresh-fetch'))
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -49,7 +49,12 @@ jobs:
           JOOBLE_API_KEY: ${{ secrets.JOOBLE_API_KEY }}
           VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
           WEBPUSH_SUBSCRIPTIONS: ${{ secrets.WEBPUSH_SUBSCRIPTIONS }}
-        run: python -m jobradar run --notify --top 10
+          GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
+          GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
+          GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
+          RESUME_KEY: ${{ secrets.RESUME_KEY }}
+          EMAIL_SIGNATURE: ${{ secrets.EMAIL_SIGNATURE }}
+        run: python -m jobradar run --notify --drafts --top 10 ${{ inputs.mode == 'fresh-fetch' && '--fresh' || '' }}
       - name: Commit jobs.json
         run: |
           git config user.name "github-actions[bot]"
@@ -83,7 +88,7 @@ jobs:
   notify:
     if: >-
       (github.event_name == 'schedule' && github.event.schedule == '25 3 * * *') ||
-      (github.event_name == 'workflow_dispatch' && inputs.mode != 'fetch')
+      (github.event_name == 'workflow_dispatch' && (inputs.mode == 'summary' || inputs.mode == 'test-notification'))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

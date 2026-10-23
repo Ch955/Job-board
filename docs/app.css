@@ -350,6 +350,30 @@ main { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
 }
 .filters[hidden] { display: none; }
 
+/* --------------------------------------------------------------- outreach */
+.outreach-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.mini-btn {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px dashed var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  text-decoration: none;
+  cursor: pointer;
+}
+.mini-btn:hover { color: var(--text); border-style: solid; }
+.mini-btn.mail { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+.mail-list { display: flex; flex-direction: column; gap: 10px; }
+.mail-item { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; }
+.mail-top { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.mail-item p { margin: 2px 0; overflow-wrap: anywhere; }
+.mail-to { font-size: 13px; }
+.mail-item .row { margin-top: 8px; }
+
 /* ----------------------------------------------------------------- drawer */
 dialog.drawer {
   margin: 0;
