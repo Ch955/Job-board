@@ -23,8 +23,12 @@ outreach:
   min_score: 70              # only draft for jobs at or above this score
   max_drafts_per_run: 10
   cooldown_days: 30          # never draft the same address twice within this
+  # {skills} only ever names skills from your resume, even if the job lists others
+  my_skills: [ADF, Databricks, PySpark, ADLS Gen2, SCD, Incremental Load, Metadata-driven, ETL/ELT,
+              SHIR / Hybrid, Azure DevOps, Data Warehousing, Data Modeling, Data Migration, Power BI,
+              Azure Security, Spark, SQL, Python, Git]
   email:
-    subject: "Application: {title} | {role}, {years}+ yrs | {notice}"
+    subject: "Immediate Joiner - {title} ({years} yrs) - {full_name}"
     body: |
       Hi,
 

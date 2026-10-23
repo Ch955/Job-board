@@ -46,7 +46,8 @@ class _SafeDict(dict):
 
 def fields(job: Job, config: dict) -> dict:
     p = config.get("profile", {})
-    skills = [k for k in job.matched_keywords if k not in ("Azure", "SQL", "Python")][:3] or ["ADF", "Databricks", "PySpark"]
+    mine = config.get("outreach", {}).get("my_skills") or []
+    skills = [k for k in job.matched_keywords if k in mine and k not in ("SQL", "Python")][:3] or ["ADF", "Databricks", "PySpark"]
     return _SafeDict(
         name=p.get("name", ""),
         full_name=p.get("full_name") or p.get("name", ""),
@@ -96,6 +97,7 @@ def publish_templates(config: dict) -> dict:
         "linkedin_note": o.get("linkedin_note", ""),
         "email_subject": (o.get("email") or {}).get("subject", ""),
         "email_body": (o.get("email") or {}).get("body", ""),
+        "my_skills": o.get("my_skills") or [],
         "profile": {k: p.get(k, "") for k in ("name", "full_name", "role", "years_experience", "notice", "linkedin")},
     }
 

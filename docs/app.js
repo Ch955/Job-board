@@ -332,7 +332,9 @@ const OUTREACH_STATUSES = ["new", "later", "applied", "interview"];
 function fillTemplate(tpl, job) {
   const p = data.outreach?.profile || {};
   const notice = p.notice || "";
-  const skills = (job.matched_keywords || []).filter((k) => !["Azure", "SQL", "Python"].includes(k)).slice(0, 3);
+  // Only skills from your resume, even when the job lists others
+  const mine = data.outreach?.my_skills || [];
+  const skills = (job.matched_keywords || []).filter((k) => mine.includes(k) && !["SQL", "Python"].includes(k)).slice(0, 3);
   const values = {
     name: p.name || "", full_name: p.full_name || p.name || "", role: p.role || "", years: p.years_experience ?? "",
     notice, notice_lower: notice.charAt(0).toLowerCase() + notice.slice(1), linkedin: p.linkedin || "",

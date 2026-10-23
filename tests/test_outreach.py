@@ -27,7 +27,7 @@ def test_extract_emails_keeps_people_drops_noise():
 
 def test_email_and_note_render(config):
     subject, body = outreach.email_for(job(), config)
-    assert subject == "Application: Azure Data Engineer | Azure Data Engineer, 3+ yrs | Immediate joiner"
+    assert subject == "Immediate Joiner - Azure Data Engineer (3 yrs) - Chakravardhana Rao Edupulapati"
     assert "Acme Analytics (Hyderabad)" in body and "ADF, Databricks, PySpark" in body
     assert "I'm an immediate joiner" in body and "{" not in body
     note = outreach.linkedin_note(job(title="Senior Azure Data Engineer - Databricks, ADF, Synapse, Purview"), config)
@@ -151,3 +151,11 @@ def test_interactive_auth_loopback(monkeypatch):
     monkeypatch.setattr(builtins, "print", lambda *a, **k: None)
     # The real Timer fires the fake browser on another thread while the local server waits
     assert gmail.interactive_auth("cid", "sec", TokenSession()) == "1//refresh"
+
+
+def test_email_never_claims_skills_not_on_resume(config):
+    j = job()
+    j.matched_keywords = ["Snowflake", "Delta Lake", "Fabric", "ADF", "Kafka"]
+    body = outreach.email_for(j, config)[1]
+    assert "focus on ADF matches" in body
+    assert not any(s in body for s in ("Snowflake", "Delta Lake", "Fabric", "Kafka"))
