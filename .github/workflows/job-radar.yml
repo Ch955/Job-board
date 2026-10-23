@@ -106,6 +106,15 @@ jobs:
           path: docs
       - id: deployment
         uses: actions/deploy-pages@v4
+      # Also publish to Firebase Hosting once .firebaserc names the site (DEPLOYMENT.md)
+      - name: Publish to Firebase Hosting
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ ! -f .firebaserc ] || [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then echo "Firebase Hosting not set up; skipped"; exit 0; fi
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > "$RUNNER_TEMP/sa.json"
+          GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json" npx --yes firebase-tools@14.11.0 deploy --only hosting:app --non-interactive
+          rm -f "$RUNNER_TEMP/sa.json"
 
   notify:
     if: >-
