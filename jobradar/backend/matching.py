@@ -24,6 +24,32 @@ DEGREE_ASK = [(re.compile(p, re.I), lvl) for p, lvl in (
 )]
 LEVEL = {"Diploma": 1, "Bachelor's": 2, "Master's": 3, "PhD": 4}
 
+# One name per city for the app's Location filter ("Bangalore Urban, Karnataka" and "KA, IN" -> Bengaluru)
+CITIES = [
+    ("Bengaluru", r"bangalore|bengaluru|\bka\b|karnataka"), ("Hyderabad", r"hyderabad|secunderabad|hitec|gachibowli|\bts\b|telangana"),
+    ("Chennai", r"chennai|\btn\b|tamil nadu"), ("Pune", r"\bpune\b"), ("Mumbai", r"mumbai|thane|navi mumbai"),
+    ("Delhi NCR", r"delhi|\bncr\b|gurgaon|gurugram|noida|faridabad|ghaziabad|\bhr\b|haryana"),
+    ("Kolkata", r"kolkata|west bengal|\bwb\b"), ("Ahmedabad", r"ahmedabad|gandhinagar|gujarat|\bgj\b"),
+    ("Kochi", r"kochi|cochin|kerala|trivandrum|thiruvananthapuram|\bkl\b"), ("Jaipur", r"jaipur|rajasthan|\brj\b"),
+    ("Chandigarh", r"chandigarh|mohali|punjab|\bpb\b"), ("Coimbatore", r"coimbatore"), ("Indore", r"indore|madhya pradesh"),
+    ("Bhubaneswar", r"bhubaneswar|odisha"), ("Visakhapatnam", r"visakhapatnam|vizag|andhra"),
+    ("Mumbai", r"\bmh\b|maharashtra"),  # after Pune, so "Pune, Maharashtra" stays Pune
+]
+_CITY_RX = [(name, re.compile(rx, re.I)) for name, rx in CITIES]
+
+
+def _city_rx(city: str) -> str:
+    """'Bangalore' also matches 'Bengaluru', 'KA, IN'...; unknown places match as typed."""
+    name = next((n for n, rx in _CITY_RX if rx.search(city)), None)
+    return "|".join(rx for n, rx in CITIES if n == name) if name else re.escape(city.lower())
+
+
+def city_label(location: str, remote: bool = False) -> str:
+    for name, rx in _CITY_RX:
+        if rx.search(location or ""):
+            return name
+    return "Remote (India)" if remote else "India"
+
 
 def _role_patterns(roles: list[str]) -> list[tuple[re.Pattern, int, str]]:
     out = []
@@ -45,7 +71,7 @@ def scorer_config(base: dict, profile: dict) -> dict:
     lo = profile.get("min_years") if profile.get("min_years") is not None else (max(0, int(years) - 1) if years is not None else 0)
     hi = profile.get("max_years") if profile.get("max_years") is not None else (int(years) + 3 if years is not None else 50)
     loc = dict(base.get("location") or {})
-    cities = {c: [re.escape(c.lower())] for c in profile.get("locations") or []}
+    cities = {c: [_city_rx(c)] for c in profile.get("locations") or []}
     loc.update(preferred=cities or loc.get("preferred", {}), points_preferred=20,
                points_india_other=20 if profile.get("anywhere_in_india") or not cities else 6,
                points_remote=20 if profile.get("remote_ok", True) else 6)
@@ -56,7 +82,7 @@ def scorer_config(base: dict, profile: dict) -> dict:
                 {"name": s, "weight": 5, "patterns": skills_vocab.patterns_for(s)} for s in profile.get("skills") or []]},
             "location": loc,
             "experience": {"points": 10, "min_years": lo, "max_years": hi, "unknown_points": 6},
-            "walk_in": {**(base.get("walk_in") or {}), "allowed_locations": [re.escape(c.lower()) for c in profile.get("locations") or []]}}
+            "walk_in": {**(base.get("walk_in") or {}), "allowed_locations": [_city_rx(c) for c in profile.get("locations") or []]}}
 
 
 class UserMatcher:
@@ -107,7 +133,9 @@ class UserMatcher:
             parts.append(f"Asks for a {need} degree" + ("." if qual_ok is None else "; you have it." if qual_ok else "; your profile shows a lower degree."))
         return {
             "score": score,
-            "breakdown": {"role": title_pts, "skills": skill_pts, "location": loc_pts, "experience": exp_pts, "recency": rec_pts},
+            "breakdown": {"role": title_pts, "skills": skill_pts, "location": loc_pts, "experience": exp_pts, "recency": rec_pts,
+                          "location_label": city_label(job.location, job.remote) if loc_ok else loc_label,
+                          "walk_in": walk_in, "years_required": ylo, "years_max": yhi},
             "matched_skills": matched, "missing_skills": missing[:10],
             "experience": {"min": ylo, "max": yhi, "fits": exp_ok},
             "role_fit": "match" if title_pts >= 18 else "related" if title_pts else "different",

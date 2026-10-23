@@ -125,3 +125,27 @@ def test_no_one_elses_skills_leak_in():
                            "skills": ["React", "TypeScript"], "years_experience": 2})
     e = matching.UserMatcher(load_config(), other).explain(job("Data Engineer", "ADF Databricks PySpark"), NOW)
     assert e["matched_skills"] == [] and e["score"] < 50
+
+
+@pytest.mark.parametrize("raw,city", [
+    ("Bangalore Urban, Karnataka, India", "Bengaluru"), ("KA, IN", "Bengaluru"), ("Bengaluru East, Karnataka, India", "Bengaluru"),
+    ("Greater Hyderabad Area", "Hyderabad"), ("TS, IN", "Hyderabad"), ("Gurugram, Haryana, India", "Delhi NCR"),
+    ("Pune Division, Maharashtra, India", "Pune"), ("MH, IN", "Mumbai"), ("Chennai, TN, India", "Chennai"),
+    ("PB, IN", "Chandigarh"), ("India", "India"),
+])
+def test_one_city_name_per_place(raw, city):
+    assert matching.city_label(raw) == city
+
+
+def test_matches_carry_the_city_label():
+    m = matching.UserMatcher(load_config(), PROFILE)
+    got = m.match([job("Data Engineer", "Airflow dbt Snowflake PySpark Python SQL, 2-4 years experience",
+                       location="Pune Division, Maharashtra, India")], NOW)
+    assert got[0]["score_breakdown"]["location_label"] == "Pune"
+
+
+def test_city_spelling_doesnt_matter():
+    p = {**PROFILE, "locations": ["Bangalore"], "anywhere_in_india": False}
+    e = matching.UserMatcher(load_config(), p).explain(
+        job("Data Engineer", "Airflow dbt, 2-4 years experience", location="Bengaluru East, Karnataka, India"), NOW)
+    assert e["breakdown"]["location"] == 20
