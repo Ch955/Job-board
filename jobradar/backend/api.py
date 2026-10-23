@@ -203,7 +203,14 @@ def create_app(settings: Settings | None = None, store: Store | None = None, ses
     # ---------------------------------------------------------------- basics
     @app.get("/healthz")
     def healthz():
-        return {"ok": True, "gmail": bool(settings.oauth()), "push": bool(settings.vapid_private_key)}
+        meta = store.get("pool", "meta") or {}
+        # Public, so only counts: which job sites answered in the last search
+        sources = {k: {"status": v.get("status"), "jobs": v.get("count", 0)} for k, v in (meta.get("sources") or {}).items()
+                   if v.get("status") not in ("disabled",)}
+        return {"ok": True, "gmail": bool(settings.oauth()), "push": bool(settings.vapid_private_key),
+                "jobs": {"in_list": meta.get("count", 0), "by_site": meta.get("by_site", {}),
+                         "updated": meta.get("updated"), "searching": search.running,
+                         "last_search": sources}}
 
     @app.get("/api/me")
     def me(u: dict = Depends(user)):

@@ -8,6 +8,7 @@ is recorded on their status and never stops or leaks into another user's run.
 from __future__ import annotations
 
 import copy
+from collections import Counter
 import json
 import logging
 from datetime import datetime, timezone
@@ -127,7 +128,8 @@ def refresh_pool(store: Store, base: dict, session, now: datetime | None = None,
                                "fetch_state": fetch_state, "sources": runs,
                                # every role wanted at this point counts as covered, so a role beyond the
                                # query cap doesn't trigger a new search on every refresh
-                               "roles": all_roles(users, first)})
+                               "roles": all_roles(users, first),
+                               "by_site": dict(Counter(d.get("source", "?") for d in kept).most_common())})
     return {"jobs": len(kept), "sources": {k: v.get("status") for k, v in runs.items()}}
 
 

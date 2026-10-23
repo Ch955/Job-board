@@ -251,3 +251,11 @@ def test_a_failed_search_is_reported_and_doesnt_stick(monkeypatch):
     r = c.put("/api/profile", headers=H("tok-alice"), json=DE).json()
     m = c.get("/api/matches", headers=H("tok-alice")).json()
     assert r["searching"] is True and m["searching"] is False and m["search_error"] == "RuntimeError"
+
+
+def test_health_shows_which_sites_supplied_jobs(monkeypatch):
+    c, store, search, calls = make_search_app(monkeypatch, [J("Data Engineer", "Airflow dbt")])
+    c.put("/api/profile", headers=H("tok-alice"), json=DE)
+    h = c.get("/healthz").json()
+    assert h["jobs"]["in_list"] == 1 and h["jobs"]["by_site"] == {"greenhouse": 1}
+    assert h["jobs"]["last_search"]["greenhouse"]["status"] == "ok" and "alice" not in str(h)
