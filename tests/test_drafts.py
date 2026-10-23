@@ -91,5 +91,64 @@ def test_disabled_or_no_address():
     client = gmail.GmailClient(FakeGmail(), "tok")
     with pytest.raises(drafts.DraftError, match="turned off"):
         drafts.create(client, {}, {**PROFILE, "drafts_enabled": False}, "application", job=JOB, to="hr@acme.com")
-    with pytest.raises(drafts.DraftError, match="email address"):
-        drafts.create(client, {}, PROFILE, "application", job=JOB, to="")
+    with pytest.raises(drafts.DraftError, match="doesn't look valid"):
+        drafts.create(client, {}, PROFILE, "application", job=JOB, to="not-an-email")
+
+
+# ---------------------------------------------------- without a recruiter email
+JOB2 = {**JOB, "url": "https://boards.greenhouse.io/acme/jobs/1", "apply_type": "company_site",
+        "apply_url": "https://boards.greenhouse.io/acme/jobs/1", "description_snippet": "dbt and Snowflake"}
+
+
+def test_application_draft_without_recipient_lands_in_gmail_without_to():
+    g = FakeGmail()
+    rec = drafts.create(gmail.GmailClient(g, "tok"), {}, PROFILE, "application", job=JOB2, to="")
+    m = parsed(g.drafts[0])
+    assert m["To"] is None and rec["to"] == "" and "Analytics Engineer" in m["Subject"]
+
+
+def test_edited_text_is_used_as_written():
+    g = FakeGmail()
+    drafts.create(gmail.GmailClient(g, "tok"), {}, PROFILE, "outreach", job=JOB2, to="",
+                  subject="My subject", body="My own words.")
+    m = parsed(g.drafts[0])
+    assert m["Subject"] == "My subject" and m.get_payload().strip() == "My own words."
+
+
+def test_preview_needs_no_gmail_and_no_address():
+    p = drafts.preview("application", PROFILE, JOB2)
+    assert p["subject"] and p["body"] and p["cover_letter"].startswith("Dear Hiring Team")
+    assert p["apply"] == {"type": "company_site", "url": JOB2["apply_url"], "evidence": ""} and p["contacts"] == []
+    cl = p["cover_letter"]
+    assert "dbt" in cl and "Snowflake" not in cl and "30 days" in cl          # only her skills; nothing invented
+    for other in ("ADF", "Databricks", "Capgemini", "Chakri"):
+        assert other not in cl
+
+
+def test_outreach_kit_alternatives():
+    p = drafts.preview("outreach", PROFILE, {**JOB2, "contact_emails": ["hr@acme.example", "bad"]})
+    assert len(p["linkedin_note"]) <= 200 and "Asha" in p["linkedin_note"]
+    assert p["recruiter_search"].startswith("https://www.linkedin.com/search/results/people/")
+    assert p["careers_link"] == JOB2["apply_url"]
+    assert p["contacts"] == [{"email": "hr@acme.example", "source": "found in the job posting"}]  # invalid one dropped
+
+
+def test_long_titles_keep_the_note_under_200():
+    p = drafts.preview("outreach", PROFILE, {**JOB2, "title": "Senior Principal Analytics Engineering Lead " * 6})
+    assert len(p["linkedin_note"]) <= 200 and p["linkedin_note"].endswith("Asha")
+
+
+def test_follow_up_warns_when_contact_was_recent():
+    from datetime import datetime, timezone
+    now = datetime(2026, 10, 24, tzinfo=timezone.utc)
+    state = {"gmail": {"events": [{"job_id": "j1", "at": "2026-10-22T10:00:00+00:00", "type": "acknowledged"}]}}
+    p = drafts.preview("follow_up", PROFILE, JOB2, state, now)
+    assert p["too_soon"] is True and "Wait" in p["advice"]
+    p = drafts.preview("follow_up", PROFILE, JOB2, {}, now)
+    assert p["too_soon"] is False and p["last_contact"] is None
+
+
+def test_nothing_is_ever_sent():
+    g = FakeGmail()
+    drafts.create(gmail.GmailClient(g, "tok"), {}, PROFILE, "application", job=JOB2, to="hr@acme.example")
+    assert g.sent == [] and len(g.drafts) == 1

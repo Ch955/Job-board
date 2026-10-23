@@ -13,7 +13,11 @@ from .. import skills_vocab
 DEFAULT_THRESHOLD = 70
 LIMITS = {"full_name": 80, "email": 120, "phone": 25, "linkedin": 120, "current_role": 80, "current_company": 80,
           "notice": 60, "location": 60}
+WORK_MODES = ("onsite", "hybrid", "remote")
+SCOPES = ("selected", "india")           # only my cities / anywhere in India
+RELOCATION = ("yes", "no", "flexible")
 LISTS = {"skills": (60, 40), "target_roles": (8, 60), "locations": (10, 40), "education": (6, 160),
+         "work_modes": (3, 10), "walkin_cities": (10, 40), "walkin_roles": (8, 60), "walkin_industries": (8, 40),
          "certifications": (12, 140), "projects": (10, 200), "highlights": (3, 240), "degree_levels": (4, 20)}
 EMAIL = re.compile(r"[^@\s<>]+@[^@\s<>]+\.[A-Za-z]{2,24}")
 
@@ -73,11 +77,42 @@ def clean(raw: dict) -> dict:
     if out["min_years"] is not None and out["max_years"] is not None and out["min_years"] > out["max_years"]:
         raise ProfileError("min_years can't be above max_years")
     out["threshold"] = int(_num(raw.get("threshold"), 0, 100, "threshold", DEFAULT_THRESHOLD))
-    for k, default in (("remote_ok", True), ("anywhere_in_india", False), ("drafts_enabled", True), ("notify", True)):
+    # Job preferences. Older profiles had only anywhere_in_india / remote_ok: those still decide the defaults.
+    if any(m not in WORK_MODES for m in out["work_modes"]):
+        raise ProfileError("work_modes can be onsite, hybrid and/or remote")
+    if not out["work_modes"]:
+        out["work_modes"] = list(WORK_MODES) if raw.get("remote_ok", True) is not False else ["onsite", "hybrid"]
+    scope = raw.get("search_scope") or ("india" if raw.get("anywhere_in_india") or not out["locations"] else "selected")
+    if scope not in SCOPES:
+        raise ProfileError("search_scope must be 'selected' or 'india'")
+    out["search_scope"] = scope
+    reloc = raw.get("relocation") or "flexible"
+    if reloc not in RELOCATION:
+        raise ProfileError("relocation must be yes, no or flexible")
+    out["relocation"] = reloc
+    # Walk-ins: separate cities (you have to be there in person), date window, radius
+    out["walkin_radius_km"] = _num(raw.get("walkin_radius_km"), 0, 1000, "walkin_radius_km")
+    out["walkin_min_score"] = int(_num(raw.get("walkin_min_score"), 0, 100, "walkin_min_score", 50))
+    out["walkin_min_years"] = _num(raw.get("walkin_min_years"), 0, 50, "walkin_min_years")
+    out["walkin_max_years"] = _num(raw.get("walkin_max_years"), 0, 50, "walkin_max_years")
+    for k in ("walkin_from", "walkin_to"):
+        v = raw.get(k) or None
+        if v and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(v)):
+            raise ProfileError(f"{k} must be a date (YYYY-MM-DD)")
+        out[k] = v
+    if out["walkin_from"] and out["walkin_to"] and out["walkin_from"] > out["walkin_to"]:
+        raise ProfileError("walk-in 'from' date is after the 'to' date")
+    for k, default in (("remote_ok", True), ("anywhere_in_india", False), ("drafts_enabled", True), ("notify", True),
+                       ("walkin_same_as_jobs", False)):
         v = raw.get(k, default)
         if not isinstance(v, bool):
             raise ProfileError(f"{k} must be true or false")
         out[k] = v
+    # Keep the older switches in step with the new preferences (read by older app versions)
+    out["remote_ok"] = "remote" in out["work_modes"]
+    out["anywhere_in_india"] = out["search_scope"] == "india"
+    if out["walkin_same_as_jobs"]:
+        out["walkin_cities"] = list(out["locations"])
     return out
 
 

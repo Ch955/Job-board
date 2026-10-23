@@ -69,6 +69,7 @@ def parse(records: list[dict]) -> list[Job]:
                 company=_val(r, "company") or "Unknown",
                 location=str(location),
                 url=_val(r, "job_url") or _val(r, "job_url_direct") or "",
+                apply_url=_val(r, "job_url_direct") or "",
                 source=str(site),
                 remote=bool(_val(r, "is_remote")),
                 posted_date=posted.isoformat() if hasattr(posted, "isoformat") else posted,

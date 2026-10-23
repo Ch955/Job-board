@@ -14,8 +14,12 @@ const K = {
 };
 const APPLIED = ["applied", "interview", "offer", "rejected"];
 const KEEP = ["later", "applied", "interview", "offer", "rejected"];
-const DEFAULT_FILTERS = { q: "", minScore: 40, location: [], source: [], remote: [] };
-const MULTI = ["source", "location", "remote"];
+// An empty list means "all": All application types, All permitted sources, every location
+const DEFAULT_FILTERS = { q: "", minScore: 40, location: [], source: [], remote: [], apply: [] };
+const MULTI = ["apply", "source", "location", "remote"];
+const APPLY_TYPES = [["easy_apply", "Easy Apply"], ["company_site", "Company website"], ["external", "External application"],
+  ["unknown", "Application type unknown"]];
+const ALL_LABEL = { apply: "All application types", source: "All permitted sources", location: "All locations", remote: "Any work mode" };
 const SOURCE_LABELS = { naukri: "Naukri", linkedin: "LinkedIn", indeed: "Indeed", glassdoor: "Glassdoor", google: "Google",
   greenhouse: "Greenhouse", lever: "Lever", ashby: "Ashby", smartrecruiters: "SmartRecruiters", adzuna: "Adzuna",
   jooble: "Jooble", remotive: "Remotive", arbeitnow: "Arbeitnow", email: "Gmail" };
@@ -30,6 +34,7 @@ const SECTIONS = [
   { id: "rejected", label: "Rejected", icon: "✖️", tile: "var(--done)", hint: "Kept for your records." },
   { id: "skipped", label: "Skipped", icon: "🙈", tile: "var(--done)", hint: "You can still apply from here: tap Apply, then Applied." },
 ];
+const WALKIN_SECTION = { id: "walkins", label: "Walk-in interviews", icon: "🚶", tile: "var(--s-mid)" };
 const GMAIL_SECTIONS = [
   { id: "mail", label: "Recruiter emails", icon: "✉️", tile: "var(--primary)" },
   { id: "reply", label: "Inbox updates", icon: "📥", tile: "var(--interview)" },
@@ -47,7 +52,7 @@ const MOVE_ACTIONS = {
   offer: [["interview", "↩ Interview"]],
   rejected: [["applied", "↩ Applied"], ["interview", "Interview"]],
 };
-const ALL_SECTIONS = [...SECTIONS, ...GMAIL_SECTIONS];
+const ALL_SECTIONS = [...SECTIONS, WALKIN_SECTION, ...GMAIL_SECTIONS];
 const sectionLabel = (id) => ALL_SECTIONS.find((x) => x.id === id)?.label || id;
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -259,7 +264,23 @@ function allJobs() {
 }
 const locationLabel = (job) => job.score_breakdown?.location_label || (job.remote ? "Remote (India)" : job.location || "India");
 const modeOf = (job) => (job.remote ? "remote" : "onsite");
-const FIELD_VALUE = { source: (j) => j.source, location: locationLabel, remote: modeOf };
+
+// Same rules as jobradar/apply_type.py, for jobs saved before the server recorded the type
+const ATS_HOSTS = ["greenhouse.io", "lever.co", "ashbyhq.com", "smartrecruiters.com", "myworkdayjobs.com", "workday.com",
+  "icims.com", "taleo.net", "successfactors.com", "jobvite.com", "zohorecruit.com", "recruitee.com", "workable.com",
+  "bamboohr.com", "darwinbox.in", "keka.com", "freshteam.com", "oraclecloud.com", "breezy.hr", "teamtailor.com"];
+const EMPLOYER_BOARDS = ["greenhouse", "lever", "ashby", "smartrecruiters"];
+const AGGREGATOR_SOURCES = ["adzuna", "jooble", "remotive", "arbeitnow"];
+function applyTypeOf(job) {
+  if (APPLY_TYPES.some(([t]) => t === job.apply_type)) return job.apply_type;
+  let host = "";
+  try { host = new URL(job.url).hostname.toLowerCase(); } catch { return "unknown"; }
+  if (EMPLOYER_BOARDS.includes(job.source) || ATS_HOSTS.some((d) => host === d || host.endsWith("." + d))) return "company_site";
+  if (AGGREGATOR_SOURCES.includes(job.source)) return "external";
+  return "unknown";
+}
+const applyLabel = (t) => (APPLY_TYPES.find(([k]) => k === t) || APPLY_TYPES[3])[1];
+const FIELD_VALUE = { source: (j) => j.source, location: locationLabel, remote: modeOf, apply: applyTypeOf };
 
 // ------------------------------------------------------------------ filters
 function matchesFilters(job, ignore) {
@@ -283,9 +304,14 @@ function normalizeFilters(f) {
   delete out.status;
   return out;
 }
+// Filter choices are kept per account on this device (and for "this device only" use)
+const filterKey = () => (session?.uid ? `${K.filters}.${session.uid}` : K.filters);
+function loadFilters() {
+  filters = normalizeFilters(readJSON(filterKey(), null) ?? readJSON(K.filters, {}));
+}
 function setFilters(patch) {
   filters = { ...filters, ...patch };
-  writeJSON(K.filters, filters);
+  writeJSON(filterKey(), filters);
   render();
 }
 const activeFilterCount = () => (filters.minScore !== DEFAULT_FILTERS.minScore ? 1 : 0) + MULTI.filter((k) => filters[k].length).length;
@@ -293,15 +319,25 @@ const activeFilterCount = () => (filters.minScore !== DEFAULT_FILTERS.minScore ?
 function buildFilterChips() {
   const all = allJobs();
   const inSection = all.filter((j) => statusOf(j) === section);
+  // Sources: every enabled, permitted source, plus any your own saved jobs came from
+  const available = data.sources_available || [];
   const groups = {
-    source: [...new Set(all.map((j) => j.source))].sort().map((v) => [v, SOURCE_LABELS[v] || v]),
+    apply: APPLY_TYPES,
+    source: [...new Set([...available, ...all.map((j) => j.source)])].sort()
+      .map((v) => [v, (SOURCE_LABELS[v] || v) + (available.length && !available.includes(v) && v !== "email" ? " (saved only)" : "")]),
     location: [...new Set(all.map(locationLabel))].sort().map((v) => [v, v]),
     remote: WORK_MODES,
   };
   const focused = document.activeElement?.dataset?.chip;
   for (const key of MULTI) {
     const base = inSection.filter((j) => matchesFilters(j, key));
-    $(`#f-${key}`).replaceChildren(...groups[key].map(([value, label]) => {
+    const allOn = !filters[key].length;
+    const allChip = el("button", { type: "button", className: "chip chip-all" }, ALL_LABEL[key],
+      el("span", { className: "chip-count", textContent: base.length }));
+    allChip.dataset.chip = `${key}:*`;
+    allChip.setAttribute("aria-pressed", String(allOn));
+    allChip.addEventListener("click", () => setFilters({ [key]: [] }));
+    $(`#f-${key}`).replaceChildren(allChip, ...groups[key].map(([value, label]) => {
       const on = filters[key].includes(value);
       const b = el("button", { type: "button", className: "chip" }, label,
         el("span", { className: "chip-count", textContent: base.filter((j) => FIELD_VALUE[key](j) === value).length }));
@@ -338,7 +374,7 @@ function appliedTimes() {
 
 function render() {
   const jobs = allJobs();
-  const isGmail = GMAIL_SECTIONS.some((g) => g.id === section);
+  const isGmail = GMAIL_SECTIONS.some((g) => g.id === section) || section === "walkins";
   const shown = isGmail ? [] : sectionJobs(section, jobs).sort(sortFor(section));
   const list = $("#list");
 
@@ -351,7 +387,9 @@ function render() {
 
   if (isGmail) {
     const multi = JRAccount.enabled();
-    list.replaceChildren(section === "mail" ? (multi ? JRAccount.renderDrafts() : renderMailSection())
+    list.replaceChildren(section === "walkins" ? (multi ? JRAccount.renderWalkins()
+        : el("div", { className: "empty" }, el("b", { textContent: "Sign in to see walk-ins" }), "Walk-ins use your own cities and profile."))
+      : section === "mail" ? (multi ? JRAccount.renderDrafts() : renderMailSection())
       : multi ? JRAccount.renderInbox() : renderInboxSection());
   } else if (!shown.length) {
     const any = jobs.some((j) => statusOf(j) === section);
@@ -413,6 +451,11 @@ function renderCard(job, index) {
   if (status === "new" && !pending && new Date(job.first_seen).getTime() >= Date.now() - 86400e3) meta.append(el("span", { className: "badge", textContent: "new" }));
   if (job.score_breakdown?.walk_in) meta.append(el("span", { className: "badge walkin", textContent: "walk-in" }));
   if (rec?.source === "gmail") meta.append(el("span", { className: "badge gmail", textContent: "from Gmail" }));
+  const at = applyTypeOf(job);
+  const ab = el("span", { className: `badge atype atype-${at}`, textContent: applyLabel(at) });
+  ab.title = job.apply_evidence || (at === "unknown" ? "How to apply isn't shown in the listing" : "From the job's link");
+  meta.append(ab);
+  if (job.work_mode === "hybrid") meta.append(el("span", { className: "badge", textContent: "hybrid" }));
   for (const p of [job.location, job.remote ? "Remote" : null, SOURCE_LABELS[job.source] || job.source, ago(job.posted_date || job.first_seen)].filter(Boolean)) {
     meta.append(el("span", { textContent: p }));
   }
@@ -447,8 +490,9 @@ function renderCard(job, index) {
   // Apply: blue to start, amber once opened, grey after you've applied
   const actions = $(".card-actions", card);
   const apply = $(".apply", card);
-  const url = safeUrl(job.url);
+  const url = safeUrl(job.apply_url || job.url);
   apply.textContent = applied ? "View job" : pending ? "⏳ Pending" : "Apply";
+  apply.title = at === "company_site" ? "Opens the employer's careers site" : at === "external" ? "Opens the listing on another site" : "Opens the job listing";
   apply.classList.toggle("pending", pending);
   apply.classList.toggle("done", applied);
   if (url) {
@@ -565,6 +609,7 @@ function renderNav(jobs) {
   $("#nav-list").replaceChildren(
     el("p", { className: "nav-group", textContent: "Jobs" }),
     ...SECTIONS.map((sec) => item(sec, counts[sec.id] || 0)),
+    ...(JRAccount.enabled() ? [item(WALKIN_SECTION, null)] : []),
     el("p", { className: "nav-group", textContent: "Gmail" }),
     item(GMAIL_SECTIONS[0], JRAccount.enabled() ? Object.keys(store.drafts).length : jobs.filter((j) => j.outreach?.draft_id).length),
     item(GMAIL_SECTIONS[1], JRAccount.enabled() ? (store.gmail.review || []).filter((r) => !store.reviews[r.id]).length || (store.gmail.events || []).length
@@ -895,6 +940,8 @@ function listen() {
 function onUserChanged(user) {
   if (user) {
     session = user;
+    loadFilters();
+    applyFiltersToInputs();
     writeJSON("jobradar.user", user);
     writeJSON(K.mode, undefined);
     if (freshSignIn) {
@@ -1231,7 +1278,7 @@ function bind() {
   });
   $("#reset-filters").addEventListener("click", () => {
     filters = { ...DEFAULT_FILTERS };
-    writeJSON(K.filters, filters);
+    writeJSON(filterKey(), filters);
     applyFiltersToInputs();
     render();
   });
@@ -1241,6 +1288,7 @@ function bind() {
     $("#filter-panel").hidden = !open;
   });
   $("#refresh").addEventListener("click", () => {
+    if (section === "walkins" && JRAccount.enabled()) JRAccount.refreshWalkins();
     JRAccount.enabled() ? JRAccount.refreshNow() : load();
     syncNow();
   });
@@ -1297,7 +1345,7 @@ function bind() {
 
 async function init() {
   applyTheme(readJSON(K.theme, "auto"));
-  filters = normalizeFilters(readJSON(K.filters, {}));
+  loadFilters();
   const savedSection = readJSON(K.section, "new");
   section = ALL_SECTIONS.some((x) => x.id === savedSection) ? savedSection : "new";
   history.replaceState({ s: section }, "", location.pathname + location.search + location.hash);

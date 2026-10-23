@@ -259,3 +259,53 @@ def test_health_shows_which_sites_supplied_jobs(monkeypatch):
     h = c.get("/healthz").json()
     assert h["jobs"]["in_list"] == 1 and h["jobs"]["by_site"] == {"greenhouse": 1}
     assert h["jobs"]["last_search"]["greenhouse"]["status"] == "ok" and "alice" not in str(h)
+
+
+def test_draft_preview_without_gmail_or_recipient(env):
+    c, store, g = env
+    c.put("/api/profile", headers=H("tok-alice"), json=PROFILE)
+    store.set("matches", "alice", {"jobs": [{"id": "j1", "title": "Data Engineer", "company": "Northwind",
+                                             "url": "https://boards.greenhouse.io/nw/1", "apply_type": "company_site",
+                                             "matched_keywords": ["dbt"]}]})
+    p = c.post("/api/drafts/preview", headers=H("tok-alice"), json={"type": "application", "job_id": "j1"}).json()
+    assert p["cover_letter"] and p["apply"]["type"] == "company_site" and g.drafts == []
+    o = c.post("/api/drafts/preview", headers=H("tok-alice"), json={"type": "outreach", "job_id": "j1"}).json()
+    assert len(o["linkedin_note"]) <= 200 and o["recruiter_search"]
+    assert c.post("/api/drafts/preview", headers=H("tok-bob"), json={"type": "application", "job_id": "j1"}).status_code == 404
+    assert c.post("/api/drafts/preview", json={"type": "application", "job_id": "j1"}).status_code == 401
+
+
+def test_gmail_draft_without_recipient_and_with_edits(env):
+    c, store, g = env
+    c.put("/api/profile", headers=H("tok-alice"), json=PROFILE)
+    store.set("matches", "alice", {"jobs": [{"id": "j1", "title": "Data Engineer", "company": "Northwind"}]})
+    url = c.post("/api/gmail/connect", headers=H("tok-alice")).json()["url"]
+    st = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)["state"][0]
+    c.get("/api/gmail/callback", params={"state": st, "code": "abc"}, follow_redirects=False)
+    bad = c.post("/api/drafts", headers=H("tok-alice"), json={"type": "application", "job_id": "j1", "to": "nobody"})
+    assert bad.status_code == 422 and "valid" in bad.json()["detail"]
+    import time as _t
+    _t.sleep(3.1)
+    r = c.post("/api/drafts", headers=H("tok-alice"), json={"type": "application", "job_id": "j1", "to": "",
+                                                             "subject": "Edited", "body": "Edited body"})
+    assert r.status_code == 200 and r.json()["draft"]["to"] == ""
+    import base64
+    raw = base64.urlsafe_b64decode(g.drafts[-1]["message"]["raw"]).decode()
+    assert "Subject: Edited" in raw and "Edited body" in raw and "\nTo:" not in raw
+
+
+def test_walkins_endpoint_uses_your_own_walkin_cities(env):
+    c, store, g = env
+    full = ("Walk-in drive. Date: 30th December 2099. Time: 10 AM - 1 PM. Venue: Tower A, Hitec City, Hyderabad. "
+            "Experience: 2-5 years. SQL, Airflow, dbt.")
+    pool = [{"id": "w1", "title": "Walk-in: Data Engineer", "company": "Northwind", "location": "Hyderabad, India",
+             "url": "https://boards.greenhouse.io/nw/1", "source": "greenhouse", "posted_date": None, "description": full}]
+    store.set("pool", "c0", {"jobs": pool})
+    store.set("pool", "meta", {"chunks": 1, "count": 1, "updated": "2099-01-01T00:00:00+00:00"})
+    c.put("/api/profile", headers=H("tok-alice"), json={**PROFILE, "walkin_cities": ["Hyderabad"], "walkin_min_score": 0})
+    c.put("/api/profile", headers=H("tok-bob"), json={**PROFILE, "walkin_cities": ["Chennai"], "walkin_min_score": 0})
+    a = c.get("/api/walkins", headers=H("tok-alice")).json()
+    b = c.get("/api/walkins", headers=H("tok-bob")).json()
+    assert [e["company"] for e in a["upcoming"]] == ["Northwind"] and a["upcoming"][0]["status"] == "confirmed"
+    assert b["upcoming"] == [] and b["cities"] == ["Chennai"]
+    assert c.get("/api/walkins").status_code == 401

@@ -19,7 +19,8 @@ def run(config, out, **kw):
     return pipeline.run(config, session=OfflineSession(), output=out, ignore_throttle=True, **kw)
 
 
-def test_full_offline_run(config, out):
+def test_full_offline_run(authorized_config, out):
+    config = authorized_config
     result = run(config, out)
     data = json.loads(out.read_text())
     titles = {j["title"] for j in data["jobs"]}
@@ -134,7 +135,7 @@ def test_jobs_asking_5_plus_years_are_dropped(config):
 def test_carry_over_drops_old_5_plus_year_jobs(config):
     now = datetime(2026, 10, 23, tzinfo=timezone.utc)
     def old(title, years, status="new"):
-        j = Job(title=title, company="C", location="Pune", url="u", source="naukri",
+        j = Job(title=title, company="C", location="Pune", url="u", source="greenhouse",
                 posted_date=(now - timedelta(days=1)).isoformat(), status=status)
         j.score, j.score_breakdown = 80, {"recency": 10, "years_required": years}
         return j
@@ -169,3 +170,29 @@ def test_fresh_run_rebuilds_list_but_keeps_state(config, out):
     after = json.loads(out.read_text())
     assert "ghost123" not in {j["id"] for j in after["jobs"]}
     assert after["state"]["emailed"] == {"a@b.in": "2026-10-23T00:00:00+00:00"}
+
+
+def test_production_config_doesnt_scrape_linkedin_naukri_indeed(config, out):
+    assert config["sources"]["jobspy"]["enabled"] is False and config["sources"]["jobspy"]["permitted"] is False
+    result = run(config, out)
+    assert result.source_runs["jobspy"]["status"] == "disabled"
+    assert not {"naukri", "linkedin", "indeed"} & {j["source"] for j in json.loads(out.read_text())["jobs"]}
+    assert not {"naukri", "linkedin", "indeed"} & set(pipeline.permitted_sources(config))
+
+
+def test_enabled_but_not_permitted_source_is_never_fetched(config, out):
+    config["sources"]["jobspy"]["enabled"] = True       # someone flips only the switch
+    result = run(config, out)
+    assert result.source_runs["jobspy"]["status"] == "not permitted"
+
+
+def test_switched_off_source_listings_are_dropped_but_tracked_ones_stay(config):
+    now = datetime(2026, 10, 23, tzinfo=timezone.utc)
+    def j(src, status="new"):
+        x = Job(title="Data Engineer", company=f"C {src} {status}", location="Pune, India", url="u", source=src,
+                posted_date=now.isoformat(), status=status)
+        x.score, x.score_breakdown = 80, {"recency": 10}
+        return x
+    previous = {x.id: x for x in (j("naukri"), j("linkedin", "applied"), j("greenhouse"), j("email"))}
+    jobs, _, _ = pipeline.process([], previous, config, now)
+    assert {(x.source, x.status) for x in jobs} == {("linkedin", "applied"), ("greenhouse", "new"), ("email", "new")}

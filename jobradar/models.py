@@ -85,6 +85,11 @@ class Job:
     # Recruiter addresses found in the posting, and the Gmail draft made for it
     contact_emails: list[str] = field(default_factory=list)
     outreach: dict = field(default_factory=dict)
+    # How to apply (apply_type.py): set from the source and the real application link; optional
+    apply_url: str = ""
+    apply_type: str = ""
+    apply_evidence: str = ""
+    work_mode: str = ""   # "remote" | "hybrid" | "onsite" when the listing says so, else ""
     # Full description is used for scoring only and never written to disk
     description: str = field(default="", repr=False, compare=False)
 

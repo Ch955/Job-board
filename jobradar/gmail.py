@@ -62,7 +62,8 @@ def access_token(session, client_id: str, client_secret: str, refresh_token: str
 def build_message(to: str, subject: str, body: str, sender: str | None = None,
                   attachment: tuple[str, bytes] | None = None, in_reply_to: str | None = None) -> EmailMessage:
     msg = EmailMessage()
-    msg["To"] = to
+    if to:  # a draft without a recipient is fine: you add it in Gmail
+        msg["To"] = to
     if sender:
         msg["From"] = sender
     msg["Subject"] = subject

@@ -13,11 +13,11 @@ import json
 import logging
 from datetime import datetime, timezone
 
-from .. import gmail, gmail_status, push
+from .. import apply_type, gmail, gmail_status, push
 from ..models import Job
-from ..pipeline import dedupe, fetch_all
+from ..pipeline import dedupe, fetch_all, permitted
 from ..scoring import Scorer, age_days
-from . import gmail_link
+from . import gmail_link, walkins
 from .matching import UserMatcher, _role_patterns
 from .profile import is_complete
 from .store import Conflict, Store
@@ -25,6 +25,7 @@ from .store import Conflict, Store
 log = logging.getLogger("jobradar.tasks")
 POOL_CHUNK = 120          # jobs per pool document (Firestore docs are capped at 1 MiB)
 DESC_CHARS = 2500         # enough of the description for skill matching
+WALKIN_DESC_CHARS = 6000
 MAX_MATCHES = 150
 MAX_QUERIES = 6
 
@@ -109,13 +110,17 @@ def refresh_pool(store: Store, base: dict, session, now: datetime | None = None,
         job.first_seen = job.first_seen or _iso(now)
         if not scorer.is_relevant(job) or (age_days(job, now) or 0) > 30 or not scorer.location_points(job)[2]:
             continue
+        apply_type.annotate(job)
         d = job.to_dict()
-        d["description"] = (job.description or "")[:DESC_CHARS]
+        # Walk-in details (date, venue, documents) are often further down: keep more of those
+        d["description"] = (job.description or "")[:WALKIN_DESC_CHARS if walkins.is_walkin(job, cfg) else DESC_CHARS]
         kept.append(d)
     # Keep last run's jobs that are still recent, so a source outage doesn't empty everyone's list
     have = {d["id"] for d in kept}
     for old in load_pool(store):
-        if old.id not in have and (age_days(old, now) or 0) <= 30:
+        if old.id not in have and (age_days(old, now) or 0) <= 30 and permitted(cfg, old.source):
+            if not old.apply_type:
+                apply_type.annotate(old)
             d = old.to_dict()
             d["description"] = old.description[:DESC_CHARS]
             kept.append(d)

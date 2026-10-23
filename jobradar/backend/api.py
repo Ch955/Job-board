@@ -25,7 +25,8 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from .. import gmail, push
 from ..config import load_config
 from ..http import make_session
-from . import drafts, gmail_link, resume_intake, tasks
+from ..pipeline import permitted_sources
+from . import drafts, gmail_link, resume_intake, tasks, walkins
 from .idtoken import InvalidToken, Verifier
 from .profile import ProfileError, clean, is_complete
 from .store import Conflict, FirestoreStore, MemoryStore, Store
@@ -281,7 +282,8 @@ def create_app(settings: Settings | None = None, store: Store | None = None, ses
     @app.get("/api/matches")
     def get_matches(u: dict = Depends(user)):
         m = store.get("matches", u["uid"]) or {}
-        return {"jobs": m.get("jobs", []), "updated": m.get("updated"), "threshold": m.get("threshold"), **search.status()}
+        return {"jobs": m.get("jobs", []), "updated": m.get("updated"), "threshold": m.get("threshold"),
+                "sources_available": permitted_sources(base), **search.status()}
 
     # ----------------------------------------------------------------- gmail
     @app.post("/api/gmail/connect")
@@ -327,6 +329,40 @@ def create_app(settings: Settings | None = None, store: Store | None = None, ses
         return {"report": r, "last_success": g.get("last_success")}
 
     # ---------------------------------------------------------------- drafts
+    def find_job(uid: str, job_id: str | None) -> dict | None:
+        """One of this user's jobs: their matches, then jobs they've saved or applied to."""
+        if not job_id:
+            return None
+        jobs = (store.get("matches", uid) or {}).get("jobs") or []
+        job = next((j for j in jobs if j["id"] == job_id), None)
+        if job is None:
+            state, _, _ = tasks.read_state(store, uid)
+            job = (state.get("saved") or {}).get(job_id)
+        if job is None:
+            raise HTTPException(404, "That job isn't in your list.")
+        return job
+
+    @app.get("/api/walkins")
+    def get_walkins(u: dict = Depends(user)):
+        """Walk-in interviews for this user's walk-in cities, from the shared pool's postings."""
+        prof = store.get("profiles", u["uid"]) or {}
+        r = walkins.for_user(tasks.load_pool(store), base, prof)
+        r["sources"] = permitted_sources(base)
+        return r
+
+    @app.post("/api/drafts/preview")
+    def preview_draft(body: dict, u: dict = Depends(user)):
+        """Text for 'Draft application' / 'Draft outreach' / follow-up: no Gmail or recipient needed."""
+        kind = body.get("type", "")
+        job = find_job(u["uid"], body.get("job_id"))
+        if job is None:
+            raise HTTPException(422, "Choose a job.")
+        state, _, _ = tasks.read_state(store, u["uid"])
+        try:
+            return drafts.preview(kind, store.get("profiles", u["uid"]) or {}, job, state)
+        except drafts.DraftError as e:
+            raise HTTPException(422, str(e)) from None
+
     @app.post("/api/drafts")
     def create_draft(body: dict, u: dict = Depends(verified)):
         cfg = oauth_cfg()
@@ -340,21 +376,14 @@ def create_app(settings: Settings | None = None, store: Store | None = None, ses
         except gmail.GmailAuthError:
             raise HTTPException(409, "Connect Gmail first.") from None
         limits.check(uid, "creating a draft", 3)
-        job = None
-        if body.get("job_id"):
-            jobs = (store.get("matches", uid) or {}).get("jobs") or []
-            job = next((j for j in jobs if j["id"] == body["job_id"]), None)
-            if job is None:
-                state, _, _ = tasks.read_state(store, uid)
-                job = (state.get("saved") or {}).get(body["job_id"])
-            if job is None:
-                raise HTTPException(404, "That job isn't in your list.")
+        job = find_job(uid, body.get("job_id"))
         attachment = resume_intake.load(store, uid) if kind in drafts.ATTACH else None
         for _ in range(3):
             state, version, doc = tasks.read_state(store, uid)
             try:
                 rec = drafts.create(client, state, prof, kind, job=job, to=(body.get("to") or "").strip(),
-                                    reply_to_message=body.get("message_id"), resume=attachment)
+                                    reply_to_message=body.get("message_id"), resume=attachment,
+                                    subject=body.get("subject"), body=body.get("body"))
             except drafts.DraftError as e:
                 raise HTTPException(422, str(e)) from None
             except gmail.GmailAuthError:

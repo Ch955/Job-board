@@ -246,6 +246,7 @@ const JRAccount = (() => {
     return {
       jobs: m.jobs || [], generated_at: m.updated, alert_score: p.threshold ?? 70,
       searching: !!m.searching, search_started: m.search_started, pool_count: m.pool_count,
+      sources_available: m.sources_available || [],
       outreach: { profile: { name: (p.full_name || "").split(" ")[0], full_name: p.full_name, role: p.current_role,
         years_experience: p.years_experience, notice: p.notice, linkedin: p.linkedin }, my_skills: p.skills || [] },
     };
@@ -262,29 +263,118 @@ const JRAccount = (() => {
       card.querySelector(".snippet").before(why);
     }
     const status = statusOf(job);
-    if (!draftsOn() || job.source === "email" || !["new", "later", "applied", "interview"].includes(status)) return;
+    if (job.source === "email" || !["new", "later", "skipped", "applied", "interview"].includes(status)) return;
     const row = card.querySelector(".outreach-row");
-    const kinds = status === "new" || status === "later" ? [["application", "✉️ Draft application"], ["outreach", "✉️ Draft outreach"]]
-      : [["follow_up", "✉️ Draft follow-up"]];
+    // Works without Gmail or a recruiter email: the editor lets you copy, download or save to Gmail
+    const kinds = ["applied", "interview"].includes(status) ? [["follow_up", "✉️ Follow up"]]
+      : [["application", "✉️ Draft application"], ["outreach", "🤝 Draft outreach"]];
     for (const [kind, label] of kinds) {
-      const rec = store.drafts[`${kind}:${job.id}`];
-      if (rec) {
-        row.append(el("a", { className: "mini-btn mail", href: "https://mail.google.com/mail/u/0/#drafts", target: "_blank",
-          rel: "noopener", textContent: `✉️ ${DRAFT_LABEL[kind]} draft ready` }));
-        continue;
-      }
-      const b = el("button", { className: "mini-btn", type: "button", textContent: label });
-      b.addEventListener("click", () => draftForJob(job, kind, b));
+      const done = store.drafts[`${kind}:${job.id}`];
+      const b = el("button", { className: `mini-btn${done ? " mail" : ""}`, type: "button", textContent: done ? `${label} ✓` : label });
+      if (done) b.title = "A Gmail draft already exists; open to copy or review";
+      b.addEventListener("click", () => openDraft(job, kind));
       row.append(b);
     }
   }
 
-  async function draftForJob(job, kind, button) {
-    const guess = (job.contact_emails || [])[0] || "";
-    const to = prompt(`Recruiter's email address for ${job.company}:`, guess);
-    if (to === null) return;
-    if (!/^[^@\s<>]+@[^@\s<>]+\.[a-z]{2,24}$/i.test(to.trim())) return toast("That email address doesn't look right.");
-    await createDraft({ type: kind, job_id: job.id, to: to.trim() }, button);
+  // ------------------------------------------------------- draft editor
+  const EMAIL_OK = /^[^@\s<>]+@[^@\s<>]+\.[a-z]{2,24}$/i;
+
+  async function openDraft(job, kind) {
+    const dlg = $("#draft-dlg"), body = $("#draft-body");
+    $("#draft-title").textContent = { application: "Application", outreach: "Recruiter outreach", follow_up: "Follow-up" }[kind];
+    body.replaceChildren(el("p", { className: "muted", textContent: "Writing from your profile…" }));
+    if (!dlg.open) openOverlay(dlg);
+    let p;
+    try {
+      p = await api("/api/drafts/preview", { method: "POST", body: { type: kind, job_id: job.id } });
+    } catch (e) {
+      body.replaceChildren(el("p", { className: "lg-error", textContent: e.message }));
+      return;
+    }
+    const field = (label, node, hint) => el("label", { className: "lg-field" }, el("span", {}, label,
+      hint ? el("small", { className: "muted", textContent: ` · ${hint}` }) : null), node);
+    const copyBtn = (label, get, ok) => {
+      const b = el("button", { className: "btn", type: "button", textContent: label });
+      b.addEventListener("click", () => copyText(get(), ok));
+      return b;
+    };
+    const parts = [el("p", { className: "draft-job" }, el("b", { textContent: job.title }), ` · ${job.company}`)];
+
+    // 1. Applying: the real application link first, clearly separate from email
+    if (kind === "application") {
+      const a = p.apply || {};
+      const href = safeUrl(a.url);
+      const label = a.type === "company_site" ? "Apply on the company's careers site ↗" : a.type === "external" ? "Open the application page ↗" : "Open the job listing ↗";
+      parts.push(el("div", { className: "draft-box" },
+        el("b", { textContent: "Apply" }),
+        el("p", { className: "muted", textContent: `${applyLabel(a.type || "unknown")}${a.evidence ? ": " + a.evidence : ""}. Opening it doesn't mark the job as applied: tap Applied once you've submitted.` }),
+        href ? el("div", { className: "row" }, el("a", { className: "btn btn-primary", href, target: "_blank", rel: "noopener noreferrer", textContent: label })) : null));
+    }
+    if (kind === "follow_up" && p.too_soon) parts.push(el("p", { className: "note", textContent: p.advice }));
+    if (p.existing_draft) parts.push(el("p", { className: "note" }, `A ${DRAFT_LABEL[kind] || kind} draft is already in your Gmail (${ago(p.existing_draft.at)}). `,
+      el("a", { href: "https://mail.google.com/mail/u/0/#drafts", target: "_blank", rel: "noopener", textContent: "Open Gmail drafts ↗" })));
+
+    // 2. Outreach without an email address: LinkedIn note and where to find the recruiter
+    if (kind === "outreach") {
+      const note = el("textarea", { rows: 3, value: p.linkedin_note || "", maxLength: 200 });
+      const count = el("small", { className: "muted", textContent: `${note.value.length}/200` });
+      note.addEventListener("input", () => (count.textContent = `${note.value.length}/200`));
+      parts.push(el("div", { className: "draft-box" }, el("b", { textContent: "LinkedIn" }),
+        field("Connection note", note), count,
+        el("div", { className: "row" }, copyBtn("Copy note", () => note.value, "Note copied. LinkedIn: Connect → Add a note → paste"),
+          el("a", { className: "btn", href: p.recruiter_search, target: "_blank", rel: "noopener", textContent: "Find the recruiter ↗" }),
+          p.careers_link ? el("a", { className: "btn", href: safeUrl(p.careers_link), target: "_blank", rel: "noopener", textContent: "Company careers page ↗" }) : null)));
+    }
+
+    // 3. The email (or message to paste anywhere)
+    const to = el("input", { type: "email", placeholder: "Optional: recruiter's email", autocomplete: "off" });
+    const toInfo = el("small", { className: "muted" });
+    const contacts = p.contacts || [];
+    const checkTo = () => {
+      const v = to.value.trim();
+      const found = contacts.find((c) => c.email.toLowerCase() === v.toLowerCase());
+      toInfo.textContent = !v ? "Leave empty to add the recipient in Gmail later."
+        : !EMAIL_OK.test(v) ? "That doesn't look like a valid email address."
+        : found ? `Found in the job posting.` : "Added by you: not verified by Job Radar.";
+      toInfo.classList.toggle("lg-error", !!v && !EMAIL_OK.test(v));
+    };
+    to.addEventListener("input", checkTo);
+    const chips = contacts.length ? el("div", { className: "chips" }, ...contacts.map((c) => {
+      const b = el("button", { type: "button", className: "chip" }, c.email, el("span", { className: "chip-count", textContent: c.source }));
+      b.addEventListener("click", () => { to.value = c.email; checkTo(); });
+      return b;
+    })) : el("small", { className: "muted", textContent: "No recruiter email in this posting. You can still copy the message, or create the Gmail draft and add the address there." });
+    checkTo();
+    const subject = el("input", { value: p.subject });
+    const msg = el("textarea", { rows: 10, value: p.body });
+    parts.push(el("div", { className: "draft-box" }, el("b", { textContent: kind === "outreach" ? "Email to the recruiter" : "Email" }),
+      field("To", to), toInfo, chips, field("Subject", subject), field("Message", msg, "edit freely"),
+      el("div", { className: "row" }, copyBtn("Copy message", () => `${subject.value}\n\n${msg.value}`, "Message copied"))));
+
+    // 4. Cover letter (application)
+    let letter = null;
+    if (kind === "application" && p.cover_letter) {
+      letter = el("textarea", { rows: 12, value: p.cover_letter });
+      const dl = el("button", { className: "btn", type: "button", textContent: "Download (.txt)" });
+      dl.addEventListener("click", () => download(`Cover letter - ${job.company}.txt`.replace(/[\\/:*?"<>|]+/g, ""), new Blob([letter.value], { type: "text/plain" })));
+      parts.push(el("div", { className: "draft-box" }, el("b", { textContent: "Cover letter" }), field("Cover letter", letter, "edit freely"),
+        el("div", { className: "row" }, copyBtn("Copy cover letter", () => letter.value, "Cover letter copied"), dl)));
+    }
+
+    // 5. Gmail draft (never sent)
+    const save = el("button", { className: "btn btn-primary", type: "button", textContent: "Create Gmail draft" });
+    save.addEventListener("click", async () => {
+      const v = to.value.trim();
+      if (v && !EMAIL_OK.test(v)) return toast("Fix the email address, or leave it empty.");
+      await createDraft({ type: kind, job_id: job.id, to: v, subject: subject.value, body: msg.value }, save);
+    });
+    parts.push(el("div", { className: "draft-box" }, el("b", { textContent: "Gmail" }),
+      draftsOn() ? el("p", { className: "muted", textContent: "Saved as a draft in your Gmail with your resume attached. Job Radar never sends it: you review and send it yourself." })
+        : el("p", { className: "muted", textContent: me?.gmail?.connected ? "Gmail drafts are turned off in your profile settings. You can still copy everything above."
+          : "Connect Gmail in Settings to save this as a Gmail draft. You can still copy everything above." }),
+      draftsOn() ? el("div", { className: "row" }, save) : null));
+    body.replaceChildren(...parts.filter(Boolean));
   }
 
   async function createDraft(body, button) {
@@ -477,6 +567,39 @@ const JRAccount = (() => {
   const lines = (v) => String(v || "").split(/\n|,/).map((s) => s.trim()).filter(Boolean); // "a, b" lists
   const rows = (v) => String(v || "").split("\n").map((s) => s.trim()).filter(Boolean);    // one per line
 
+  const INDIAN_CITIES = ["Hyderabad", "Bengaluru", "Chennai", "Pune", "Mumbai", "Navi Mumbai", "Thane", "Delhi", "Gurugram",
+    "Noida", "Faridabad", "Ghaziabad", "Kolkata", "Ahmedabad", "Gandhinagar", "Vadodara", "Surat", "Kochi", "Thiruvananthapuram",
+    "Coimbatore", "Madurai", "Jaipur", "Chandigarh", "Mohali", "Indore", "Bhopal", "Bhubaneswar", "Nagpur", "Nashik", "Lucknow",
+    "Mysuru", "Mangaluru", "Visakhapatnam", "Vijayawada", "Warangal", "Goa", "Kanpur", "Patna", "Secunderabad"];
+
+  // Add / remove list with autocomplete (Indian cities) or free text
+  function chipList(values, placeholder, suggest) {
+    let items = [...(values || [])];
+    const box = el("div", { className: "chips" });
+    const draw = () => box.replaceChildren(...items.map((v) => {
+      const b = el("button", { type: "button", className: "chip", title: "Remove" }, v, el("span", { className: "chip-count", textContent: "×" }));
+      b.setAttribute("aria-pressed", "true");
+      b.addEventListener("click", () => { items = items.filter((x) => x !== v); draw(); });
+      return b;
+    }));
+    const input = el("input", { placeholder, enterKeyHint: "done" });
+    if (suggest) {
+      if (!document.getElementById("in-cities")) {
+        document.body.append(el("datalist", { id: "in-cities" }, ...INDIAN_CITIES.map((c) => el("option", { value: c }))));
+      }
+      input.setAttribute("list", "in-cities");
+    }
+    const add = () => {
+      for (const v of lines(input.value)) if (!items.some((x) => x.toLowerCase() === v.toLowerCase())) items.push(v);
+      input.value = "";
+      draw();
+    };
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); add(); } });
+    input.addEventListener("change", () => suggest && INDIAN_CITIES.includes(input.value) && add());
+    draw();
+    return { node: el("div", { className: "chip-edit" }, box, input), get: () => (input.value.trim() && add(), items), set: (v) => { items = [...v]; draw(); } };
+  }
+
   function profileForm(p, { onSaved, intro } = {}) {
     const form = el("form", { className: "pf" });
     const field = (label, input, hint) => el("label", { className: "lg-field" }, el("span", {}, label, hint ? el("small", { className: "muted", textContent: ` · ${hint}` }) : null), input);
@@ -506,6 +629,30 @@ const JRAccount = (() => {
     const tOut = el("output", { textContent: threshold.value });
     threshold.addEventListener("input", () => (tOut.textContent = threshold.value));
     const check = (name, on, label) => el("label", { className: "lg-check" }, el("input", { type: "checkbox", name, checked: on }), ` ${label}`);
+    const radio = (name, value, on, label) => el("label", { className: "lg-check" }, el("input", { type: "radio", name, value, checked: on }), ` ${label}`);
+    const cities = chipList(p.locations, "Type a city, e.g. Hyderabad", true);
+    const scope = p.search_scope || (p.anywhere_in_india || !(p.locations || []).length ? "india" : "selected");
+    const modes = p.work_modes || (p.remote_ok === false ? ["onsite", "hybrid"] : ["onsite", "hybrid", "remote"]);
+    const relocation = el("select", { name: "relocation" }, ...[["flexible", "Flexible"], ["yes", "Willing to relocate"], ["no", "Not willing to relocate"]]
+      .map(([v, l]) => el("option", { value: v, textContent: l, selected: (p.relocation || "flexible") === v })));
+    const wCities = chipList(p.walkin_cities, "Type a city, e.g. Hyderabad", true);
+    const wRoles = chipList(p.walkin_roles, "Add a role and press Enter");
+    const wInd = chipList(p.walkin_industries, "e.g. Banking, IT services");
+    const copyCities = el("button", { type: "button", className: "link-btn", textContent: "Use my job cities for walk-ins" });
+    copyCities.addEventListener("click", () => wCities.set(cities.get()));
+    const wScore = el("input", { name: "walkin_min_score", type: "range", min: 0, max: 100, step: 5, value: p.walkin_min_score ?? 50 });
+    const wOut = el("output", { textContent: wScore.value });
+    wScore.addEventListener("input", () => (wOut.textContent = wScore.value));
+    const reset = el("button", { type: "button", className: "link-btn", textContent: "Reset job and walk-in preferences" });
+    reset.addEventListener("click", () => {
+      cities.set([]); wCities.set([]); wRoles.set([]); wInd.set([]);
+      for (const i of form.querySelectorAll("input[name=work_modes]")) i.checked = true;
+      form.querySelector("input[name=search_scope][value=india]").checked = true;
+      relocation.value = "flexible";
+      for (const n of ["walkin_radius_km", "walkin_from", "walkin_to", "walkin_min_years", "walkin_max_years"]) form.elements[n].value = "";
+      wScore.value = 50; wOut.textContent = "50";
+      toast("Preferences reset. Save to keep the change.");
+    });
     const err = el("p", { className: "lg-error", role: "alert" });
     const save = el("button", { className: "btn btn-primary", type: "submit", textContent: "Save profile" });
     form.append(...[
@@ -519,9 +666,15 @@ const JRAccount = (() => {
       field("Years of experience", text("years_experience", p.years_experience, { type: "number", min: 0, max: 50, step: 0.5 })),
       field("Roles you want", text("target_roles", (p.target_roles || [p.current_role].filter(Boolean)).join(", ")), "comma separated"),
       el("div", { className: "lg-field" }, el("span", {}, "Your skills", el("small", { className: "muted", textContent: " · only these are used; tap to remove" })), chips, addSkill),
-      field("Preferred cities", text("locations", (p.locations || []).join(", ")), "comma separated"),
-      check("anywhere_in_india", p.anywhere_in_india ?? false, "Open to anywhere in India"),
-      check("remote_ok", p.remote_ok ?? true, "Open to remote"),
+      el("h4", { className: "pf-h", textContent: "Job preferences" }),
+      el("div", { className: "lg-field" }, el("span", {}, "Preferred job locations", el("small", { className: "muted", textContent: " · add several" })), cities.node),
+      el("div", { className: "lg-field" }, el("span", {}, "Search"),
+        radio("search_scope", "selected", scope === "selected", "Only my cities (and remote, if chosen)"),
+        radio("search_scope", "india", scope === "india", "Anywhere in India")),
+      el("div", { className: "lg-field" }, el("span", {}, "Work arrangement", el("small", { className: "muted", textContent: " · tick all that suit you" })),
+        el("div", { className: "row" }, ...[["onsite", "On-site"], ["hybrid", "Hybrid"], ["remote", "Remote (anywhere in India)"]]
+          .map(([v, l]) => el("label", { className: "lg-check" }, el("input", { type: "checkbox", name: "work_modes", value: v, checked: modes.includes(v) }), ` ${l}`)))),
+      field("Relocation", relocation),
       field("Experience range to search (years)", el("div", { className: "row" },
         text("min_years", p.min_years, { type: "number", min: 0, max: 50, placeholder: "min" }),
         text("max_years", p.max_years, { type: "number", min: 0, max: 50, placeholder: "max" })), "optional"),
@@ -530,6 +683,19 @@ const JRAccount = (() => {
       field("Certifications", area("certifications", p.certifications), "one per line"),
       field("Highlights for drafts", area("highlights", p.highlights), "up to 3 lines, your own words"),
       el("label", { className: "lg-field" }, el("span", {}, "Show jobs scoring at least ", tOut), threshold),
+      el("h4", { className: "pf-h", textContent: "Walk-in interviews" }),
+      el("p", { className: "muted", textContent: "You have to be there in person, so walk-ins use their own cities. Leave empty to see none." }),
+      el("div", { className: "lg-field" }, el("span", {}, "Walk-in cities"), wCities.node),
+      copyCities,
+      field("Max travel from those cities (km)", text("walkin_radius_km", p.walkin_radius_km, { type: "number", min: 0, max: 1000, placeholder: "e.g. 30" }), "optional"),
+      field("Dates", el("div", { className: "row" }, text("walkin_from", p.walkin_from, { type: "date" }), text("walkin_to", p.walkin_to, { type: "date" })), "optional"),
+      el("div", { className: "lg-field" }, el("span", {}, "Walk-in roles", el("small", { className: "muted", textContent: " · empty = your roles above" })), wRoles.node),
+      el("div", { className: "lg-field" }, el("span", {}, "Industries", el("small", { className: "muted", textContent: " · optional, matched in the listing text" })), wInd.node),
+      field("Walk-in experience (years)", el("div", { className: "row" },
+        text("walkin_min_years", p.walkin_min_years, { type: "number", min: 0, max: 50, placeholder: "min" }),
+        text("walkin_max_years", p.walkin_max_years, { type: "number", min: 0, max: 50, placeholder: "max" })), "optional"),
+      el("label", { className: "lg-field" }, el("span", {}, "Walk-ins scoring at least ", wOut), wScore),
+      reset,
       check("drafts_enabled", p.drafts_enabled ?? true, "Allow Gmail drafts (never sent automatically)"),
       check("notify", p.notify ?? true, "Notify me about new matches"),
       err, el("div", { className: "row" }, save)].filter(Boolean));
@@ -541,8 +707,12 @@ const JRAccount = (() => {
       const body = {
         full_name: f.get("full_name"), email: f.get("email"), phone: f.get("phone"), linkedin: f.get("linkedin"),
         current_role: f.get("current_role"), current_company: f.get("current_company"), years_experience: num("years_experience"),
-        target_roles: lines(f.get("target_roles")), skills, locations: lines(f.get("locations")),
-        anywhere_in_india: f.get("anywhere_in_india") === "on", remote_ok: f.get("remote_ok") === "on",
+        target_roles: lines(f.get("target_roles")), skills, locations: cities.get(),
+        search_scope: f.get("search_scope") || "india", relocation: f.get("relocation") || "flexible",
+        work_modes: f.getAll("work_modes"),
+        walkin_cities: wCities.get(), walkin_roles: wRoles.get(), walkin_industries: wInd.get(),
+        walkin_radius_km: num("walkin_radius_km"), walkin_from: f.get("walkin_from") || null, walkin_to: f.get("walkin_to") || null,
+        walkin_min_years: num("walkin_min_years"), walkin_max_years: num("walkin_max_years"), walkin_min_score: Number(wScore.value),
         min_years: num("min_years"), max_years: num("max_years"), notice: f.get("notice"),
         education: rows(f.get("education")), certifications: rows(f.get("certifications")),
         highlights: rows(f.get("highlights")).slice(0, 3),
@@ -639,6 +809,105 @@ const JRAccount = (() => {
     if (!dlg.open) openOverlay(dlg);
   }
 
+  // ------------------------------------------------------------- walk-ins
+  let walk = null, walkAt = 0;
+  const wf = { city: [], verifiedOnly: false, minScore: 0, q: "", when: "all" };
+
+  async function loadWalkins(force = false) {
+    if (!force && walk && Date.now() - walkAt < 120e3) return walk;
+    walk = await api("/api/walkins");
+    walkAt = Date.now();
+    return walk;
+  }
+
+  function icsFor(ev) {
+    const d = ev.dates[0].replace(/-/g, "");
+    const esc = (t) => String(t || "").replace(/[\\,;]/g, (m) => "\\" + m).replace(/\n/g, " ");
+    return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Job Radar//Walk-ins//EN", "BEGIN:VEVENT",
+      `UID:${ev.id}@jobradar`, `DTSTAMP:${new Date().toISOString().replace(/[-:]/g, "").slice(0, 15)}Z`,
+      `DTSTART;VALUE=DATE:${d}`, `SUMMARY:${esc(`Walk-in: ${ev.title} · ${ev.company}`)}`,
+      `LOCATION:${esc(ev.venue || ev.city)}`,
+      `DESCRIPTION:${esc([ev.time && `Time: ${ev.time}`, ev.documents && `Bring: ${ev.documents}`, `Source: ${ev.url}`].filter(Boolean).join(" | "))}`,
+      "BEGIN:VALARM", "TRIGGER:-PT12H", "ACTION:DISPLAY", "DESCRIPTION:Walk-in tomorrow", "END:VALARM",
+      "END:VEVENT", "END:VCALENDAR"].join("\r\n");
+  }
+
+  function walkCard(ev) {
+    const saved = store.walkins[ev.id]?.saved;
+    const save = el("button", { className: `btn${saved ? " is-applied" : ""}`, type: "button", textContent: saved ? "✓ Saved" : "Save walk-in" });
+    save.addEventListener("click", () => {
+      store.walkins[ev.id] = { saved: !saved, at: new Date().toISOString(), event: saved ? undefined : ev };
+      changed();
+      render();
+    });
+    const actions = el("div", { className: "row" }, save,
+      el("a", { className: "btn", href: safeUrl(ev.url), target: "_blank", rel: "noopener noreferrer", textContent: "View source ↗" }));
+    if (ev.status === "confirmed") {
+      const cal = el("button", { className: "btn", type: "button", textContent: "Add to calendar" });
+      cal.addEventListener("click", () => download(`walk-in-${ev.company}.ics`.replace(/[^\w.-]+/g, "-"), new Blob([icsFor(ev)], { type: "text/calendar" })));
+      actions.append(cal);
+    }
+    const when = ev.dates.length ? ev.dates.map((d) => new Date(d + "T00:00:00").toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })).join(", ") : "Date not published";
+    const line = (label, v) => (v ? el("p", { className: "muted" }, el("b", { textContent: `${label}: ` }), v) : null);
+    const exp = ev.experience.min != null ? `${ev.experience.min}${ev.experience.max ? "–" + ev.experience.max : "+"} years` : null;
+    return el("article", { className: "panel-item walkin" }, ...[
+      el("div", { className: "panel-top" }, el("b", { textContent: ev.company }),
+        el("span", { className: `st-chip ${ev.status === "confirmed" ? "st-applied" : "st-pending"}`,
+          textContent: ev.status === "confirmed" ? "date & venue in posting" : `unconfirmed: no ${ev.missing.join(" or ")}` })),
+      el("p", {}, el("b", { textContent: ev.title }), ` · match ${ev.score}`),
+      el("p", { textContent: `📅 ${when}${ev.time ? " · " + ev.time : ""}` }),
+      el("p", { textContent: `📍 ${ev.venue || ev.location || ev.city}${ev.distance_km ? ` (${ev.distance_km} km from your city)` : ""}` }),
+      line("Experience", exp), line("Pay", ev.salary), line("Bring", ev.documents), line("Registration", ev.registration),
+      el("p", { className: "muted", textContent: `From ${SOURCE_LABELS[ev.source] || ev.source}${ev.posted ? " · posted " + ago(ev.posted) : ""} · checked ${ago(walk.checked)}. Confirm the details on the source before going.` }),
+      actions].filter(Boolean));
+  }
+
+  function renderWalkins() {
+    const wrap = el("div", { className: "panel-list" });
+    const editBtn = el("button", { className: "btn", type: "button", textContent: "Walk-in preferences" });
+    editBtn.addEventListener("click", openOnboarding);
+    if (!walk) {
+      wrap.append(el("p", { className: "muted", textContent: "Looking for walk-ins…" }));
+      loadWalkins().then(() => section === "walkins" && render()).catch((e) => toast(e.message));
+      return wrap;
+    }
+    if (!walk.cities.length) {
+      wrap.append(el("div", { className: "empty" }, el("b", { textContent: "Choose your walk-in cities" }),
+        "Walk-ins need you there in person, so they use their own cities. Add them in your profile."), el("div", { className: "row" }, editBtn));
+      return wrap;
+    }
+    const all = [...walk.upcoming, ...walk.unconfirmed];
+    const cities = [...new Set(all.map((e) => e.city))].sort();
+    const today = new Date().toISOString().slice(0, 10);
+    const week = new Date(Date.now() + 7 * 864e5).toISOString().slice(0, 10);
+    const shown = all.filter((e) => (!wf.city.length || wf.city.includes(e.city)) && (!wf.verifiedOnly || e.status === "confirmed")
+      && e.score >= wf.minScore && (!wf.q || `${e.title} ${e.company}`.toLowerCase().includes(wf.q.toLowerCase()))
+      && (wf.when === "all" || (e.dates.length && e.dates.some((d) => d >= today && d <= week))));
+    const chip = (label, on, run) => { const b = el("button", { type: "button", className: "chip" }, label); b.setAttribute("aria-pressed", String(on)); b.addEventListener("click", run); return b; };
+    const search = el("input", { type: "search", placeholder: "Role or company", value: wf.q });
+    search.addEventListener("change", () => { wf.q = search.value.trim(); render(); });
+    const score = el("input", { type: "range", min: 0, max: 100, step: 5, value: wf.minScore });
+    score.addEventListener("change", () => { wf.minScore = Number(score.value); render(); });
+    wrap.append(el("div", { className: "panel-item" },
+      el("p", { className: "muted", textContent: `Walk-ins in ${walk.cities.join(", ")}. Only postings that say they're walk-ins; details come from the posting.` }),
+      el("div", { className: "chips" }, chip("All cities", !wf.city.length, () => { wf.city = []; render(); }),
+        ...cities.map((c) => chip(c, wf.city.includes(c), () => { wf.city = wf.city.includes(c) ? wf.city.filter((x) => x !== c) : [...wf.city, c]; render(); }))),
+      el("div", { className: "chips" }, chip("Any date", wf.when === "all", () => { wf.when = "all"; render(); }),
+        chip("Next 7 days", wf.when === "week", () => { wf.when = "week"; render(); }),
+        chip("Verified upcoming only", wf.verifiedOnly, () => { wf.verifiedOnly = !wf.verifiedOnly; render(); })),
+      el("label", { className: "lg-field" }, el("span", {}, `Match at least ${wf.minScore}`), score), search,
+      el("div", { className: "row" }, editBtn)));
+    if (!shown.length) {
+      wrap.append(el("div", { className: "empty" }, el("b", { textContent: all.length ? "No walk-ins match these filters" : `No walk-ins found in ${walk.cities.join(", ")}` }),
+        all.length ? "Try clearing a filter." : "None of the current job sources has a walk-in for your cities right now. Job Radar checks every 3 hours." +
+          (walk.expired ? ` ${walk.expired} past walk-in(s) were hidden.` : "")));
+      return wrap;
+    }
+    for (const ev of shown) wrap.append(walkCard(ev));
+    if (walk.expired) wrap.append(el("p", { className: "muted", textContent: `${walk.expired} past walk-in(s) hidden.` }));
+    return wrap;
+  }
+
   // ------------------------------------------------------------ settings
   function renderSettings() {
     const body = $("#account-body");
@@ -709,5 +978,6 @@ const JRAccount = (() => {
   }
 
   return { enabled, api, refreshMe, onSignedIn, loadMatches, decorateCard, renderInbox, renderDrafts, renderSettings,
-    openOnboarding, pushKey, savePush, signedOut, profile, handleReturn, checkVerification, refreshNow, get me() { return me; } };
+    openOnboarding, pushKey, savePush, signedOut, profile, handleReturn, checkVerification, refreshNow, renderWalkins,
+    refreshWalkins: () => loadWalkins(true).then(() => section === "walkins" && render()).catch((e) => toast(e.message)), get me() { return me; } };
 })();

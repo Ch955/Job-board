@@ -12,8 +12,8 @@
 
 const JRSync = (() => {
   const KEEP = ["later", "applied", "interview", "offer", "rejected"];
-  const MAPS = ["statuses", "saved", "sent", "pending", "gmail", "reviews", "drafts"];
-  const NEWEST = ["pending", "reviews", "drafts"]; // per key, the record with the later "at" wins
+  const MAPS = ["statuses", "saved", "sent", "pending", "gmail", "reviews", "drafts", "walkins"];
+  const NEWEST = ["pending", "reviews", "drafts", "walkins"]; // per key, the record with the later "at" wins
   const empty = () => Object.fromEntries(MAPS.map((k) => [k, {}]));
   function normalize(s) {
     const out = { ...empty(), ...(s || {}) };

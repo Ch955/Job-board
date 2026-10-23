@@ -123,7 +123,30 @@ verification **and** a yearly third-party security assessment (CASA). Vendors qu
 roughly US$540–1,000 per year for the self-serve tier and several weeks; that is a paid
 step and needs your approval. Everything else in Job Radar works without Gmail.
 
-## 7. Known limitations
+## 7. Job sources, application types and walk-ins
+
+**Sources in use (permitted):** company career boards via their public APIs (Greenhouse, Lever, Ashby,
+SmartRecruiters), Remotive, and, with free API keys, **Adzuna** and **Jooble**, which carry many Indian jobs.
+**LinkedIn, Naukri and Indeed are switched off** (`config.yaml → sources.jobspy`: `enabled: false`,
+`permitted: false`): the JobSpy library scrapes their pages, which their terms don't allow. Jobs you had already
+tracked from them stay in your lists; untracked ones drop out of the shared list. The app's Job Source filter
+lists only enabled, permitted sources (plus "saved only" for your own tracked history).
+
+To get more Indian jobs, add the free keys (developer.adzuna.com, jooble.org/api/about) as `ADZUNA_APP_ID`,
+`ADZUNA_APP_KEY` and `JOOBLE_API_KEY` in **both** GitHub Secrets and Render's Environment.
+
+**Application type** (badge on each job) comes from evidence only (`jobradar/apply_type.py`): the employer's
+careers portal (an ATS board or a direct employer link) → *Company website*; an aggregator link → *External
+application*; anything else → *Application type unknown*. *Easy Apply* needs explicit source data, which no
+current source provides, so nothing is labelled Easy Apply.
+
+**Walk-ins** (`jobradar/backend/walkins.py`) are postings whose own text says "walk-in" / "walk-in drive".
+Date, time, venue, documents, registration and pay are read from that text. "Date & venue in posting" means
+both were found; otherwise the event is "unconfirmed". Past dates are hidden; repeats are merged. With LinkedIn
+and Naukri off, walk-ins are rare: they mostly appear on Indian job boards, so expect few until Adzuna/Jooble
+keys are added (and even then, few). Travel radius uses city-to-city distances, not street addresses.
+
+## 8. Known limitations
 
 - Job sources: company boards (Greenhouse, Lever, Ashby, SmartRecruiters) and the keyed APIs
   (Adzuna, Jooble) are compliant. LinkedIn/Naukri/Indeed come from scraping (JobSpy), which

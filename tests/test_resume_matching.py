@@ -149,3 +149,54 @@ def test_city_spelling_doesnt_matter():
     e = matching.UserMatcher(load_config(), p).explain(
         job("Data Engineer", "Airflow dbt, 2-4 years experience", location="Bengaluru East, Karnataka, India"), NOW)
     assert e["breakdown"]["location"] == 20
+
+
+# ---------------------------------------------------------------- job preferences
+def prefs(**kw):
+    return profile.clean({**{k: v for k, v in PROFILE.items() if k not in ("work_modes", "search_scope", "relocation",
+                                                                              "remote_ok", "anywhere_in_india")}, **kw})
+
+
+def titles(p, jobs):
+    return sorted(g["location"] for g in matching.UserMatcher(load_config(), {**p, "threshold": 0}).match(jobs, NOW))
+
+
+JOBS3 = [job("Data Engineer", "Airflow dbt, 2-4 years", location="Hyderabad, Telangana, India"),
+         job("Data Engineer", "Airflow dbt, 2-4 years", location="Chennai, Tamil Nadu, India"),
+         job("Data Engineer", "Airflow dbt, 2-4 years. Hybrid, 3 days office", location="Pune, Maharashtra, India"),
+         Job(title="Data Engineer", company="Acme", location="Remote", url="https://x", source="lever", remote=True,
+             posted_date="2026-10-22", description="Airflow dbt, 2-4 years. HQ in Gurugram")]
+
+
+def test_multiple_cities_selected_only_and_no_relocation():
+    p = prefs(locations=["Hyderabad", "Chennai"], search_scope="selected", relocation="no")
+    assert titles(p, JOBS3) == ["Chennai, Tamil Nadu, India", "Hyderabad, Telangana, India", "Remote"]
+
+
+def test_remote_job_isnt_excluded_for_its_company_city_but_respects_work_mode():
+    p = prefs(locations=["Hyderabad"], search_scope="selected", relocation="no", work_modes=["onsite", "hybrid"])
+    assert "Remote" not in titles(p, JOBS3)
+    p = prefs(locations=["Hyderabad"], search_scope="selected", relocation="no", work_modes=["remote"])
+    assert titles(p, JOBS3) == ["Remote"]   # stated hybrid Pune job and unstated on-site ones go
+
+
+def test_anywhere_in_india_and_relocation_keep_other_cities():
+    assert len(titles(prefs(locations=["Hyderabad"], search_scope="india"), JOBS3)) == 4
+    assert len(titles(prefs(locations=["Hyderabad"], search_scope="selected", relocation="yes"), JOBS3)) == 4
+
+
+def test_old_profiles_keep_working():
+    p = profile.clean({"full_name": "A", "email": "a@example.com", "locations": ["Pune"], "anywhere_in_india": True,
+                       "remote_ok": False})
+    assert p["search_scope"] == "india" and p["work_modes"] == ["onsite", "hybrid"] and p["relocation"] == "flexible"
+    assert p["remote_ok"] is False and p["anywhere_in_india"] is True
+
+
+def test_walkin_preferences_validated_and_copyable():
+    p = profile.clean({"locations": ["Hyderabad", "Chennai"], "walkin_same_as_jobs": True, "walkin_radius_km": 30,
+                       "walkin_from": "2026-10-24", "walkin_to": "2026-11-15"})
+    assert p["walkin_cities"] == ["Hyderabad", "Chennai"] and p["walkin_radius_km"] == 30
+    for bad in ({"walkin_from": "24/10/2026"}, {"walkin_from": "2026-11-02", "walkin_to": "2026-11-01"},
+                {"work_modes": ["office"]}, {"relocation": "maybe"}, {"search_scope": "world"}):
+        with pytest.raises(profile.ProfileError):
+            profile.clean(bad)

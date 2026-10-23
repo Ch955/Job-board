@@ -72,9 +72,11 @@ def scorer_config(base: dict, profile: dict) -> dict:
     hi = profile.get("max_years") if profile.get("max_years") is not None else (int(years) + 3 if years is not None else 50)
     loc = dict(base.get("location") or {})
     cities = {c: [_city_rx(c)] for c in profile.get("locations") or []}
+    scope = profile.get("search_scope") or ("india" if profile.get("anywhere_in_india") or not cities else "selected")
+    other = 20 if scope == "india" or not cities else {"yes": 14, "flexible": 10}.get(profile.get("relocation"), 6)
+    remote_ok = "remote" in (profile.get("work_modes") or (["remote"] if profile.get("remote_ok", True) else []))
     loc.update(preferred=cities or loc.get("preferred", {}), points_preferred=20,
-               points_india_other=20 if profile.get("anywhere_in_india") or not cities else 6,
-               points_remote=20 if profile.get("remote_ok", True) else 6)
+               points_india_other=other, points_remote=20 if remote_ok else 6)
     return {**base,
             "title": {"rules": [{"pattern": p.pattern, "points": pts} for p, pts, _ in _role_patterns(roles)],
                       "exclude": [r"\bintern(ship)?\b"] if (years or 0) >= 1 else [], "penalties": []},
@@ -82,7 +84,8 @@ def scorer_config(base: dict, profile: dict) -> dict:
                 {"name": s, "weight": 5, "patterns": skills_vocab.patterns_for(s)} for s in profile.get("skills") or []]},
             "location": loc,
             "experience": {"points": 10, "min_years": lo, "max_years": hi, "unknown_points": 6},
-            "walk_in": {**(base.get("walk_in") or {}), "allowed_locations": [_city_rx(c) for c in profile.get("locations") or []]}}
+            "walk_in": {**(base.get("walk_in") or {}), "allowed_locations": [
+                _city_rx(c) for c in (profile.get("walkin_cities") or profile.get("locations") or [])]}}
 
 
 class UserMatcher:
@@ -144,6 +147,31 @@ class UserMatcher:
             "summary": " ".join(parts),
         }
 
+    def fits_preferences(self, job: Job) -> tuple[bool, str]:
+        """Your job preferences: cities / anywhere in India, relocation, on-site / hybrid / remote."""
+        from ..apply_type import work_mode
+        p = self.profile
+        modes = p.get("work_modes") or (["onsite", "hybrid", "remote"] if p.get("remote_ok", True) else ["onsite", "hybrid"])
+        mode = job.work_mode or work_mode(job.remote, f"{job.title} {job.location} {job.description or job.description_snippet}")
+        if mode and mode not in modes:
+            return False, f"{mode} job, and you chose {', '.join(modes)}"
+        if not mode and modes == ["remote"]:
+            return False, "not listed as remote"
+        if mode == "remote":
+            return True, "Remote (India)"   # where the company sits doesn't matter for a remote job
+        cities = p.get("locations") or []
+        scope = p.get("search_scope") or ("india" if p.get("anywhere_in_india") or not cities else "selected")
+        if not cities or scope == "india":
+            return True, ""
+        here = city_label(job.location, job.remote)
+        if any(city_label(c) == here or c.lower() in (job.location or "").lower() for c in cities):
+            return True, ""
+        if here == "India":
+            return True, "Location not specific in the listing"
+        if p.get("relocation") in ("yes", "flexible"):
+            return True, f"In {here}: you're open to relocating"
+        return False, f"In {here}, outside your cities"
+
     def match(self, pool: list[Job], now: datetime | None = None) -> list[dict]:
         """Jobs at or above the user's threshold, best first, each with its explanation."""
         now = now or datetime.now(timezone.utc)
@@ -151,7 +179,12 @@ class UserMatcher:
         for job in pool:
             if (age_days(job, now) or 0) > 30:
                 continue
+            ok, why = self.fits_preferences(job)
+            if not ok:
+                continue
             e = self.explain(job, now)
+            if why:
+                e["summary"] += f" {why}."
             if e["score"] >= self.threshold:
                 d = job.to_dict()
                 d.update(score=e["score"], matched_keywords=e["matched_skills"], score_breakdown=e["breakdown"], match=e)

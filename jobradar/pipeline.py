@@ -9,7 +9,7 @@ from pathlib import Path
 
 import requests
 
-from . import outreach, push, store
+from . import apply_type, outreach, push, store
 from .config import ROOT, env
 from .http import make_session
 from .models import Job
@@ -34,6 +34,28 @@ class RunResult:
     dropped: dict = field(default_factory=dict)
     output: Path | None = None
     drafts: dict | None = None
+
+
+SITE_SOURCE = {"naukri": "jobspy", "linkedin": "jobspy", "indeed": "jobspy", "glassdoor": "jobspy", "google": "jobspy"}
+USER_SOURCES = ("email", "manual")  # added from your own Gmail or by hand: always yours to keep
+
+
+def permitted(config: dict, source: str) -> bool:
+    """Is this job source enabled and allowed? ("naukri" etc. belong to the jobspy source.)"""
+    if source in USER_SOURCES:
+        return True
+    cfg = (config.get("sources") or {}).get(SITE_SOURCE.get(source, source)) or {}
+    return bool(cfg.get("enabled", True)) and bool(cfg.get("permitted", True))
+
+
+def permitted_sources(config: dict) -> list[str]:
+    """Source names the app may show as available (the Job Source filter's options)."""
+    out = []
+    for name in REGISTRY:
+        if not permitted(config, name):
+            continue
+        out += (config["sources"]["jobspy"].get("sites") or []) if name == "jobspy" else [name]
+    return out
 
 
 def _due(name: str, cfg: dict, state: dict, now: datetime) -> bool:
@@ -62,6 +84,9 @@ def fetch_all(
             continue
         if not cfg.get("enabled", True):
             runs[name] = {"status": "disabled", "count": 0}
+            continue
+        if not cfg.get("permitted", True):
+            runs[name] = {"status": "not permitted", "count": 0}
             continue
         if not ignore_throttle and not _due(name, cfg, state, now):
             runs[name] = {"status": "throttled", "count": 0}
@@ -138,6 +163,7 @@ def process(
         job.contact_emails = outreach.extract_emails(job.description) or (old.contact_emails if old else [])
         if not job.description_snippet:
             job.description_snippet = job.description[:snippet_chars].rstrip()
+        apply_type.annotate(job)
         scorer.score(job, now)
         keep = job.status in keep_statuses
         if not keep:
@@ -165,6 +191,8 @@ def process(
         if jid in final:
             continue
         keep = old.status in keep_statuses
+        if not keep and not permitted(config, old.source):
+            continue  # a source that's been switched off: its listings go too (tracked ones stay)
         new_rec, days = scorer.recency_points(old, now)
         if not keep and (days or 0) > max_age:
             continue
@@ -177,6 +205,8 @@ def process(
         if not keep and drop_experience and not scorer.experience_eligible(
                 bd_old.get("years_required"), bd_old.get("years_max")):
             continue
+        if not old.apply_type:
+            apply_type.annotate(old)  # saved before application types existed
         bd = old.score_breakdown or {}
         old.score = max(0, min(100, old.score - int(bd.get("recency", 0)) + new_rec))
         bd.update(recency=new_rec, age_days=days)
@@ -231,6 +261,7 @@ def run(
             {
                 "version": store.SCHEMA_VERSION,
                 "generated_at": now.isoformat(timespec="seconds"),
+                "sources_available": permitted_sources(config),  # the app's Job Source filter options
                 "profile": {
                     "name": config.get("profile", {}).get("name"),
                     "role": config.get("profile", {}).get("role"),

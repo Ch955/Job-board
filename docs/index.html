@@ -96,8 +96,12 @@
           <span>Min score <output id="f-score-val">40</output></span>
           <input id="f-score" type="range" min="40" max="100" step="5" value="40">
         </label>
+        <div class="field chip-field" role="group" aria-labelledby="l-apply">
+          <span id="l-apply">Application type <small class="muted">· tap several</small></span>
+          <div id="f-apply" class="chips"></div>
+        </div>
         <div class="field chip-field" role="group" aria-labelledby="l-source">
-          <span id="l-source">Source <small class="muted">· tap several</small></span>
+          <span id="l-source">Job source <small class="muted">· tap several</small></span>
           <div id="f-source" class="chips"></div>
         </div>
         <div class="field chip-field" role="group" aria-labelledby="l-location">
@@ -214,6 +218,15 @@
       <button class="icon-btn" aria-label="Close">✕</button>
     </form>
     <section class="menu-section" id="onboard-body"></section>
+  </dialog>
+
+  <!-- ============================================================= drafts -->
+  <dialog id="draft-dlg" class="sheet" aria-label="Draft">
+    <form method="dialog" class="menu-head">
+      <h2 id="draft-title">Draft</h2>
+      <button class="icon-btn" aria-label="Close">✕</button>
+    </form>
+    <section class="menu-section" id="draft-body"></section>
   </dialog>
 
   <div id="toast" class="toast" role="status" hidden></div>

@@ -19,3 +19,6 @@ services:
       - { key: CRON_SECRET, sync: false }
       - { key: VAPID_PRIVATE_KEY, sync: false }
       - { key: VAPID_SUBJECT, sync: false }
+      - { key: ADZUNA_APP_ID, sync: false }
+      - { key: ADZUNA_APP_KEY, sync: false }
+      - { key: JOOBLE_API_KEY, sync: false }

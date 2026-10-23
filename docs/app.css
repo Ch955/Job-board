@@ -716,3 +716,20 @@ dialog.sheet[open] { animation: rise .2s ease-out; }
 .verify-box { display: flex; flex-direction: column; gap: 6px; width: 100%; }
 .verify-box .row { flex-wrap: wrap; }
 .st-chip.st-pending { background: var(--pending-soft); color: var(--pending); }
+.badge.atype { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+.badge.atype-easy_apply { border-color: var(--good); color: var(--good); }
+.badge.atype-company_site { border-color: var(--primary); color: var(--primary); }
+.chip.chip-all[aria-pressed="true"] { font-weight: 700; }
+.draft-box { display: flex; flex-direction: column; gap: 8px; padding: 12px; margin: 10px 0; border: 1px solid var(--border);
+  border-radius: var(--radius); background: var(--surface); }
+.draft-box textarea, .draft-box input { font: inherit; color: var(--text); background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 12px; padding: 10px 12px; width: 100%; min-width: 0; }
+.draft-box .lg-field { font-weight: 600; }
+.draft-job { margin: 0 0 4px; }
+.pf-h { margin: 10px 0 0; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.chip-edit { display: flex; flex-direction: column; gap: 6px; }
+.chip-edit input, .pf select { font: inherit; font-weight: 400; color: var(--text); background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; min-width: 0; }
+.panel-item input[type="search"] { font: inherit; color: var(--text); background: var(--surface-2); border: 1px solid var(--border);
+  border-radius: 12px; padding: 10px 12px; width: 100%; min-width: 0; }
+.panel-item .chips { margin: 6px 0; }
