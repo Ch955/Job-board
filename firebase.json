@@ -20,7 +20,8 @@
       "public": "docs",
       "cleanUrls": false,
       "ignore": [
-        "**/.*"
+        "**/.*",
+        "firebase.json"
       ],
       "headers": [
         {

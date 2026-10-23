@@ -17,7 +17,7 @@ on:
         options: [fetch, fresh-fetch, summary, test-notification]
   push:                       # redeploy the app when you change it
     branches: [ccr-2ca82853-eyb6vc]
-    paths: ["docs/**", "!docs/jobs.json"]
+    paths: ["docs/**", "!docs/jobs.json", "firebase.json", ".firebaserc"]
 
 permissions:
   contents: write   # commit docs/jobs.json
