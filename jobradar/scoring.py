@@ -41,9 +41,8 @@ class Scorer:
         self.loc_cfg = loc
         self.preferred = {city: [_rx(p) for p in pats] for city, pats in loc["preferred"].items()}
         self.india = [_rx(p) for p in loc.get("india_terms", [])]
+        self.not_india = [_rx(p) for p in loc.get("not_india_terms", [])]
         self.remote_terms = [_rx(p) for p in loc.get("remote_terms", [])]
-        self.remote_ok = [_rx(p) for p in loc.get("remote_ok_terms", [])]
-        self.remote_blocked = [_rx(p) for p in loc.get("remote_blocked_terms", [])]
 
         self.exp = config["experience"]
         self.recency = config["recency"]
@@ -69,19 +68,21 @@ class Scorer:
         return min(total, self.skill_max), matched
 
     def location_points(self, job: Job) -> tuple[int, str, bool]:
-        """Return (points, label, eligible)."""
+        """Return (points, label, eligible). Only India, or remote open to India, is eligible."""
         loc = job.location
+        if _any(self.not_india, loc):
+            return 0, "Abroad", False
+        remote = job.remote or _any(self.remote_terms, loc)
+        job.remote = remote
         for city, patterns in self.preferred.items():
             if _any(patterns, loc):
                 return int(self.loc_cfg["points_preferred"]), city, True
-        if job.remote or _any(self.remote_terms, loc):
-            job.remote = True
-            if _any(self.remote_ok, loc) or not _any(self.remote_blocked, loc):
-                return int(self.loc_cfg["points_remote"]), "Remote", True
-            return 0, "Remote (region-locked)", False
         if _any(self.india, loc):
+            if remote:
+                return int(self.loc_cfg["points_remote"]), "Remote (India)", True
             return int(self.loc_cfg["points_india_other"]), "India", True
-        return 0, "Other", False
+        # Remote with no mention of India (worldwide, US, EMEA, bare "Remote") or abroad
+        return 0, "Abroad" if not remote else "Remote (not India)", False
 
     @staticmethod
     def required_years(text: str) -> int | None:

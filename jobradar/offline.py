@@ -45,7 +45,8 @@ def render_fixture(name: str, now: datetime | None = None) -> object:
             return str(int(when.timestamp()))
         return str(int(when.timestamp() * 1000))
 
-    return json.loads(_PLACEHOLDER.sub(sub, raw))
+    # NaN mimics the missing values a pandas DataFrame hands back
+    return json.loads(_PLACEHOLDER.sub(sub, raw), parse_constant=lambda c: float(c))
 
 
 class FakeResponse:
@@ -63,8 +64,15 @@ class FakeResponse:
 class OfflineSession:
     """Duck-typed stand-in for requests.Session. Unknown URLs return 404."""
 
+    offline = True
+
     def __init__(self) -> None:
         self.calls: list[str] = []
+
+    def jobspy_records(self, site: str, query: str) -> list[dict]:
+        """JobSpy doesn't use our session; its sources ask for fixture rows instead."""
+        self.calls.append(f"JOBSPY {site} {query}")
+        return [r for r in render_fixture("jobspy.json") if r["site"] == site]
 
     def request(self, method: str, url: str, **_: object) -> FakeResponse:
         self.calls.append(f"{method} {url}")

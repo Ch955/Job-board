@@ -1,0 +1,19 @@
+[
+  {"site": "naukri", "title": "Azure Data Engineer - ADF / Databricks", "company": "Example Tech Services",
+   "location": "Hyderabad, Telangana, India", "date_posted": "{{DAYS_AGO:0}}", "is_remote": false,
+   "job_url": "https://example.com/naukri/1", "job_url_direct": null,
+   "description": "Build ADF pipelines and Databricks notebooks.", "skills": ["Azure Data Factory", "PySpark", "ADLS", "SQL"],
+   "experience_range": "3-6 Yrs"},
+  {"site": "naukri", "title": "Data Engineer", "company": "Example Retail", "location": null,
+   "date_posted": "{{DAYS_AGO:1}}", "is_remote": true, "job_url": "https://example.com/naukri/2",
+   "description": NaN, "skills": "Snowflake,Python,Airflow", "experience_range": "2-5 Yrs"},
+  {"site": "linkedin", "title": "Data Engineer", "company": "Example SaaS", "location": "Coimbatore, Tamil Nadu, India",
+   "date_posted": "{{DAYS_AGO:1}}", "is_remote": false, "job_url": "https://example.com/linkedin/3",
+   "description": "Spark, Databricks, Azure, Python. 3+ years of experience.", "skills": null, "experience_range": null},
+  {"site": "linkedin", "title": "Senior Data Engineer", "company": "Example UK", "location": "London, England, United Kingdom",
+   "date_posted": "{{DAYS_AGO:1}}", "is_remote": false, "job_url": "https://example.com/linkedin/4",
+   "description": "Databricks, Azure, PySpark.", "skills": null, "experience_range": null},
+  {"site": "indeed", "title": "Big Data Engineer", "company": "Example Bank", "location": "Chennai, TN, IN",
+   "date_posted": "{{DAYS_AGO:2}}", "is_remote": false, "job_url": "https://example.com/indeed/5",
+   "description": "Hadoop, Spark, Hive, Kafka. 4+ years experience.", "skills": null, "experience_range": null}
+]

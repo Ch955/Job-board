@@ -1,2 +1,4 @@
 requests>=2.31,<3
 PyYAML>=6.0,<7
+# LinkedIn / Naukri / Indeed scraper. Pinned: upgrade deliberately, it tracks site changes.
+python-jobspy==1.2.0

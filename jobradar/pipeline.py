@@ -21,6 +21,9 @@ log = logging.getLogger("jobradar")
 
 # Earlier sources win on duplicates: a direct company board link beats an aggregator.
 SOURCE_PRIORITY = {name: i for i, name in enumerate(REGISTRY)}
+# JobSpy tags jobs with the real site name
+for _i, _site in enumerate(("naukri", "linkedin", "indeed", "glassdoor", "google")):
+    SOURCE_PRIORITY[_site] = SOURCE_PRIORITY["jobspy"] + _i / 10
 
 
 @dataclass
@@ -154,6 +157,9 @@ def process(
         keep = old.status in keep_statuses
         new_rec, days = scorer.recency_points(old, now)
         if not keep and (days or 0) > max_age:
+            continue
+        # Re-check location so a rule change (e.g. India-only) cleans up old entries too
+        if not keep and drop_ineligible and not scorer.location_points(old)[2]:
             continue
         bd = old.score_breakdown or {}
         old.score = max(0, min(100, old.score - int(bd.get("recency", 0)) + new_rec))

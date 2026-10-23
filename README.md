@@ -14,8 +14,8 @@ sources (one module each, isolated)        processing                         ou
 ───────────────────────────────────        ──────────────────────────────     ─────────────────
 Greenhouse / Lever / Ashby /         ─┐    title gate (is it a DE role?)
 SmartRecruiters company boards        │    dedupe: company + title + city
-Adzuna, Jooble (free keys)            ├──▶ score 0-100 (config.yaml rules) ──▶ docs/jobs.json
-Remotive, Arbeitnow (no key)          │    drop: >30 days, <40, wrong region
+LinkedIn, Naukri, Indeed (JobSpy)     ├──▶ score 0-100 (config.yaml rules) ──▶ docs/jobs.json
+Adzuna, Jooble (free keys), Remotive  │    drop: >30 days, <40, outside India
 Gmail job-alert emails (phase 5)     ─┘    merge with history (keep status)
 ```
 
@@ -63,9 +63,31 @@ those are in India or remote. Delete or fix any `FAIL` rows. To find a company's
 careers page and look at the job links: `boards.greenhouse.io/<slug>`, `jobs.lever.co/<slug>`,
 `jobs.ashbyhq.com/<slug>` or `jobs.smartrecruiters.com/<slug>`.
 
+## LinkedIn, Naukri and Indeed
+
+Neither LinkedIn nor Naukri offers a public job-search API, and their alert emails only show a
+handful of jobs. Job Radar gets their listings with [JobSpy](https://github.com/speedyapply/JobSpy)
+(`python-jobspy`, open source, free). It reads the same public search pages you see when logged out,
+so no account or password is involved and your own LinkedIn/Naukri profiles can't be affected.
+
+Configure it under `sources.jobspy` in `config.yaml`: sites, search queries, results per query,
+and how many hours back to look. Each site × query is a separate call, so if LinkedIn rate-limits a
+run you still get Naukri and Indeed, and the run report lists what failed.
+
+Caveats:
+- This is scraping. It's against LinkedIn's and Naukri's terms of use, and it can break when those
+  sites change their pages. The version is pinned in `requirements.txt`. If a site stops returning
+  jobs, upgrading `python-jobspy` is usually the fix.
+- Sites sometimes block cloud server IPs (which is what GitHub Actions uses). Run
+  `python -m jobradar run --sources jobspy` locally first, then watch the run report once it's on Actions.
+
+If a site keeps blocking, the paid fallback is an [Apify](https://apify.com) scraper "actor". Apify's
+free plan includes $5 of usage credit every month, and community Naukri/LinkedIn job actors are
+priced at roughly $0.30 to $5 per 1,000 jobs. At this project's volume that should mostly fit inside the free credit.
+
 ## Free API keys (optional but recommended)
 
-The four company-board APIs, Remotive and Arbeitnow need no key. Adzuna and Jooble need a free key.
+The four company-board APIs, JobSpy and Remotive need no key. Adzuna and Jooble need a free key.
 Without one, that source is skipped and the rest still run.
 
 For local runs, copy `.env.example` to `.env` and fill it in. `.env` is git-ignored.
@@ -95,7 +117,7 @@ All rules live in `config.yaml`. No code changes are needed to tune them.
 |---|---|---|
 | Title | 25 | Best matching `title.rules` pattern (e.g. "data engineer" = 25, "ETL" = 18) |
 | Skills | 35 | Sum of matched `skills.keywords` weights (ADF, Databricks, PySpark = 6 each...), capped |
-| Location | 20 | Hyderabad/Bangalore/Pune/Mumbai 20, remote open to India 18, rest of India 8, elsewhere 0 |
+| Location | 20 | Anywhere in India 20, remote open to India 20. Abroad, or remote without India: dropped |
 | Experience | 10 | Required years parsed from the description: ≤4 → 10, ≤6 → 5, more → 0, not stated → 5 |
 | Recency | 10 | ≤1 day 10, ≤3 days 8, ≤7 days 6, ≤14 days 3, ≤30 days 1 |
 | Penalty | | Staff/Principal −15, Lead/Architect −8 |
@@ -103,8 +125,11 @@ All rules live in `config.yaml`. No code changes are needed to tune them.
 Before scoring, a job must pass the **title gate**: its title has to match a `title.rules` pattern and
 none of `title.exclude` (intern, manager, director, sales, data scientist/analyst...).
 
-After scoring, a job is dropped if it is older than 30 days, scores below 40, or is in a location you
-can't work from (for example "Remote, US only" or "London"). Jobs you've marked applied, interview or
+After scoring, a job is dropped if it is older than 30 days, scores below 40, or isn't in India.
+**India only:** a job is kept only if its location names an Indian city or state, or "India". A remote
+job is kept only if it says India (e.g. "Remote - India"). "Remote (Worldwide)", "Remote - EMEA",
+a bare "Remote", and every city abroad are dropped. Jobs already in `jobs.json` are re-checked
+on every run, so tightening the rules also cleans out old entries. Jobs you've marked applied, interview or
 offer are never dropped for age.
 
 Each job records the keywords it matched (`matched_keywords`) and a `score_breakdown`, so you can see
@@ -141,7 +166,7 @@ jobradar/
   pipeline.py          fetch -> gate -> dedupe -> score -> filter -> merge -> save
   scoring.py           rule-based scorer
   models.py            the Job schema, text/date normalization
-  sources/             one module per source
+  sources/             one module per source (jobspy_boards.py = LinkedIn/Naukri/Indeed)
   offline.py           fixture-backed fake HTTP session for --offline and tests
 tests/                 pytest suite + API-shaped fixtures
 docs/                  GitHub Pages root: jobs.json now, the PWA in phase 4

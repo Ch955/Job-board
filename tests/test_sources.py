@@ -1,6 +1,7 @@
 """Each parser against an API-shaped fixture."""
 
 from jobradar.offline import render_fixture
+from jobradar.sources import jobspy_boards
 from jobradar.sources import adzuna, arbeitnow, ashby, greenhouse, jooble, lever, remotive, smartrecruiters
 
 
@@ -52,3 +53,12 @@ def test_arbeitnow_remote_only_and_epoch_seconds():
     jobs = arbeitnow.parse(render_fixture("arbeitnow.json"), remote_only=True)
     assert len(jobs) == 1 and jobs[0].location == "Remote (Berlin)" and jobs[0].posted_date
     assert len(arbeitnow.parse(render_fixture("arbeitnow.json"), remote_only=False)) == 2
+
+
+def test_jobspy_rows_tagged_with_real_site_and_skills_used():
+    jobs = jobspy_boards.parse(render_fixture("jobspy.json"))
+    assert {j.source for j in jobs} == {"naukri", "linkedin", "indeed"}
+    nk = jobs[0]
+    assert "Skills: Azure Data Factory, PySpark" in nk.description and "Experience: 3-6 Yrs" in nk.description
+    # NaN description + null location from Naukri
+    assert jobs[1].location == "India" and jobs[1].remote and "nan" not in jobs[1].description.lower()

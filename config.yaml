@@ -82,28 +82,30 @@ skills:
     - { name: Terraform,       weight: 1, patterns: ['terraform'] }
 
 # ---------------------------------------------------------------------------
-# Location: preferred cities get full points, remote that is open to India
-# gets nearly full, rest of India gets some, everything else gets zero.
+# Location: India only. Any Indian city is fine; remote counts only when the
+# posting says it's open to India. Everything abroad is dropped.
 # ---------------------------------------------------------------------------
 location:
-  points_preferred: 20
-  points_remote: 18
-  points_india_other: 8
+  points_preferred: 20       # cities below (also used as the card label)
+  points_india_other: 20     # anywhere else in India: you're open to all of India
+  points_remote: 20          # remote, open to India
   preferred:
     Hyderabad: ['hyderabad', 'secunderabad', 'hitec city', 'gachibowli']
     Bangalore: ['bangalore', 'bengaluru']
     Pune:      ['pune']
     Mumbai:    ['mumbai', 'navi mumbai', 'thane']
-  india_terms: ['india', ',\s*in$', '\bind$', 'chennai', 'gurgaon', 'gurugram', 'noida', 'delhi', 'kolkata',
-                'ahmedabad', 'kochi', 'trivandrum', 'coimbatore', 'jaipur', 'chandigarh', 'indore']
+  india_terms: ['india', ',\s*in$', '\bind$',
+                'chennai', 'gurgaon', 'gurugram', 'noida', 'delhi', '\bncr\b', 'faridabad', 'ghaziabad',
+                'kolkata', 'ahmedabad', 'gandhinagar', 'vadodara', 'surat', 'kochi', 'cochin', 'trivandrum',
+                'thiruvananthapuram', 'coimbatore', 'madurai', 'jaipur', 'chandigarh', 'mohali', 'indore',
+                'bhopal', 'bhubaneswar', 'nagpur', 'nashik', 'lucknow', 'mysore', 'mysuru', 'mangalore',
+                'mangaluru', 'visakhapatnam', 'vizag', 'vijayawada', 'warangal', 'goa', 'kanpur', 'patna',
+                'karnataka', 'maharashtra', 'telangana', 'tamil nadu', 'kerala', 'haryana', 'gujarat',
+                'uttar pradesh', 'west bengal', 'andhra pradesh', 'odisha', 'rajasthan', 'punjab']
+  # These win over a matching Indian city name (e.g. "Hyderabad, Pakistan")
+  not_india_terms: ['pakistan', 'sindh', 'bangladesh', 'sri lanka', 'nepal']
   remote_terms: ['remote', 'work from home', '\bwfh\b', 'anywhere', 'distributed']
-  # A remote job is only useful if it's open to India. These make it eligible...
-  remote_ok_terms: ['india', 'apac', 'asia', 'worldwide', 'global', 'anywhere', 'emea']
-  # ...and if it mentions one of these (and none of the above) it's treated as not open to you.
-  remote_blocked_terms: ['\bus\b', 'usa', 'united states', 'canada', 'europe', '\beu\b', '\buk\b',
-                         'united kingdom', 'germany', 'latam', 'brazil', 'mexico', 'americas',
-                         'north america', 'australia', 'new york', 'san francisco', 'london', 'berlin']
-  # Drop jobs that are neither in India nor remote-open-to-India (saves noise).
+  # Drop everything that isn't in India or remote-open-to-India.
   drop_ineligible: true
 
 experience:
@@ -131,6 +133,18 @@ sources:
   lever:           { enabled: true }
   ashby:           { enabled: true }
   smartrecruiters: { enabled: true, query: data, max_details_per_company: 15 }
+  jobspy:
+    # LinkedIn, Naukri and Indeed India via the open-source JobSpy library
+    # (github.com/speedyapply/JobSpy). Free, no login: it reads the same public
+    # search pages you see logged out. Sites may rate-limit; failures only skip that site.
+    enabled: true
+    sites: [naukri, linkedin, indeed]
+    queries: ['azure data engineer', 'databricks data engineer', 'data engineer pyspark']
+    location: India
+    country_indeed: india
+    results_wanted: 30       # per site per query
+    hours_old: 72            # only recent postings; runs every 3h so this has slack
+    fetch_description: true  # needed for skill scoring; slower (one extra request per job)
   adzuna:
     enabled: true           # needs ADZUNA_APP_ID + ADZUNA_APP_KEY, skipped otherwise
     country: in
@@ -149,7 +163,7 @@ sources:
     search: data engineer
     min_interval_hours: 6   # Remotive asks for at most ~4 calls/day
   arbeitnow:
-    enabled: true
+    enabled: false          # mostly Germany-based jobs; nothing for India-only search
     pages: 3
     remote_only: true
 

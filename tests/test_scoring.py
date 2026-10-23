@@ -39,15 +39,23 @@ def test_irrelevant_titles(scorer, title):
     ("Bengaluru, India", False, "Bangalore", True),
     ("Navi Mumbai", False, "Mumbai", True),
     ("Chennai, India", False, "India", True),
-    ("Remote - India", True, "Remote", True),
-    ("Remote (Worldwide)", True, "Remote", True),
-    ("Remote", True, "Remote", True),
-    ("Remote (USA Only)", True, "Remote (region-locked)", False),
-    ("Remote - Europe", True, "Remote (region-locked)", False),
-    ("London, UK", False, "Other", False),
+    ("Coimbatore, Tamil Nadu", False, "India", True),
+    ("Gurugram, Haryana", False, "India", True),
+    ("Kochi, IN", False, "India", True),
+    ("Remote - India", True, "Remote (India)", True),
     ("Bangalore / San Francisco", False, "Bangalore", True),
+    # Everything abroad, and remote that doesn't say India, is out
+    ("Remote (Worldwide)", True, "Remote (not India)", False),
+    ("Remote", True, "Remote (not India)", False),
+    ("Remote - EMEA", True, "Remote (not India)", False),
+    ("Remote (USA Only)", True, "Remote (not India)", False),
+    ("London, UK", False, "Abroad", False),
+    ("Singapore", False, "Abroad", False),
+    ("Warsaw, Poland", False, "Abroad", False),
+    ("Hyderabad, Sindh, Pakistan", False, "Abroad", False),
 ])
 def test_location(scorer, location, remote, label, eligible):
+    """India only: any Indian city, or remote that says India."""
     _, got_label, got_eligible = scorer.location_points(job(location=location, remote=remote))
     assert (got_label, got_eligible) == (label, eligible)
 
@@ -85,6 +93,11 @@ def test_perfect_match_scores_high_and_lists_keywords(scorer):
     assert j.score >= 90
     assert {"ADF", "Databricks", "PySpark", "ADLS Gen2", "Snowflake"} <= set(j.matched_keywords)
     assert j.score_breakdown["location_label"] == "Hyderabad"
+
+
+def test_all_indian_cities_score_the_same_as_preferred(scorer):
+    hyd = scorer.location_points(job(location="Hyderabad"))[0]
+    assert scorer.location_points(job(location="Jaipur, Rajasthan"))[0] == hyd
 
 
 def test_skill_points_are_capped(scorer):

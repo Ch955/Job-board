@@ -28,7 +28,11 @@ def test_full_offline_run(config, out):
     assert "Account Executive, Enterprise" not in titles  # title gate
     assert "Staff Data Engineer" not in titles         # San Francisco, not eligible
     assert "Data Engineering Intern" not in titles     # excluded
-    assert "Data Engineer (m/w/d)" not in titles       # remote Berlin = region locked
+    companies = {j["company"] for j in data["jobs"]}
+    assert "Global Remote Co" not in companies         # remote worldwide, not India
+    assert "Example UK" not in companies               # LinkedIn job in London
+    assert {"Example Tech Services", "Example Retail", "Example SaaS", "Example Bank"} <= companies
+    assert {"naukri", "linkedin", "indeed"} <= {j["source"] for j in data["jobs"]}
     assert all(j["score"] >= 40 for j in data["jobs"])
     assert [j["score"] for j in data["jobs"]] == sorted((j["score"] for j in data["jobs"]), reverse=True)
 
@@ -100,3 +104,16 @@ def test_carry_over_and_age_out(config):
     assert titles == {"Data Engineer", "Big Data Engineer"}  # 40-day-old applied job kept
     assert new == []
     assert next(j for j in jobs if j.title == "Data Engineer").score == 78  # recency 10 -> 8
+
+
+def test_carry_over_drops_jobs_abroad_after_rule_change(config):
+    """Old foreign jobs already in jobs.json are cleaned out on the next run."""
+    now = datetime(2026, 10, 23, tzinfo=timezone.utc)
+    def old(location, status="new"):
+        j = Job(title="Data Engineer", company=location, location=location, url="u", source="remotive",
+                posted_date=(now - timedelta(days=1)).isoformat(), status=status)
+        j.score, j.score_breakdown = 80, {"recency": 10}
+        return j
+    previous = {j.id: j for j in (old("Remote (Worldwide)"), old("Berlin"), old("Pune"), old("London", "applied"))}
+    jobs, _, _ = pipeline.process([], previous, config, now)
+    assert {j.location for j in jobs} == {"Pune", "London"}  # applied jobs are never removed
