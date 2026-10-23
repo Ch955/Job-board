@@ -12,3 +12,5 @@ client_secret*.json
 out/
 # Never commit a plain resume; only assets/resume.pdf.enc
 *.pdf
+# Firebase service account key (goes in GitHub Secrets only)
+*firebase-adminsdk*.json

@@ -42,7 +42,7 @@ Repo → **Settings** → **Secrets and variables** → **Actions** → **New re
 | `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN` | `python -m jobradar gmail-auth` ([Gmail setup](#one-time-gmail-setup-about-15-minutes-free)) | for recruiter drafts |
 | `RESUME_KEY` | `python -m jobradar encrypt-resume` | to attach your resume |
 | `EMAIL_SIGNATURE` | your own text, e.g. your phone number | optional |
-| `SYNC_PASSPHRASE` | the passphrase you sign in to the app with | for Gmail status updates |
+| `FIREBASE_SERVICE_ACCOUNT` | Firebase → Project settings → Service accounts → Generate new private key (the whole JSON) | for Gmail status updates |
 | `ADZUNA_APP_ID`, `ADZUNA_APP_KEY` | [Adzuna](#adzuna) | optional |
 | `JOOBLE_API_KEY` | [Jooble](#jooble) | optional |
 
@@ -137,45 +137,44 @@ emails and recruiter replies). It can't send. You can revoke it any time at <htt
 
 ## The app
 
-### Sign in and sync (phone + laptop show the same thing)
-The first time you open the app it asks you to sign in. That keeps your Applied / Interview / Skip choices identical
-on every device, still for ₹0. Tap **Sign in with GitHub**, then enter your passphrase (first time: choose one and type
-it twice; use the same one on every device). Until GitHub sign-in is set up (below), use **Use a token instead**:
+### Sign in with email (phone + laptop show the same thing)
+The app opens with a sign-in page: **Continue with Google** or your **email + password** (with *Create an account* and
+*Forgot password?*). Once signed in, your Applied / Interview / Skip choices are the same on every device and update
+live within seconds. Prefer not to? Tap *Use on this device only*.
 
-1. **Create a GitHub token** (once per device; the login page has the same steps):
-   <https://github.com/settings/personal-access-tokens/new> → name `Job Radar`, expiration 1 year →
-   *Only select repositories* → your Job-board repo → Permissions → Repository → **Contents: Read and write** → Generate.
-2. **Choose a passphrase** on your first device (8+ characters) and type it twice. Use the same passphrase on every
-   other device. It encrypts your statuses and never leaves the device.
-3. Tick **Keep me signed in** so you don't have to sign in again.
+Accounts and statuses live in **Firebase** (Google's free Spark plan, no card). Each person's statuses are one private
+document that only their own account can read or write.
 
-Your statuses are stored in `sync/state.enc.json` in the repo, encrypted with AES-256-GCM (key from your passphrase,
-PBKDF2-SHA256). The repo is public, but the file is unreadable without the passphrase. Changes reach your other
-devices within a minute while the app is open, or straight away with ⟳ / pull down. Prefer not to sign in? Tap
-*Use on this device only*.
+#### One-time Firebase setup (about 10 minutes, free)
+1. **Create a project.** Open <https://console.firebase.google.com> → **Create a project** → name it `job-radar` →
+   you can turn off Google Analytics → **Create**.
+2. **Turn on sign-in.** **Build** → **Authentication** → **Get started** → *Sign-in method*:
+   enable **Email/Password**, and **Google** (pick your support email) → **Save**.
+   Then **Settings** → **Authorized domains** → **Add domain** → `ch955.github.io`.
+3. **Create the database.** **Build** → **Firestore Database** → **Create database** → any location near you
+   (e.g. `asia-south1`, Mumbai) → *Start in production mode*. Open its **Rules** tab, replace everything with this,
+   and **Publish**:
+   ```
+   rules_version = '2';
+   service cloud.firestore {
+     match /databases/{database}/documents {
+       match /users/{uid} {
+         allow read, write: if request.auth != null && request.auth.uid == uid;
+       }
+     }
+   }
+   ```
+4. **Connect the app.** **Project settings** (gear icon) → *Your apps* → the **</>** (Web) icon → nickname
+   `Job Radar` → **Register app**. Copy the `apiKey`, `authDomain`, `projectId` and `appId` values into
+   `docs/app-config.json` on GitHub and commit. (These values are meant to be public; the rules above are what keep
+   your data private.) The app redeploys in about a minute and the sign-in page goes live.
+5. **Sign in** on your phone and laptop with the same account. Use **chakri.evn@gmail.com** so the Gmail step below
+   knows which account is yours.
 
-### Setting up "Sign in with GitHub" (one time, about 10 minutes, free)
-GitHub's sign-in ends with a step that needs a secret, which can't sit in a public web page. A tiny free
-**Cloudflare Worker** (`oauth/worker.js`, about 40 lines) holds it and does just that step. It stores nothing and only
-answers your app.
-
-1. **GitHub OAuth app.** Open <https://github.com/settings/applications/new>:
-   - Application name: `Job Radar`
-   - Homepage URL and Authorization callback URL: both `https://ch955.github.io/Job-board/`
-   - **Register application**, copy the **Client ID**, then **Generate a new client secret** and copy it (shown once).
-2. **Cloudflare Worker.** Sign up free at <https://dash.cloudflare.com/sign-up> (no card needed). Then:
-   - **Workers & Pages** → **Create** → **Create Worker** → name it `job-radar-login` → **Deploy**.
-   - **Edit code**, replace everything with the contents of `oauth/worker.js`, then **Deploy**.
-   - The worker's **Settings** → **Variables and Secrets** → add `GITHUB_CLIENT_ID` (text), `GITHUB_CLIENT_SECRET`
-     (secret) and `ALLOWED_ORIGIN` = `https://ch955.github.io` (text) → **Deploy**.
-   - Copy the worker's address, like `https://job-radar-login.<your-name>.workers.dev`.
-3. **Tell the app.** Edit `docs/app-config.json` on GitHub, fill in `client_id` and `proxy` (the worker address), and
-   commit. The app redeploys in about a minute and shows the **Sign in with GitHub** button.
-
-Signing in gives the app GitHub's `public_repo` access, which covers all your public repos (OAuth apps can't be
-narrowed to one). The app only ever reads and writes `sync/state.enc.json`. You can revoke it at any time under
-<https://github.com/settings/applications>. If you'd rather limit access to this one repo, keep using a fine-grained
-token (*Use a token instead*).
+#### Let GitHub Actions write Gmail updates to your account
+Firebase → **Project settings** → **Service accounts** → **Generate new private key** → it downloads a JSON file.
+Open it in Notepad, copy **all** of it, and save it as the GitHub Secret `FIREBASE_SERVICE_ACCOUNT`. (Together with the
+Gmail secrets, this turns on the Gmail status updates.) Keep that file private and delete it afterwards.
 
 ### Using it
 - **☰ menu:** your profile and totals, the sections with counts, Gmail sections, Export, Settings, theme, sign out.
@@ -196,7 +195,7 @@ token (*Use a token instead*).
 - **Gmail (read-only):** every 3 hours GitHub reads recent job emails. Application confirmations move the job to
   Applied, interview / test invites to Interview, rejections to Rejected, marked "from Gmail". Applications you made
   elsewhere (e.g. a LinkedIn confirmation for a job not in the list) are added to Applied too. Needs the Gmail setup
-  below plus one more secret, `SYNC_PASSPHRASE` = the passphrase you sign in with.
+  below plus the `FIREBASE_SERVICE_ACCOUNT` secret.
 - **Export to Excel:** ☰ → *Export to Excel (.csv)* (or Settings → This section). Status, applied date, score, title,
   company, location, source, skills, recruiter email and link for every job.
 - Filters: minimum score plus multi-select chips (e.g. Naukri + LinkedIn); search; pull down to refresh; dark / light.
@@ -260,7 +259,7 @@ Other useful flags:
 | `python -m jobradar gmail-auth --client-file …json` | one-time Gmail sign-in |
 | `python -m jobradar encrypt-resume resume.pdf` | encrypt your resume for draft attachments |
 | `python -m jobradar gmail-test` | create a test draft to yourself |
-| `python -m jobradar gmail-sync` | read job emails (read-only) and update statuses in the sync file |
+| `python -m jobradar gmail-sync` | read job emails (read-only) and update statuses in your app account |
 
 ### First thing to do: check the company list
 
@@ -389,13 +388,12 @@ tests/                 pytest suite + API-shaped fixtures
   outreach.py          recruiter emails in postings, email + LinkedIn templates, drafting rules
   gmail.py             Gmail API over plain HTTP: sign-in, drafts
   resume.py            encrypted resume (assets/resume.pdf.enc)
-  sync.py              encrypted status file shared with the app (same format as docs/sync.js)
-oauth/worker.js        Cloudflare Worker for "Sign in with GitHub" (holds the OAuth client secret)
-docs/app-config.json   GitHub sign-in settings (client id + worker address; nothing secret)
+  sync.py              status merge rules (identical to docs/sync.js)
+  cloud_store.py       Firebase from GitHub Actions: service-account sign-in, read/write your statuses
   gmail_status.py      Gmail confirmations / interviews / rejections -> statuses
-sync/state.enc.json    your statuses, encrypted (written by the app and by the workflow)
+docs/app-config.json   Firebase web settings (public by design)
   notify.py            which notifications to send, and sending them
-docs/                  the app (GitHub Pages root): index.html, app.js, sync.js, app.css, sw.js, jobs.json
+docs/                  the app (GitHub Pages root): index.html, app.js, cloud.js (sign-in + sync), sync.js, app.css, sw.js, jobs.json
 .github/workflows/     the 3-hourly schedule
 scripts/make_icons.py  regenerates the app icons
 ```

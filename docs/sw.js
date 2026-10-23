@@ -1,6 +1,6 @@
 /* Job Radar service worker: offline shell, fresh jobs.json, push notifications. */
-const VERSION = "jobradar-v7";
-const SHELL = ["./", "index.html", "app.css", "app.js", "sync.js", "manifest.webmanifest",
+const VERSION = "jobradar-v8";
+const SHELL = ["./", "index.html", "app.css", "app.js", "sync.js", "cloud.js", "manifest.webmanifest",
                "icons/icon.svg", "icons/icon-192.png", "icons/icon-512.png"];
 
 self.addEventListener("install", (event) => {

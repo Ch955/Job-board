@@ -9,7 +9,6 @@ const K = {
   filters: "jobradar.filters",
   theme: "jobradar.theme",
   section: "jobradar.section",
-  sync: "jobradar.sync",       // {owner, repo, branch, token, key, salt, iter} when "keep me signed in"
   mode: "jobradar.mode",       // "local" = chose to use without sync
   dirty: "jobradar.dirty",     // unsynced local changes
 };
@@ -59,9 +58,8 @@ let section = "new";
 let lastFetch = 0;
 let animateNext = true;
 let reloading = false;
-let session = null; // {owner, repo, branch, token, key(CryptoKey), salt, iter, gh}
-let appConfig = {};  // docs/app-config.json: GitHub sign-in settings
-let ghLogin = null;  // {token, login, avatar} right after "Sign in with GitHub"
+let session = null;  // {uid, email, name, photo} when signed in
+let appConfig = {};  // docs/app-config.json: Firebase settings (public by design)
 let syncInfo = { state: "off", at: null, error: "" };
 
 // ------------------------------------------------------------------ storage
@@ -576,9 +574,9 @@ function renderNav(jobs) {
   const p = data.outreach?.profile || {};
   const name = p.full_name || p.name || "Job Radar";
   const av = $("#dr-avatar");
-  if (session?.avatar) {
+  if (session?.photo) {
     av.textContent = "";
-    av.style.backgroundImage = `url("${encodeURI(session.avatar)}")`;
+    av.style.backgroundImage = `url("${encodeURI(session.photo)}")`;
     av.classList.add("has-img");
   } else {
     av.style.backgroundImage = "";
@@ -587,7 +585,7 @@ function renderNav(jobs) {
   }
   $("#dr-name").textContent = p.name || name;
   $("#dr-role").textContent = [p.role, p.years_experience ? `${p.years_experience}+ yrs` : "", p.notice].filter(Boolean).join(" · ");
-  if (session?.login) $("#dr-role").textContent += ` · @${session.login}`;
+  if (session?.email) $("#dr-role").textContent += ` · ${session.email}`;
   const times = appliedTimes();
   const week = startOfWeek();
   countUp($("#dr-week"), times.filter((d) => d >= week).length);
@@ -803,8 +801,13 @@ function cycleTheme() {
 }
 
 // --------------------------------------------------------------------- sync
+// session = {uid, email, name, photo} once signed in. Statuses live in Firestore
+// users/<uid> (cloud.js); every device listens to it, and saves merge in a transaction.
 let syncTimer = null;
-let syncing = null;
+let saving = null;
+let unsubscribe = null;
+let localVersion = 0;
+let freshSignIn = false;
 
 function setSync(state, error = "") {
   syncInfo = { state, at: state === "ok" ? new Date().toISOString() : syncInfo.at, error };
@@ -812,7 +815,7 @@ function setSync(state, error = "") {
 }
 function syncLabel() {
   if (!session) return "This device only";
-  if (syncInfo.state === "syncing") return "Syncing…";
+  if (syncInfo.state === "syncing") return "Saving…";
   if (syncInfo.state === "offline") return "Offline · will sync later";
   if (syncInfo.state === "error") return `Sync problem: ${syncInfo.error}`;
   return syncInfo.at ? `Synced ${ago(syncInfo.at)}` : "Signed in";
@@ -824,231 +827,214 @@ function renderSyncBadges() {
   $("#dr-sync").dataset.state = state;
   $(".txt", $("#dr-sync")).textContent = syncLabel();
 }
-function scheduleSync(delay = 1200) {
+function scheduleSync(delay = 700) {
+  localVersion++;
   clearTimeout(syncTimer);
   syncTimer = setTimeout(() => syncNow(), delay);
 }
+function cloudError(e) {
+  const code = e?.code || "";
+  if (code.includes("permission-denied")) return "no access. Check the Firestore rules in the README";
+  if (code.includes("unavailable")) return "can't reach the server";
+  return e?.message || String(e);
+}
 
-// Read the shared file, merge it with this device, and write it back when this device has news
+// Send this device's changes; the live listener brings in everyone else's
 async function syncNow() {
-  if (!session) return;
-  if (syncing) return syncing;
-  syncing = (async () => {
+  if (!session || !window.JRCloud?.ready) return;
+  if (saving) return saving;
+  if (!readJSON(K.dirty, false)) return;
+  saving = (async () => {
     if (!navigator.onLine) return setSync("offline");
     setSync("syncing");
+    const v = localVersion;
     try {
-      for (let attempt = 0; attempt < 3; attempt++) {
-        const remote = await session.gh.get();
-        const remoteState = remote ? await JRSync.open(remote.envelope, session.key) : JRSync.empty();
-        store = JRSync.merge(store, remoteState);
-        saveLocal();
-        if (remote && !readJSON(K.dirty, false)) break; // nothing new here to send
-        try {
-          await session.gh.put(await JRSync.seal(store, session.key, session.salt, session.iter), remote?.sha);
-          writeJSON(K.dirty, false);
-          break;
-        } catch (e) {
-          if (e.status === 409 || e.status === 422) continue; // another device wrote first: merge again
-          throw e;
-        }
-      }
+      const local = store;
+      const merged = await JRCloud.save(session.uid, session.email, (remote) => JRSync.merge(local, remote));
+      store = JRSync.merge(store, merged); // keep anything you changed while it was saving
+      saveLocal();
+      if (v === localVersion) writeJSON(K.dirty, false);
       setSync("ok");
       render();
     } catch (e) {
-      if (e.status === 401 || e.status === 403) setSync("error", "token expired or lacks access. Sign out and in again");
-      else if (e.name === "OperationError") setSync("error", "passphrase doesn't match this file");
-      else setSync(navigator.onLine ? "error" : "offline", e.message);
+      setSync(navigator.onLine ? "error" : "offline", cloudError(e));
     }
   })();
   try {
-    await syncing;
+    await saving;
   } finally {
-    syncing = null;
+    saving = null;
+    if (readJSON(K.dirty, false) && syncInfo.state === "ok") scheduleSync(); // changed again meanwhile
   }
 }
 
-async function startSession(cfg) {
-  const key = typeof cfg.key === "string" ? await JRSync.importKey(cfg.key) : cfg.key;
-  session = { ...cfg, key, gh: JRSync.client(cfg) };
+function listen() {
+  unsubscribe?.();
+  unsubscribe = JRCloud.subscribe(session.uid, (remote, mine) => {
+    if (mine || !remote) return;
+    store = JRSync.merge(store, remote);
+    saveLocal();
+    setSync("ok");
+    render();
+  }, (e) => setSync("error", cloudError(e)));
+}
+
+function onUserChanged(user) {
+  if (user) {
+    session = user;
+    writeJSON("jobradar.user", user);
+    writeJSON(K.mode, undefined);
+    if (freshSignIn) {
+      writeJSON(K.dirty, true); // bring this device's statuses into your account
+      freshSignIn = false;
+    }
+    setSync("ok");
+    listen();
+    showApp();
+    syncNow();
+  } else {
+    unsubscribe?.();
+    unsubscribe = null;
+    session = null;
+    writeJSON("jobradar.user", undefined);
+    if (readJSON(K.mode, null) === "local") showApp();
+    else showLogin();
+  }
 }
 
 // -------------------------------------------------------------------- login
-function repoFromLocation() {
-  const m = location.hostname.match(/^([\w-]+)\.github\.io$/i);
-  const repo = location.pathname.split("/").filter(Boolean)[0];
-  return m ? { owner: m[1], repo: repo || `${m[1]}.github.io` } : { owner: "", repo: "" };
+const firebaseCfg = () => appConfig.firebase || {};
+const cloudConfigured = () => !!(firebaseCfg().apiKey && firebaseCfg().projectId);
+let loginMode = "signin"; // or "signup"
+
+function authMessage(e) {
+  const code = e?.code || "";
+  return ({
+    "auth/invalid-credential": "Wrong email or password.",
+    "auth/invalid-login-credentials": "Wrong email or password.",
+    "auth/wrong-password": "Wrong email or password.",
+    "auth/user-not-found": "No account with that email. Tap Create an account.",
+    "auth/email-already-in-use": "That email already has an account. Sign in instead.",
+    "auth/weak-password": "Use a password of at least 6 characters.",
+    "auth/invalid-email": "That email address doesn't look right.",
+    "auth/missing-email": "Enter your email first.",
+    "auth/too-many-requests": "Too many tries. Wait a minute, or reset your password.",
+    "auth/network-request-failed": "No internet connection.",
+    "auth/popup-closed-by-user": "",
+    "auth/cancelled-popup-request": "",
+    "auth/unauthorized-domain": "This site isn't allowed in Firebase yet: Authentication → Settings → Authorized domains → add it.",
+    "auth/operation-not-allowed": "Turn this sign-in method on in Firebase → Authentication → Sign-in method.",
+  })[code] ?? (e?.message || "Sign-in failed.");
 }
 
-const oauthCfg = () => appConfig.github_oauth || {};
-const oauthReady = () => !!(oauthCfg().client_id && oauthCfg().proxy);
-const redirectUri = () => location.origin + location.pathname;
-
-// mode: "github" = the Sign in with GitHub button; "pass" = passphrase step; "token" = paste a token
-function showLogin(mode) {
-  $("#app").hidden = true;
-  $("#login").hidden = false;
-  const saved = readJSON(K.sync, null) || readJSON(K.sync, null, sessionStorage) || {};
-  const user = ghLogin || (saved.login ? { login: saved.login, avatar: saved.avatar } : null);
-  const haveToken = !!(ghLogin?.token || saved.token);
-  mode = mode || (haveToken ? "pass" : oauthReady() ? "github" : "token");
-  const guess = repoFromLocation();
-  $("#lg-owner").value = saved.owner || guess.owner || user?.login || "";
-  $("#lg-repo").value = saved.repo || guess.repo || "Job-board";
-  $("#lg-repo-label").textContent = `${$("#lg-owner").value || "?"}/${$("#lg-repo").value || "?"}`;
-  $("#lg-repo-box").open = !$("#lg-owner").value;
-
-  $("#lg-step-gh").hidden = mode !== "github";
-  $("#login-form").hidden = mode === "github";
-  $("#lg-user").hidden = !(mode === "pass" && user);
-  if (user) {
-    $("#lg-login").textContent = `@${user.login}`;
-    if (user.avatar) $("#lg-avatar").src = user.avatar;
-  }
-  $("#lg-token-wrap").hidden = mode !== "token";
-  $("#lg-token-wrap").nextElementSibling.hidden = mode !== "token"; // "How do I get a token?"
-  $("#lg-back-gh").hidden = !(mode === "token" && oauthReady());
-  $("#lg-use-token").hidden = false;
-  $("#lg-gh-note").textContent = oauthReady() ? "" : "GitHub sign-in isn't set up for this app yet (README: Sign in with GitHub). You can use a token meanwhile.";
-  $("#lg-github").disabled = !oauthReady();
-  $("#lg-confirm-wrap").hidden = true;
-  $("#lg-sub").textContent = mode === "pass"
-    ? "Enter your passphrase. It unlocks your statuses on this device."
+function setLoginMode(mode) {
+  loginMode = mode;
+  const up = mode === "signup";
+  $("#lg-confirm-wrap").hidden = !up;
+  $("#lg-forgot").hidden = up;
+  $("#lg-pass").autocomplete = up ? "new-password" : "current-password";
+  $("#lg-submit").textContent = up ? "Create account" : "Sign in";
+  $("#lg-switch-text").textContent = up ? "Already have an account?" : "New here?";
+  $("#lg-mode").textContent = up ? "Sign in" : "Create an account";
+  $("#lg-sub").textContent = up
+    ? "Create your account. Use the same email on your phone and laptop."
     : "Sign in to keep your applications in sync on every device.";
   $("#lg-error").textContent = "";
+  $("#lg-info").textContent = "";
+}
+
+function showLogin() {
+  $("#app").hidden = true;
+  $("#login").hidden = false;
+  const ready = cloudConfigured();
+  for (const sel of ["#lg-google", "#lg-email", "#lg-pass", "#lg-pass2", "#lg-submit", "#lg-forgot", "#lg-mode"]) $(sel).disabled = !ready;
+  $("#lg-setup-note").hidden = ready;
+  $("#lg-setup-note").textContent = ready ? "" : "Sign-in isn't set up for this app yet (README: Sign in with email). You can use it on this device meanwhile.";
+  const last = readJSON("jobradar.lastEmail", "");
+  if (last && !$("#lg-email").value) $("#lg-email").value = last;
   $("#lg-pass").value = "";
-  if (mode !== "github") setTimeout(() => $("#lg-pass").focus(), 50);
+  $("#lg-pass2").value = "";
+  setLoginMode(loginMode);
+  if (ready) setTimeout(() => ($("#lg-email").value ? $("#lg-pass") : $("#lg-email")).focus(), 50);
 }
 
-function startGitHubLogin() {
-  if (!oauthReady()) return;
-  const state = JRSync.b64u(crypto.getRandomValues(new Uint8Array(18)));
-  writeJSON("jobradar.oauth", { state, at: Date.now() }, sessionStorage);
-  const q = new URLSearchParams({ client_id: oauthCfg().client_id, redirect_uri: redirectUri(),
-    scope: oauthCfg().scope || "public_repo", state, allow_signup: "false" });
-  location.assign(`https://github.com/login/oauth/authorize?${q}`);
-}
-
-// Back from GitHub with ?code=…&state=…: swap the code for a token through the helper
-async function finishGitHubLogin() {
-  const q = new URLSearchParams(location.search);
-  if (!q.has("code") && !q.has("error")) return false;
-  const expected = readJSON("jobradar.oauth", null, sessionStorage);
-  writeJSON("jobradar.oauth", undefined, sessionStorage);
-  history.replaceState(history.state, "", location.pathname + location.hash); // drop ?code from the address bar
-  const fail = (msg) => {
-    showLogin("github");
-    $("#lg-gh-note").textContent = msg;
-    return true;
-  };
-  if (q.get("error")) return fail(q.get("error") === "access_denied" ? "Sign-in was cancelled." : `GitHub said: ${q.get("error")}`);
-  if (!expected || expected.state !== q.get("state")) return fail("That sign-in link didn't come from this app. Try again.");
+async function withBusy(button, label, fn) {
+  const old = button.textContent;
+  button.disabled = true;
+  button.textContent = label;
   try {
-    const r = await fetch(oauthCfg().proxy, { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code: q.get("code"), redirect_uri: redirectUri() }) });
-    const out = await r.json().catch(() => ({}));
-    if (!r.ok || !out.access_token) throw new Error(out.description || out.error || `helper answered ${r.status}`);
-    const u = await fetch("https://api.github.com/user", { headers: { Authorization: `Bearer ${out.access_token}`, Accept: "application/vnd.github+json" } });
-    if (!u.ok) throw new Error(`GitHub ${u.status}`);
-    const user = await u.json();
-    ghLogin = { token: out.access_token, login: user.login, avatar: user.avatar_url };
-    showLogin("pass");
-  } catch (e) {
-    fail(`GitHub sign-in didn't finish: ${e.message}`);
+    return await fn();
+  } finally {
+    button.disabled = false;
+    button.textContent = old;
   }
-  return true;
 }
 
 async function onLogin(e) {
   e.preventDefault();
   const err = $("#lg-error");
-  const submit = $("#lg-submit");
   err.textContent = "";
+  $("#lg-info").textContent = "";
+  const email = $("#lg-email").value.trim();
   const pass = $("#lg-pass").value;
-  const saved = readJSON(K.sync, null) || readJSON(K.sync, null, sessionStorage) || {};
-  const tokenMode = !$("#lg-token-wrap").hidden;
-  const token = ((tokenMode && $("#lg-token").value) || ghLogin?.token || saved.token || "").trim();
-  const owner = $("#lg-owner").value.trim();
-  const repo = $("#lg-repo").value.trim();
-  if (pass.length < 8) return (err.textContent = "Use a passphrase of at least 8 characters.");
-  if (!token) {
-    if (oauthReady() && !tokenMode) return showLogin("github");
-    showLogin("token");
-    return ($("#lg-error").textContent = "Paste your GitHub token (see “How do I get a token?”).");
-  }
-  if (!owner || !repo) {
-    $("#lg-repo-box").open = true;
-    return (err.textContent = "Fill in the repository owner and name.");
-  }
-  submit.disabled = true;
-  submit.textContent = "Checking…";
+  if (!/^\S+@\S+\.\S+$/.test(email)) return (err.textContent = "Enter your email address.");
+  if (pass.length < 6) return (err.textContent = "Use a password of at least 6 characters.");
+  if (loginMode === "signup" && $("#lg-pass2").value !== pass) return (err.textContent = "The two passwords don't match.");
+  writeJSON("jobradar.lastEmail", email);
+  await withBusy($("#lg-submit"), loginMode === "signup" ? "Creating…" : "Signing in…", async () => {
+    try {
+      await JRCloud.remember($("#lg-remember").checked);
+      freshSignIn = true;
+      if (loginMode === "signup") await JRCloud.signUp(email, pass);
+      else await JRCloud.signIn(email, pass);
+      // onUserChanged takes it from here
+    } catch (ex) {
+      freshSignIn = false;
+      err.textContent = authMessage(ex);
+    }
+  });
+}
+
+async function onGoogle() {
+  $("#lg-error").textContent = "";
   try {
-    const info = await JRSync.client({ owner, repo, token, branch: "" }).repoInfo();
-    if (info.permissions && !info.permissions.push) throw new Error("This token can read the repo but not write. Give it Contents: Read and write.");
-    const branch = info.default_branch;
-    const gh = JRSync.client({ owner, repo, token, branch });
-    const remote = await gh.get();
-    let key, salt, iter;
-    if (remote) {
-      ({ salt, iter } = remote.envelope);
-      key = await JRSync.deriveKey(pass, salt, iter);
-      try {
-        await JRSync.open(remote.envelope, key);
-      } catch {
-        throw new Error("Wrong passphrase. Use the one you chose on your first device.");
-      }
-    } else {
-      // First sign-in anywhere: choose the passphrase
-      if ($("#lg-confirm-wrap").hidden) {
-        $("#lg-confirm-wrap").hidden = false;
-        $("#lg-sub").textContent = "First sign-in: choose a passphrase you'll use on every device, and type it again.";
-        $("#lg-pass2").focus();
-        throw Object.assign(new Error(""), { quiet: true });
-      }
-      if ($("#lg-pass2").value !== pass) throw new Error("The two passphrases don't match.");
-      salt = JRSync.newSalt();
-      iter = JRSync.ITERATIONS;
-      key = await JRSync.deriveKey(pass, salt, iter);
-    }
-    const who = ghLogin || (saved.token === token ? { login: saved.login, avatar: saved.avatar } : {});
-    const cfg = { owner, repo, branch, token, key: await JRSync.exportKey(key), salt, iter, login: who.login, avatar: who.avatar };
-    const remember = $("#lg-remember").checked;
-    writeJSON(K.sync, remember ? cfg : undefined);
-    writeJSON(K.sync, remember ? undefined : cfg, sessionStorage);
-    writeJSON(K.mode, undefined);
-    await startSession(cfg);
-    writeJSON(K.dirty, true); // bring this device's statuses into the shared file
-    $("#lg-token").value = "";
-    ghLogin = null;
-    showApp();
-    await syncNow();
-    toast(remote ? "Signed in · statuses synced" : "Sync is on. Sign in on your other devices with the same passphrase.");
+    await JRCloud.remember($("#lg-remember").checked);
+    freshSignIn = true;
+    await JRCloud.google();
   } catch (ex) {
-    if (ex.status === 401 && !tokenMode && oauthReady()) {
-      ghLogin = null;
-      writeJSON(K.sync, undefined);
-      showLogin("github");
-      $("#lg-gh-note").textContent = "Your GitHub sign-in expired. Sign in again.";
-    } else if (!ex.quiet) {
-      err.textContent = ex.status === 401 ? "GitHub didn't accept that token. Check you copied all of it." : ex.message;
-    }
-  } finally {
-    submit.disabled = false;
-    submit.textContent = "Continue";
+    freshSignIn = false;
+    $("#lg-error").textContent = authMessage(ex);
   }
 }
 
-function signOut() {
-  if (!confirm("Sign out on this device? Your statuses stay in your encrypted sync file; this device forgets them until you sign in again.")) return;
-  writeJSON(K.sync, undefined);
-  writeJSON(K.sync, undefined, sessionStorage);
+async function onForgot() {
+  const email = $("#lg-email").value.trim();
+  $("#lg-error").textContent = "";
+  if (!/^\S+@\S+\.\S+$/.test(email)) {
+    $("#lg-email").focus();
+    return ($("#lg-error").textContent = "Type your email above, then tap Forgot password again.");
+  }
+  try {
+    await JRCloud.resetPassword(email);
+    $("#lg-info").textContent = `Reset link sent to ${email}. Check your inbox (and spam).`;
+  } catch (ex) {
+    $("#lg-error").textContent = authMessage(ex);
+  }
+}
+
+async function signOut() {
+  if (!confirm("Sign out on this device? Your statuses stay safe in your account; this device forgets them until you sign in again.")) return;
   writeJSON(K.mode, undefined);
   writeJSON(K.dirty, undefined);
-  session = null;
   store = JRSync.empty();
   saveLocal();
   closeOverlay($("#nav"));
   closeOverlay($("#settings"));
-  showLogin();
+  try {
+    await JRCloud.signOut();
+  } catch {
+    onUserChanged(null);
+  }
 }
 
 function showApp() {
@@ -1056,6 +1042,17 @@ function showApp() {
   $("#app").hidden = false;
   animateNext = true;
   render();
+}
+
+function waitForCloud(ms = 8000) {
+  if (window.JRCloud) return Promise.resolve(window.JRCloud);
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error("sign-in service didn't load")), ms);
+    window.addEventListener("jrcloud-loaded", () => {
+      clearTimeout(t);
+      resolve(window.JRCloud);
+    }, { once: true });
+  });
 }
 
 // ------------------------------------------------------------------ settings
@@ -1083,7 +1080,7 @@ function renderSyncBody() {
   const out = el("button", { className: "btn", type: "button", textContent: "Sign out" });
   out.addEventListener("click", signOut);
   body.replaceChildren(
-    el("p", { className: "muted", textContent: `${syncLabel()} · ${session.owner}/${session.repo} (encrypted)` }),
+    el("p", { className: "muted", textContent: `${syncLabel()} · signed in as ${session.email || session.name}` }),
     el("div", { className: "row" }, now, out));
 }
 
@@ -1205,7 +1202,7 @@ function bind() {
   });
   $("#open-nav").addEventListener("click", () => openOverlay($("#nav")));
   $("#section-title").addEventListener("click", () => openOverlay($("#nav")));
-  $("#sync-dot").addEventListener("click", () => (session ? syncNow().then(() => toast(syncLabel())) : showLogin()));
+  $("#sync-dot").addEventListener("click", () => (session ? toast(syncLabel()) : showLogin()));
   $("#dr-sync").addEventListener("click", () => {
     closeOverlay($("#nav"));
     session ? openSettings() : showLogin();
@@ -1229,16 +1226,9 @@ function bind() {
     e.target.value = "";
   });
   $("#login-form").addEventListener("submit", onLogin);
-  for (const id of ["#lg-owner", "#lg-repo"]) $(id).addEventListener("input", () => ($("#lg-repo-label").textContent = `${$("#lg-owner").value}/${$("#lg-repo").value}`));
-  $("#lg-github").addEventListener("click", startGitHubLogin);
-  $("#lg-use-token").addEventListener("click", () => showLogin("token"));
-  $("#lg-back-gh").addEventListener("click", () => showLogin("github"));
-  $("#lg-switch").addEventListener("click", () => {
-    ghLogin = null;
-    const saved = readJSON(K.sync, null);
-    if (saved) writeJSON(K.sync, { ...saved, token: "", login: "", avatar: "", key: "" });
-    showLogin(oauthReady() ? "github" : "token");
-  });
+  $("#lg-google").addEventListener("click", onGoogle);
+  $("#lg-forgot").addEventListener("click", onForgot);
+  $("#lg-mode").addEventListener("click", () => setLoginMode(loginMode === "signup" ? "signin" : "signup"));
   $("#lg-skip").addEventListener("click", () => {
     writeJSON(K.mode, "local");
     showApp();
@@ -1250,8 +1240,6 @@ function bind() {
     syncNow();
   });
   window.addEventListener("online", () => syncNow());
-  // Changes made on another device show up within a minute while the app is open
-  setInterval(() => document.visibilityState === "visible" && syncNow(), 45e3);
   setInterval(() => document.visibilityState === "visible" && renderSyncBadges(), 30e3);
   window.addEventListener("storage", (e) => {
     if (e.key === K.store) {
@@ -1289,22 +1277,28 @@ async function init() {
   } catch {
     appConfig = {};
   }
-  if (await finishGitHubLogin()) {
-    await load({ quiet: true });
-    return;
-  }
-  const cfg = readJSON(K.sync, null) || readJSON(K.sync, null, sessionStorage);
-  if (cfg?.key && cfg?.token) {
+  load({ quiet: true });
+  if (!cloudConfigured()) {
+    if (readJSON(K.mode, null) === "local") showApp();
+    else showLogin();
+  } else {
     try {
-      await startSession(cfg);
-    } catch {
-      session = null;
+      const cloud = await waitForCloud();
+      await cloud.init(firebaseCfg());
+      cloud.onUser(onUserChanged); // shows the app or the login page
+    } catch (e) {
+      // Offline or the sign-in service is blocked: keep working with this device's copy
+      const cached = readJSON("jobradar.user", null);
+      if (cached || readJSON(K.mode, null) === "local") {
+        session = cached;
+        showApp();
+        setSync("offline");
+      } else {
+        showLogin();
+        $("#lg-error").textContent = `Can't reach the sign-in service (${e.message}). Check your connection.`;
+      }
     }
   }
-  if (session || readJSON(K.mode, null) === "local") showApp();
-  else showLogin();
-  await load({ quiet: true });
-  syncNow();
   focusJobFromHash();
 }
 

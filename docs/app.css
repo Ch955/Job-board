@@ -640,32 +640,24 @@ dialog.sheet[open] { animation: rise .2s ease-out; }
   min-width: 0;
 }
 .lg-field input:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px var(--primary-soft); }
-.lg-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
-.lg-help { font-size: 13px; color: var(--muted); }
-.lg-help summary { cursor: pointer; color: var(--primary); font-weight: 600; }
-.lg-help ol { padding-left: 18px; margin: 8px 0; }
-.lg-help li { margin-bottom: 3px; }
-.lg-help a { color: var(--primary); }
 .lg-check { display: flex; align-items: center; gap: 8px; font-size: 14px; }
 .lg-check input { width: 18px; height: 18px; accent-color: var(--primary); }
 .lg-submit { min-height: 48px; font-size: 16px; }
-.lg-step { display: flex; flex-direction: column; align-items: stretch; gap: 10px; }
-.gh-btn { min-height: 50px; font-size: 16px; gap: 10px; background: #1f2328; border-color: #1f2328; color: #fff; }
-.gh-btn svg { width: 22px; height: 22px; fill: currentColor; }
-.gh-btn:hover { background: #32383f; }
-:root[data-theme="dark"] .gh-btn { background: #f0f3f6; color: #1f2328; border-color: #f0f3f6; }
-@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .gh-btn { background: #f0f3f6; color: #1f2328; border-color: #f0f3f6; } }
-.lg-note { margin: 0; font-size: 12.5px; text-align: center; }
-.lg-note:empty { display: none; }
-.lg-step .link-btn, #lg-back-gh { align-self: center; font-size: 13px; }
-.lg-user { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 14px; background: var(--surface-2); border: 1px solid var(--border); }
-.lg-user img { border-radius: 50%; background: var(--border); }
-.lg-user div { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.lg-user b { font-size: 15px; overflow: hidden; text-overflow: ellipsis; }
-.lg-user span { font-size: 12px; }
+.google-btn { width: 100%; min-height: 50px; font-size: 16px; gap: 10px; background: var(--surface); border: 1px solid var(--border); color: var(--text); }
+.google-btn svg { width: 22px; height: 22px; }
+.google-btn:hover { background: var(--surface-2); }
+.lg-divider { display: flex; align-items: center; gap: 10px; margin: 16px 0 12px; color: var(--muted); font-size: 12.5px; }
+.lg-divider::before, .lg-divider::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+.lg-label-row { display: flex; justify-content: space-between; align-items: baseline; }
+.lg-forgot { padding: 0; font-size: 12.5px; }
+.lg-switch { margin: 12px 0 0; text-align: center; font-size: 14px; color: var(--muted); }
+.lg-switch .link-btn { padding: 0; }
+.lg-note { margin: 12px 0 0; font-size: 12.5px; text-align: center; padding: 8px 10px; border-radius: 10px; background: var(--pending-soft); color: var(--pending); }
+.lg-info { margin: 0; color: var(--good); font-size: 13px; font-weight: 600; }
+.lg-info:empty { display: none; }
+.login-card > .lg-skip { display: block; margin: 10px auto 0; font-size: 13px; color: var(--muted); }
 .lg-error { min-height: 1em; margin: 0; color: var(--bad); font-size: 13px; font-weight: 600; }
 .lg-error:empty { display: none; }
-.login-card > .link-btn { display: block; margin: 12px auto 0; font-size: 13px; color: var(--muted); }
 
 /* -------------------------------------------------------------------- toast */
 .toast {

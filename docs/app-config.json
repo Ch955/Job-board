@@ -1,6 +1,8 @@
 {
-  "github_oauth": {
-    "client_id": "",
-    "proxy": ""
+  "firebase": {
+    "apiKey": "",
+    "authDomain": "",
+    "projectId": "",
+    "appId": ""
   }
 }

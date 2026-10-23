@@ -202,26 +202,42 @@ def cmd_gmail_test(args: argparse.Namespace) -> int:
 
 
 def cmd_gmail_sync(args: argparse.Namespace) -> int:
-    """Never fails the workflow for a missing setup: it says what's missing and exits 0."""
-    from . import gmail_status, sync
+    """Gmail (read-only) -> statuses in your Firebase account. Never fails the workflow for a
+    missing setup: it says what's missing and exits 0."""
+    import copy
+
+    from . import cloud_store, gmail_status
     from .config import env
-    passphrase = env("SYNC_PASSPHRASE")
-    missing = [k for k in ("SYNC_PASSPHRASE",) if not env(k)] + ([outreach.gmail_configured()] if outreach.gmail_configured() else [])
+    missing = ([] if env("FIREBASE_SERVICE_ACCOUNT") else ["FIREBASE_SERVICE_ACCOUNT not set"])
+    if outreach.gmail_configured():
+        missing.append(outreach.gmail_configured())
     if missing:
         print(f"Gmail status sync skipped: {'; '.join(missing)}")
         return 0
-    state, envelope, key = sync.load(passphrase)
-    if envelope is None:
-        print("Gmail status sync skipped: sign in to the app once first (it creates sync/state.enc.json)")
-        return 0
     config = load_config(args.config)
+    email = env("APP_LOGIN_EMAIL") or config.get("profile", {}).get("apply_email")
+    session = make_session()
+    sa = cloud_store.load_service_account(env("FIREBASE_SERVICE_ACCOUNT"))
+    project = sa["project_id"]
+    ftoken = cloud_store.access_token(session, sa)
+    uid = cloud_store.lookup_uid(session, ftoken, project, email)
+    if not uid:
+        print(f"Gmail status sync skipped: no app account for {email} yet (sign in to the app once with it)")
+        return 0
     path = ROOT / config.get("pipeline", {}).get("output", "docs/jobs.json")
     jobs = json.loads(path.read_text(encoding="utf-8")).get("jobs", []) if path.exists() else []
-    session = make_session()
-    token = gmail.access_token(session, env("GMAIL_CLIENT_ID"), env("GMAIL_CLIENT_SECRET"), env("GMAIL_REFRESH_TOKEN"))
-    report = gmail_status.run(state, jobs, session, token, days=args.days)
-    sync.save(state, envelope, key)
-    print(f"Gmail status sync: {report}")
+    gtoken = gmail.access_token(session, env("GMAIL_CLIENT_ID"), env("GMAIL_CLIENT_SECRET"), env("GMAIL_REFRESH_TOKEN"))
+    for attempt in range(3):
+        state, update_time = cloud_store.get_state(session, ftoken, project, uid)
+        state = copy.deepcopy(state or {})
+        report = gmail_status.run(state, jobs, session, gtoken, days=args.days)
+        try:
+            cloud_store.put_state(session, ftoken, project, uid, state, update_time, email)
+            print(f"Gmail status sync: {report}")
+            return 0
+        except cloud_store.Conflict:
+            continue  # the app saved at the same moment: read again and redo
+    print("Gmail status sync: the app kept saving at the same time; will retry next run")
     return 0
 
 
@@ -265,7 +281,7 @@ def main(argv: list[str] | None = None) -> int:
     p_gt = sub.add_parser("gmail-test", help="create a test draft addressed to yourself")
     p_gt.set_defaults(func=cmd_gmail_test)
 
-    p_gs = sub.add_parser("gmail-sync", help="read job emails (read-only) and update statuses in the sync file")
+    p_gs = sub.add_parser("gmail-sync", help="read job emails (read-only) and update statuses in your app account")
     p_gs.add_argument("--days", type=int, default=3, help="how far back to look")
     p_gs.set_defaults(func=cmd_gmail_sync)
 

@@ -64,24 +64,13 @@ jobs:
           git commit -m "Update jobs $(date -u +'%Y-%m-%d %H:%M') UTC"
           for i in 1 2 3; do git pull --rebase origin "${GITHUB_REF_NAME}" && git push && exit 0; sleep $((i*5)); done
           exit 1
-      - name: Gmail statuses (read-only) into the encrypted sync file
+      - name: Gmail statuses (read-only) into your app account
         env:
           GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
           GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
           GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
-          SYNC_PASSPHRASE: ${{ secrets.SYNC_PASSPHRASE }}
-        run: |
-          # The app may write the same file at any moment: start from the latest copy and retry
-          for i in 1 2 3; do
-            git fetch -q origin "${GITHUB_REF_NAME}" && git reset -q --hard "origin/${GITHUB_REF_NAME}"
-            python -m jobradar gmail-sync
-            git add sync/state.enc.json 2>/dev/null || true
-            if git diff --cached --quiet; then exit 0; fi
-            git commit -q -m "Sync statuses from Gmail"
-            git push -q && exit 0
-            sleep $((i*5))
-          done
-          exit 1
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: python -m jobradar gmail-sync
 
   deploy:
     needs: fetch
