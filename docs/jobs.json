@@ -1,6 +1,6 @@
 {
  "version": 1,
- "generated_at": "2026-10-24T20:47:45+00:00",
+ "generated_at": "2026-10-24T23:12:57+00:00",
  "sources_available": [
   "greenhouse",
   "lever",
@@ -22,8 +22,8 @@
  },
  "stats": {
   "total": 126,
-  "new_this_run": 2,
-  "fetched_raw": 6733,
+  "new_this_run": 0,
+  "fetched_raw": 6724,
   "by_source": {
    "linkedin": 56,
    "naukri": 30,
@@ -31,24 +31,24 @@
    "smartrecruiters": 1
   },
   "dropped": {
-   "irrelevant_title": 6380,
+   "irrelevant_title": 6376,
    "location": 95,
-   "experience": 81,
+   "experience": 86,
    "walk_in": 1,
    "too_old": 0,
    "low_score": 0,
-   "duplicates": 104
+   "duplicates": 97
   },
   "source_runs": {
    "greenhouse": {
     "status": "ok",
-    "count": 5308,
-    "seconds": 2.6
+    "count": 5309,
+    "seconds": 2.3
    },
    "lever": {
     "status": "ok",
     "count": 476,
-    "seconds": 4.8
+    "seconds": 1.2
    },
    "ashby": {
     "status": "ok",
@@ -58,12 +58,12 @@
    "smartrecruiters": {
     "status": "ok",
     "count": 36,
-    "seconds": 7.2
+    "seconds": 7.0
    },
    "jobspy": {
     "status": "ok",
     "count": 270,
-    "seconds": 152.6,
+    "seconds": 147.9,
     "warnings": [
      "glassdoor 'azure data engineer': RuntimeError: Glassdoor response status code 403",
      "glassdoor 'databricks data engineer': RuntimeError: Glassdoor response status code 403",
@@ -87,14 +87,13 @@
     "seconds": 0.0
    },
    "remotive": {
-    "status": "ok",
-    "count": 10,
-    "seconds": 0.1
+    "status": "throttled",
+    "count": 0
    },
    "arbeitnow": {
     "status": "ok",
     "count": 48,
-    "seconds": 0.9
+    "seconds": 0.6
    }
   },
   "drafts": {
@@ -106,13 +105,13 @@
  },
  "state": {
   "last_fetched": {
-   "greenhouse": "2026-10-24T20:47:45+00:00",
-   "lever": "2026-10-24T20:47:45+00:00",
-   "ashby": "2026-10-24T20:47:45+00:00",
-   "smartrecruiters": "2026-10-24T20:47:45+00:00",
-   "jobspy": "2026-10-24T20:47:45+00:00",
+   "greenhouse": "2026-10-24T23:12:57+00:00",
+   "lever": "2026-10-24T23:12:57+00:00",
+   "ashby": "2026-10-24T23:12:57+00:00",
+   "smartrecruiters": "2026-10-24T23:12:57+00:00",
+   "jobspy": "2026-10-24T23:12:57+00:00",
    "remotive": "2026-10-24T20:47:45+00:00",
-   "arbeitnow": "2026-10-24T20:47:45+00:00"
+   "arbeitnow": "2026-10-24T23:12:57+00:00"
   }
  },
  "push": {
@@ -670,59 +669,6 @@
    "work_mode": ""
   },
   {
-   "title": "Data Engineer - Python",
-   "company": "Princeton IT America",
-   "location": "TN, IN",
-   "url": "https://in.indeed.com/viewjob?jk=5717c64b5cbda8e3",
-   "source": "indeed",
-   "remote": false,
-   "posted_date": "2026-10-23T00:00:00+00:00",
-   "description_snippet": "Job Title: Data Engineer - Python Location: Chennai Job description: Position: Data Engineer Location: Chennai Experience: 4-6 Years Role Overview We are looking for a highly skilled Data Engineer with strong Python development expertise to design, develop, and maintain scalable data pipelines and d",
-   "score": 100,
-   "status": "new",
-   "matched_keywords": [
-    "Databricks",
-    "PySpark",
-    "ADLS Gen2",
-    "Azure",
-    "SQL",
-    "ETL/ELT",
-    "Python",
-    "Spark",
-    "Azure DevOps",
-    "Data Warehousing",
-    "Power BI",
-    "Git",
-    "Synapse",
-    "Snowflake",
-    "Airflow"
-   ],
-   "score_breakdown": {
-    "title": 25,
-    "skills": 35,
-    "location": 20,
-    "experience": 10,
-    "recency": 10,
-    "penalty": 0,
-    "location_label": "India",
-    "location_eligible": true,
-    "walk_in": false,
-    "walk_in_eligible": true,
-    "years_required": 4,
-    "years_max": 6,
-    "experience_eligible": true,
-    "age_days": 1
-   },
-   "first_seen": "2026-10-23T21:26:09+00:00",
-   "id": "e049d76cf15b",
-   "contact_emails": [],
-   "outreach": {},
-   "apply_url": "http://in.indeed.com/job/data-engineer-python-5717c64b5cbda8e3",
-   "apply_type": "unknown",
-   "apply_evidence": "Indeed page; the apply method isn't shown in the listing data",
-   "work_mode": ""
-  },
-  {
    "title": "Walk-in Drive - Data Engineer (Virtual)",
    "company": "Simform",
    "location": "GJ, IN",
@@ -776,6 +722,59 @@
    "apply_type": "company_site",
    "apply_evidence": "Direct link to careers.kula.ai",
    "work_mode": "remote"
+  },
+  {
+   "title": "Data Engineer - Python",
+   "company": "Princeton IT America",
+   "location": "TN, IN",
+   "url": "https://in.indeed.com/viewjob?jk=5717c64b5cbda8e3",
+   "source": "indeed",
+   "remote": false,
+   "posted_date": "2026-10-23T00:00:00+00:00",
+   "description_snippet": "Job Title: Data Engineer - Python Location: Chennai Job description: Position: Data Engineer Location: Chennai Experience: 4-6 Years Role Overview We are looking for a highly skilled Data Engineer with strong Python development expertise to design, develop, and maintain scalable data pipelines and d",
+   "score": 100,
+   "status": "new",
+   "matched_keywords": [
+    "Databricks",
+    "PySpark",
+    "ADLS Gen2",
+    "Azure",
+    "SQL",
+    "ETL/ELT",
+    "Python",
+    "Spark",
+    "Azure DevOps",
+    "Data Warehousing",
+    "Power BI",
+    "Git",
+    "Synapse",
+    "Snowflake",
+    "Airflow"
+   ],
+   "score_breakdown": {
+    "title": 25,
+    "skills": 35,
+    "location": 20,
+    "experience": 10,
+    "recency": 10,
+    "penalty": 0,
+    "location_label": "India",
+    "location_eligible": true,
+    "walk_in": false,
+    "walk_in_eligible": true,
+    "years_required": 4,
+    "years_max": 6,
+    "experience_eligible": true,
+    "age_days": 1
+   },
+   "first_seen": "2026-10-23T21:26:09+00:00",
+   "id": "e049d76cf15b",
+   "contact_emails": [],
+   "outreach": {},
+   "apply_url": "http://in.indeed.com/job/data-engineer-python-5717c64b5cbda8e3",
+   "apply_type": "unknown",
+   "apply_evidence": "Indeed page; the apply method isn't shown in the listing data",
+   "work_mode": ""
   },
   {
    "title": "Data Engineer- GCP/Azure",
@@ -1797,6 +1796,61 @@
    "work_mode": ""
   },
   {
+   "title": "Azure Databricks Engineer",
+   "company": "Unknown",
+   "location": "TS, IN",
+   "url": "https://in.indeed.com/viewjob?jk=6546c2a34f96b73b",
+   "source": "indeed",
+   "remote": false,
+   "posted_date": "2026-10-23T00:00:00+00:00",
+   "description_snippet": "Role Type: Full-time Location: Hyderabad Senior Data Engineer specializing in Azure Databricks, Apache Spark, and modern data platform architecture. Proven experience in designing enterprise-scale ETL/ELT solutions, implementing Lakehouse architectures using Delta Lake, and optimizing large-scale da",
+   "score": 97,
+   "status": "new",
+   "matched_keywords": [
+    "ADF",
+    "Databricks",
+    "PySpark",
+    "ADLS Gen2",
+    "Azure",
+    "SQL",
+    "ETL/ELT",
+    "Python",
+    "Spark",
+    "Azure DevOps",
+    "Data Warehousing",
+    "Data Modeling",
+    "Data Governance",
+    "Git",
+    "Synapse",
+    "Delta Lake",
+    "Kafka"
+   ],
+   "score_breakdown": {
+    "title": 22,
+    "skills": 35,
+    "location": 20,
+    "experience": 10,
+    "recency": 10,
+    "penalty": 0,
+    "location_label": "India",
+    "location_eligible": true,
+    "walk_in": false,
+    "walk_in_eligible": true,
+    "years_required": 3,
+    "years_max": 5,
+    "experience_eligible": true,
+    "age_days": 1
+   },
+   "first_seen": "2026-10-24T04:34:57+00:00",
+   "id": "e223f588daac",
+   "contact_emails": [],
+   "outreach": {},
+   "apply_url": "https://www.turnkeylearning.com/careers/azure-databricks-engineer",
+   "apply_type": "company_site",
+   "apply_evidence": "Direct link to www.turnkeylearning.com",
+   "work_mode": ""
+  },
+  {
    "title": "Databricks Developer",
    "company": "Jobbycart technologies private limited",
    "location": "TN, IN",
@@ -1850,61 +1904,6 @@
    "apply_url": "http://in.indeed.com/job/databricks-developer-d62cbbed9519fce1",
    "apply_type": "unknown",
    "apply_evidence": "Indeed page; the apply method isn't shown in the listing data",
-   "work_mode": ""
-  },
-  {
-   "title": "Azure Databricks Engineer",
-   "company": "Unknown",
-   "location": "TS, IN",
-   "url": "https://in.indeed.com/viewjob?jk=6546c2a34f96b73b",
-   "source": "indeed",
-   "remote": false,
-   "posted_date": "2026-10-23T00:00:00+00:00",
-   "description_snippet": "Role Type: Full-time Location: Hyderabad Senior Data Engineer specializing in Azure Databricks, Apache Spark, and modern data platform architecture. Proven experience in designing enterprise-scale ETL/ELT solutions, implementing Lakehouse architectures using Delta Lake, and optimizing large-scale da",
-   "score": 97,
-   "status": "new",
-   "matched_keywords": [
-    "ADF",
-    "Databricks",
-    "PySpark",
-    "ADLS Gen2",
-    "Azure",
-    "SQL",
-    "ETL/ELT",
-    "Python",
-    "Spark",
-    "Azure DevOps",
-    "Data Warehousing",
-    "Data Modeling",
-    "Data Governance",
-    "Git",
-    "Synapse",
-    "Delta Lake",
-    "Kafka"
-   ],
-   "score_breakdown": {
-    "title": 22,
-    "skills": 35,
-    "location": 20,
-    "experience": 10,
-    "recency": 10,
-    "penalty": 0,
-    "location_label": "India",
-    "location_eligible": true,
-    "walk_in": false,
-    "walk_in_eligible": true,
-    "years_required": 3,
-    "years_max": 5,
-    "experience_eligible": true,
-    "age_days": 1
-   },
-   "first_seen": "2026-10-24T04:34:57+00:00",
-   "id": "e223f588daac",
-   "contact_emails": [],
-   "outreach": {},
-   "apply_url": "https://www.turnkeylearning.com/careers/azure-databricks-engineer",
-   "apply_type": "company_site",
-   "apply_evidence": "Direct link to www.turnkeylearning.com",
    "work_mode": ""
   },
   {
@@ -2110,7 +2109,7 @@
    "title": "Pyspark Engineer",
    "company": "Citi",
    "location": "Chennai, Tamil Nadu, India",
-   "url": "https://www.linkedin.com/jobs/view/4481914235",
+   "url": "https://www.linkedin.com/jobs/view/4481698787",
    "source": "linkedin",
    "remote": false,
    "posted_date": "2026-10-23T00:00:00+00:00",
@@ -2159,7 +2158,7 @@
    "id": "505eb9c0319a",
    "contact_emails": [],
    "outreach": {},
-   "apply_url": "https://www.linkedin.com/jobs/view/4481914235",
+   "apply_url": "https://www.linkedin.com/jobs/view/4481698787",
    "apply_type": "unknown",
    "apply_evidence": "LinkedIn page; the apply method isn't shown in the listing data",
    "work_mode": ""
@@ -2218,7 +2217,7 @@
    "title": "Pyspark Engineer",
    "company": "Citi",
    "location": "TN, IN",
-   "url": "https://in.indeed.com/viewjob?jk=1f87fcf6b5831752",
+   "url": "https://in.indeed.com/viewjob?jk=52eedd5c58b49404",
    "source": "indeed",
    "remote": false,
    "posted_date": "2026-10-23T00:00:00+00:00",
@@ -2267,7 +2266,7 @@
    "id": "2f7f187a629c",
    "contact_emails": [],
    "outreach": {},
-   "apply_url": "https://jobs.citi.com/job/chennai/pyspark-engineer/287/102321798896",
+   "apply_url": "https://jobs.citi.com/job/chennai/pyspark-engineer/287/102321798912",
    "apply_type": "company_site",
    "apply_evidence": "Direct link to jobs.citi.com",
    "work_mode": ""
@@ -2618,56 +2617,6 @@
    "work_mode": ""
   },
   {
-   "title": "Data Engineer - ETL, SQL, Databricks",
-   "company": "Optum",
-   "location": "TS, IN",
-   "url": "https://in.indeed.com/viewjob?jk=b7796a69d7382247",
-   "source": "indeed",
-   "remote": false,
-   "posted_date": "2026-10-22T00:00:00+00:00",
-   "description_snippet": "Optum is a global organization that delivers care, aided by technology to help millions of people live healthier lives. The work you do with our team will directly improve health outcomes by connecting people with the care, pharmacy benefits, data and resources they need to feel their best. Here, yo",
-   "score": 93,
-   "status": "new",
-   "matched_keywords": [
-    "Databricks",
-    "PySpark",
-    "Azure",
-    "SQL",
-    "ETL/ELT",
-    "Python",
-    "Spark",
-    "Data Warehousing",
-    "SHIR / Hybrid",
-    "Data Modeling",
-    "Snowflake",
-    "Airflow"
-   ],
-   "score_breakdown": {
-    "title": 25,
-    "skills": 35,
-    "location": 20,
-    "experience": 5,
-    "recency": 8,
-    "penalty": 0,
-    "location_label": "India",
-    "location_eligible": true,
-    "walk_in": false,
-    "walk_in_eligible": true,
-    "years_required": null,
-    "years_max": null,
-    "experience_eligible": true,
-    "age_days": 2
-   },
-   "first_seen": "2026-10-23T21:20:29+00:00",
-   "id": "9aebd5d7fbf2",
-   "contact_emails": [],
-   "outreach": {},
-   "apply_url": "https://uhg.taleo.net/careersection/10780/jobdetail.ftl?job=2394801&lang=en",
-   "apply_type": "company_site",
-   "apply_evidence": "Employer's careers portal (taleo.net)",
-   "work_mode": ""
-  },
-  {
    "title": "Data Engineer- GCP/Azure",
    "company": "Innovantes IT Solutions LLP",
    "location": "CH, IN",
@@ -2720,6 +2669,56 @@
    "apply_url": "https://theinnovantes.com/careers",
    "apply_type": "company_site",
    "apply_evidence": "Direct link to theinnovantes.com",
+   "work_mode": ""
+  },
+  {
+   "title": "Data Engineer - ETL, SQL, Databricks",
+   "company": "Optum",
+   "location": "TS, IN",
+   "url": "https://in.indeed.com/viewjob?jk=b7796a69d7382247",
+   "source": "indeed",
+   "remote": false,
+   "posted_date": "2026-10-22T00:00:00+00:00",
+   "description_snippet": "Optum is a global organization that delivers care, aided by technology to help millions of people live healthier lives. The work you do with our team will directly improve health outcomes by connecting people with the care, pharmacy benefits, data and resources they need to feel their best. Here, yo",
+   "score": 93,
+   "status": "new",
+   "matched_keywords": [
+    "Databricks",
+    "PySpark",
+    "Azure",
+    "SQL",
+    "ETL/ELT",
+    "Python",
+    "Spark",
+    "Data Warehousing",
+    "SHIR / Hybrid",
+    "Data Modeling",
+    "Snowflake",
+    "Airflow"
+   ],
+   "score_breakdown": {
+    "title": 25,
+    "skills": 35,
+    "location": 20,
+    "experience": 5,
+    "recency": 8,
+    "penalty": 0,
+    "location_label": "India",
+    "location_eligible": true,
+    "walk_in": false,
+    "walk_in_eligible": true,
+    "years_required": null,
+    "years_max": null,
+    "experience_eligible": true,
+    "age_days": 2
+   },
+   "first_seen": "2026-10-23T21:20:29+00:00",
+   "id": "9aebd5d7fbf2",
+   "contact_emails": [],
+   "outreach": {},
+   "apply_url": "https://uhg.taleo.net/careersection/10780/jobdetail.ftl?job=2394801&lang=en",
+   "apply_type": "company_site",
+   "apply_evidence": "Employer's careers portal (taleo.net)",
    "work_mode": ""
   },
   {
@@ -3250,7 +3249,7 @@
    "title": "Databricks + PySpark - Technical Lead-Data Engg",
    "company": "Birlasoft",
    "location": "Pune/Pimpri-Chinchwad Area",
-   "url": "https://www.linkedin.com/jobs/view/4448221016",
+   "url": "https://www.linkedin.com/jobs/view/4448218115",
    "source": "linkedin",
    "remote": false,
    "posted_date": "2026-10-22T00:00:00+00:00",
@@ -3286,7 +3285,7 @@
    "id": "27e128d751d7",
    "contact_emails": [],
    "outreach": {},
-   "apply_url": "https://www.linkedin.com/jobs/view/4448221016",
+   "apply_url": "https://www.linkedin.com/jobs/view/4448218115",
    "apply_type": "unknown",
    "apply_evidence": "LinkedIn page; the apply method isn't shown in the listing data",
    "work_mode": ""
