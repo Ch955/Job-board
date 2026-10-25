@@ -154,8 +154,8 @@ def cmd_notify(args: argparse.Namespace) -> int:
     print("Result:", report)
     if report["skipped"]:
         print(f"Not sent: {report['skipped']}")
-        return 1
-    return 0 if report["sent"] else 1
+        return 1 if args.test else 0   # no phone subscribed yet is not a failed run; a test should say so
+    return 0 if report["sent"] or not args.test and not report.get("failed") else 1
 
 
 def cmd_gmail_auth(args: argparse.Namespace) -> int:

@@ -236,3 +236,19 @@ def test_known_source_blocks_in_plain_words():
         "google 'data engineer': RuntimeError: Google returned no job data"]}})
     reasons = {f["source"]: f["reason"] for f in out}
     assert reasons["naukri"].startswith("Naukri is refusing automated searches") and "Google Jobs" in reasons["google"]
+
+
+def test_switched_off_portals_never_reach_matches():
+    from datetime import datetime, timezone
+    from jobradar.backend import tasks
+    from jobradar.backend.store import MemoryStore
+    from jobradar.config import load_config
+    from jobradar.models import Job
+    now = datetime(2026, 10, 25, tzinfo=timezone.utc)
+    store = MemoryStore()
+    store.set("profiles", "u", {"target_roles": ["Data Engineer"], "skills": ["Python", "Airflow"], "years_experience": 3,
+                                "threshold": 0, "full_name": "A", "email": "a@x.com"})
+    pool = [Job(title="Data Engineer", company=f"C{s}", location="Hyderabad", url=f"https://x/{s}", source=s,
+                description="Python Airflow 2-5 years", posted_date="2026-10-24") for s in ("linkedin", "naukri", "indeed", "greenhouse", "adzuna")]
+    tasks.match_user(store, load_config(), "u", pool, now)
+    assert {j["source"] for j in store.get("matches", "u")["jobs"]} == {"linkedin", "naukri", "greenhouse"}

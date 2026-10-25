@@ -312,10 +312,18 @@ const STATUS_RANK = { offer: 6, interview: 5, rejected: 4, applied: 3, later: 2,
 const SOURCE_PREF = ["greenhouse", "lever", "ashby", "smartrecruiters", "linkedin", "naukri"];
 const pref = (j) => (SOURCE_PREF.includes(j.source) ? SOURCE_PREF.indexOf(j.source) : 99);
 
+// Only the job sources switched on (LinkedIn, Naukri, companies' careers sites) plus your own Gmail
+const USER_SOURCES = ["email", "manual"];
+function allowedSource(src) {
+  const on = data.sources_available || [];
+  return !on.length || on.includes(src) || USER_SOURCES.includes(src);
+}
+
 function allJobs() {
   const ids = new Set(data.jobs.map((j) => j.id));
   const jobs = data.jobs.concat(Object.values(store.saved).filter((j) => j?.id && !ids.has(j.id)))
-    .filter((j) => statusOf(j) !== "merged");   // a Gmail copy that was matched to the real job
+    .filter((j) => statusOf(j) !== "merged")    // a Gmail copy that was matched to the real job
+    .filter((j) => allowedSource(j.source) || KEEP.includes(statusOf(j)));  // switched-off portals: only what you acted on
   // Duplicates: keep the copy you've done the most with (applied beats new), then the careers site, LinkedIn, Naukri
   const groups = new Map();
   for (const j of jobs) {
@@ -455,8 +463,8 @@ function buildFilterChips() {
     band: BANDS,
     status: STAGE_ORDER.filter((st) => all.some((j) => statusOf(j) === st)).map((st) => [st, sectionLabel(st)]),
     apply: APPLY_TYPES,
-    source: [...new Set([...available, ...all.map((j) => j.source)])].sort()
-      .map((v) => [v, (SOURCE_LABELS[v] || v) + (available.length && !available.includes(v) && v !== "email" ? " (saved only)" : "")]),
+    source: [...new Set([...available, ...all.map((j) => j.source).filter((v) => !available.length || available.includes(v) || USER_SOURCES.includes(v))])]
+      .sort().map((v) => [v, SOURCE_LABELS[v] || v]),
     location: [...new Set(all.map(locationLabel))].sort().map((v) => [v, v]),
     remote: WORK_MODES,
   };

@@ -161,6 +161,7 @@ def match_user(store: Store, base: dict, uid: str, pool: list[Job] | None = None
         return {"skipped": "profile incomplete"}
     pool = load_pool(store) if pool is None else pool
     matcher = UserMatcher(base, p)
+    pool = [j for j in pool if permitted(base, j.source)]  # switched-off portals never reach anyone's list
     jobs = matcher.match(pool, now)[:MAX_MATCHES]
     old = store.get("matches", uid) or {}
     seen = set(old.get("seen") or [])
