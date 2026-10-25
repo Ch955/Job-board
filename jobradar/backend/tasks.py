@@ -232,7 +232,9 @@ def gmail_sync_user(store: Store, cfg: gmail_link.OAuthConfig, session, uid: str
                 continue  # the app saved at the same moment: read again and redo
         else:
             raise RuntimeError("the app kept saving at the same time; will retry next run")
-        status.update(last_success=_iso(now), last_error=None, last_report=report)
+        status.update(last_success=_iso(now), last_error=None, last_report=report,
+                      note=(f"{report['remaining']} more emails to read: they're picked up on the next sync "
+                            "(Gmail allows only so many reads a minute)." if report.get("partial") else None))
         store.update("gmail", uid, status)
         return report
     except gmail.GmailAuthError as e:

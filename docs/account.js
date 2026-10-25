@@ -400,7 +400,8 @@ const JRAccount = (() => {
   async function syncGmail(quiet = false) {
     try {
       const r = await api("/api/gmail/sync", { method: "POST" });
-      if (!quiet) toast(`Gmail checked · ${r.report.updated || 0} updated, ${r.report.review || 0} to review`);
+      if (!quiet) toast(`Gmail checked · ${r.report.checked || 0} emails read, ${r.report.updated || 0} updated, ${r.report.review || 0} to review`
+        + (r.report.partial ? ` · ${r.report.remaining} more next sync` : ""));
     } catch (e) {
       if (!quiet) toast(e.message);
     }
@@ -460,6 +461,7 @@ const JRAccount = (() => {
     box.append(...[
       el("div", { className: "panel-top" }, el("b", { textContent: g.email || "Gmail" }), el("span", { className: "st-chip st-applied", textContent: "connected" })),
       el("p", { className: "muted", textContent: g.last_success ? `Last successful sync ${ago(g.last_success)} · ${rep.checked ?? 0} emails read, ${rep.updated ?? 0} updates, ${rep.review ?? 0} to review` : "Not synced yet." }),
+      g.note && !g.last_error ? el("p", { className: "muted", textContent: g.note }) : null,
       g.last_error ? el("p", { className: "lg-error", textContent: `${g.last_error}${g.last_attempt ? " (" + ago(g.last_attempt) + ")" : ""}` }) : null,
       el("div", { className: "row" }, sync, off)].filter(Boolean));
     return box;

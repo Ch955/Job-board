@@ -162,8 +162,8 @@ class GmailClient:
         self._last = 0.0
 
     RATE_REASONS = ("rateLimitExceeded", "userRateLimitExceeded", "RATE_LIMIT_EXCEEDED")
-    MIN_GAP = 0.1      # seconds between requests: ~10/s, well under Gmail's per-user quota
-    RETRIES = 4        # on "slow down": wait 2, 4, 8, 16 s (or what Google asks), then give up
+    MIN_GAP = 0.25     # seconds between requests: ~4/s (~1,200 quota units a minute), far under the per-user limit
+    RETRIES = 2        # on "slow down": wait 20 then 40 s (per-minute quota needs time to refill), then give up
 
     def _get(self, path: str, params=None) -> dict:
         for attempt in range(self.RETRIES + 1):
@@ -179,7 +179,7 @@ class GmailClient:
                 wait = float(r.headers.get("Retry-After") or 0)
             except (TypeError, ValueError, AttributeError):
                 wait = 0
-            self.sleep(min(max(wait, 2 ** (attempt + 1)), 60))
+            self.sleep(min(max(wait, 20 * (attempt + 1)), 60))
         if r.status_code == 401:
             raise GmailAuthError("Gmail access expired or was revoked", revoked=True)
         if r.status_code >= 400:
@@ -192,7 +192,7 @@ class GmailClient:
             if r.status_code == 429 or (r.status_code == 403 and reason in self.RATE_REASONS):
                 raise GmailApiError(429, msg, reason or "429",
                                     f"Gmail is still limiting requests after several retries ({reason or 'rate limit'}: "
-                                    f"{msg[:140] or 'no detail from Google'}). It will try again on the next run.")
+                                    f"{msg[:140] or 'no detail from Google'}). Progress so far is saved; it continues on the next run.")
             if r.status_code == 403:  # insufficientPermissions / ACCESS_TOKEN_SCOPE_INSUFFICIENT
                 raise GmailAuthError(f"Gmail permission missing ({reason or 'forbidden'})", revoked=True)
             raise GmailApiError(r.status_code, msg, reason)

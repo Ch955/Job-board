@@ -170,11 +170,13 @@ def _sender_name(sender: str) -> str:
 
 # ----------------------------------------------------------------------- run
 def run(state: dict, jobs: list[dict], client, token: str | None = None, now: datetime | None = None, days: int = 3,
-        limit: int = 300, read_bodies: bool = True) -> dict:
+        limit: int = 300, read_bodies: bool = True, per_run: int = 120) -> dict:
     """Update `state` (sync format) in place from this user's recent Gmail. Returns a report.
 
     `client` is a gmail.GmailClient (or, for the old single-user CLI, a requests session + `token`).
     `last_check` is written only after every message was handled, so a failed run never looks successful.
+    At most `per_run` emails are read per run; if Gmail's per-minute quota runs out part-way, what was read is
+    kept (processed ids) and the report says how many are left ("partial"), so the next run carries on.
     """
     if not isinstance(client, gmail.GmailClient):
         client = gmail.GmailClient(client, token)
@@ -205,8 +207,18 @@ def run(state: dict, jobs: list[dict], client, token: str | None = None, now: da
         query = f"newer_than:{max(days, 14)}d {BASE_QUERY}"
     ids = [m for m in client.list_message_ids(query, limit=limit) if m not in seen]
 
-    for mid in reversed(ids):  # oldest first, so later emails win
-        msg = client.message(mid)
+    todo = list(reversed(ids))  # oldest first, so later emails win
+    for i, mid in enumerate(todo):
+        if i >= per_run:
+            report.update(partial=True, remaining=len(todo) - i)
+            break
+        try:
+            msg = client.message(mid)
+        except gmail.GmailApiError as e:
+            if e.status != 429 or not report["checked"]:
+                raise
+            report.update(partial=True, remaining=len(todo) - i, limited=True)
+            break
         report["checked"] += 1
         processed.append(mid)
         subject, sender, snippet = _header(msg, "Subject"), _header(msg, "From"), msg.get("snippet", "")
@@ -216,7 +228,17 @@ def run(state: dict, jobs: list[dict], client, token: str | None = None, now: da
         # Not sure yet: read the body once (not stored) for a clearer signal or the job title
         unclear = kind is None and ATS_SENDERS.search(sender) or kind and (conf != "high" or mconf in ("medium", "ambiguous"))
         if read_bodies and unclear:
-            body = gmail.message_text(client.message(mid, full=True))
+            try:
+                body = gmail.message_text(client.message(mid, full=True))
+            except gmail.GmailApiError as e:
+                if e.status != 429:
+                    raise
+                processed.pop()  # not decided yet: read it again next run
+                report["checked"] -= 1
+                if not report["checked"]:
+                    raise
+                report.update(partial=True, remaining=len(todo) - i, limited=True)
+                break
             kind, conf = classify_ex(subject, snippet, sender, body)
             job, mconf, cands = match_ex(pool, f"{subject} {snippet} {body}", sender, msg.get("threadId", ""), threads)
         if not kind:
@@ -274,5 +296,6 @@ def run(state: dict, jobs: list[dict], client, token: str | None = None, now: da
     g["processed"] = processed[-3000:]
     g["events"] = events[:100]
     g["review"] = [r for r in review if r["id"] not in resolved][:50]
-    g["last_check"] = now.isoformat(timespec="seconds")
+    if not report.get("partial"):
+        g["last_check"] = now.isoformat(timespec="seconds")
     return report

@@ -178,3 +178,66 @@ def test_failed_run_doesnt_record_a_successful_check():
     with pytest.raises(Exception):
         gs.run(state, JOBS, Broken([msg("m1", "Offer letter")]), "t", now=NOW)
     assert "last_check" not in state.get("gmail", {})
+
+
+@pytest.fixture(autouse=True)
+def no_pacing(monkeypatch):
+    monkeypatch.setattr(gs.gmail.GmailClient, "MIN_GAP", 0)
+
+
+RATE = {"error": {"code": 403, "message": "Quota exceeded for quota metric 'Total Query Cost'",
+                  "errors": [{"reason": "rateLimitExceeded"}]}}
+
+
+class Limited(FakeGmail):
+    """Answers `allow` message reads, then says "slow down" for good."""
+    def __init__(self, msgs, allow, **kw):
+        super().__init__(msgs, **kw)
+        self.allow = allow
+
+    def get(self, url, headers=None, params=None):
+        if not url.endswith("/messages"):
+            if self.allow <= 0:
+                return Resp(RATE, 403)
+            self.allow -= 1
+        return super().get(url, headers, params)
+
+
+def quiet(state, g):
+    return gs.run(state, [], gs.gmail.GmailClient(g, "t", sleep=lambda w: None), now=NOW)
+
+
+def test_rate_limit_part_way_keeps_progress_and_continues_next_run():
+    mails = [msg(f"m{i}", f"Your application was sent to Company{i} Pvt Ltd", ts=f"2026-10-23T0{i}:00:00+00:00")
+             for i in range(1, 6)]
+    state, g = {}, Limited(mails, allow=2)
+    r = quiet(state, g)
+    assert r["checked"] == 2 and r["partial"] and r["remaining"] == 3
+    assert state["gmail"]["processed"] == ["m1", "m2"]          # oldest first, kept
+    assert "last_check" not in state["gmail"]                   # window not closed: the rest are still due
+    g.allow = 99
+    r = quiet(state, g)
+    assert r["checked"] == 3 and not r.get("partial") and state["gmail"]["last_check"]
+    assert sorted(state["gmail"]["processed"]) == ["m1", "m2", "m3", "m4", "m5"]
+
+
+def test_rate_limit_before_anything_is_read_is_an_error():
+    state = {}
+    with pytest.raises(gs.gmail.GmailApiError):
+        quiet(state, Limited([msg("m1", "Offer letter")], allow=0))
+    assert "last_check" not in state.get("gmail", {})
+
+
+def test_unread_body_on_rate_limit_is_left_for_next_run():
+    mails = [msg("m1", "Your application was sent to Qloron Pvt Ltd", ts="2026-10-23T01:00:00+00:00"),
+             msg("m2", "Update", sender="no-reply@greenhouse.io", ts="2026-10-23T02:00:00+00:00")]
+    state = {}
+    r = quiet(state, Limited(mails, allow=2))                   # m1, m2 metadata; m2's body is refused
+    assert r["checked"] == 1 and r["partial"] and state["gmail"]["processed"] == ["m1"]
+
+
+def test_each_run_reads_at_most_per_run_emails():
+    mails = [msg(f"m{i}", "Your OTP", ts="2026-10-23T09:00:00+00:00") for i in range(5)]
+    state = {}
+    r = gs.run(state, [], FakeGmail(mails), "t", now=NOW, per_run=3)
+    assert r["checked"] == 3 and r["remaining"] == 2 and "last_check" not in state["gmail"]

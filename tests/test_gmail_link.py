@@ -155,7 +155,7 @@ def test_rate_limit_is_retried_with_backoff():
     waits = []
     s = Flaky(fails=2)
     assert gmail.GmailClient(s, "t", sleep=waits.append).profile()["emailAddress"] == "a@gmail.com"
-    assert s.calls == 3 and [w for w in waits if w >= 1] == [2, 4]
+    assert s.calls == 3 and [w for w in waits if w >= 1] == [20, 40]
 
 
 def test_persistent_rate_limit_explains_with_googles_message():
