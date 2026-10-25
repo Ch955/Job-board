@@ -1,6 +1,6 @@
 {
  "version": 1,
- "generated_at": "2026-10-25T15:06:59+00:00",
+ "generated_at": "2026-10-25T15:20:57+00:00",
  "sources_available": [
   "greenhouse",
   "lever",
@@ -15,7 +15,7 @@
  },
  "stats": {
   "total": 91,
-  "new_this_run": 2,
+  "new_this_run": 0,
   "fetched_raw": 6586,
   "by_source": {
    "linkedin": 58,
@@ -35,27 +35,27 @@
    "greenhouse": {
     "status": "ok",
     "count": 5310,
-    "seconds": 3.0
+    "seconds": 4.0
    },
    "lever": {
     "status": "ok",
     "count": 476,
-    "seconds": 1.6
+    "seconds": 0.7
    },
    "ashby": {
     "status": "ok",
     "count": 585,
-    "seconds": 0.4
+    "seconds": 0.5
    },
    "smartrecruiters": {
     "status": "ok",
     "count": 35,
-    "seconds": 7.0
+    "seconds": 7.4
    },
    "jobspy": {
     "status": "ok",
     "count": 180,
-    "seconds": 161.2
+    "seconds": 150.7
    },
    "adzuna": {
     "status": "disabled",
@@ -83,11 +83,11 @@
  },
  "state": {
   "last_fetched": {
-   "greenhouse": "2026-10-25T15:06:59+00:00",
-   "lever": "2026-10-25T15:06:59+00:00",
-   "ashby": "2026-10-25T15:06:59+00:00",
-   "smartrecruiters": "2026-10-25T15:06:59+00:00",
-   "jobspy": "2026-10-25T15:06:59+00:00",
+   "greenhouse": "2026-10-25T15:20:57+00:00",
+   "lever": "2026-10-25T15:20:57+00:00",
+   "ashby": "2026-10-25T15:20:57+00:00",
+   "smartrecruiters": "2026-10-25T15:20:57+00:00",
+   "jobspy": "2026-10-25T15:20:57+00:00",
    "remotive": "2026-10-25T11:25:57+00:00",
    "arbeitnow": "2026-10-25T11:25:57+00:00"
   }
