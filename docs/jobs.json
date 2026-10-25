@@ -1,6 +1,6 @@
 {
  "version": 1,
- "generated_at": "2026-10-25T20:49:46+00:00",
+ "generated_at": "2026-10-25T23:16:14+00:00",
  "sources_available": [
   "greenhouse",
   "lever",
@@ -14,18 +14,18 @@
   "role": "Azure Data Engineer"
  },
  "stats": {
-  "total": 93,
+  "total": 94,
   "new_this_run": 1,
   "fetched_raw": 6583,
   "by_source": {
-   "linkedin": 59,
+   "linkedin": 60,
    "naukri": 33,
    "smartrecruiters": 1
   },
   "dropped": {
-   "irrelevant_title": 6304,
+   "irrelevant_title": 6307,
    "location": 91,
-   "experience": 61,
+   "experience": 58,
    "walk_in": 1,
    "too_old": 0,
    "low_score": 0,
@@ -35,27 +35,27 @@
    "greenhouse": {
     "status": "ok",
     "count": 5307,
-    "seconds": 2.1
+    "seconds": 4.2
    },
    "lever": {
     "status": "ok",
     "count": 476,
-    "seconds": 1.0
+    "seconds": 1.2
    },
    "ashby": {
     "status": "ok",
     "count": 585,
-    "seconds": 0.3
+    "seconds": 0.4
    },
    "smartrecruiters": {
     "status": "ok",
     "count": 35,
-    "seconds": 7.5
+    "seconds": 7.1
    },
    "jobspy": {
     "status": "ok",
     "count": 180,
-    "seconds": 156.4
+    "seconds": 157.6
    },
    "adzuna": {
     "status": "disabled",
@@ -83,11 +83,11 @@
  },
  "state": {
   "last_fetched": {
-   "greenhouse": "2026-10-25T20:49:46+00:00",
-   "lever": "2026-10-25T20:49:46+00:00",
-   "ashby": "2026-10-25T20:49:46+00:00",
-   "smartrecruiters": "2026-10-25T20:49:46+00:00",
-   "jobspy": "2026-10-25T20:49:46+00:00",
+   "greenhouse": "2026-10-25T23:16:14+00:00",
+   "lever": "2026-10-25T23:16:14+00:00",
+   "ashby": "2026-10-25T23:16:14+00:00",
+   "smartrecruiters": "2026-10-25T23:16:14+00:00",
+   "jobspy": "2026-10-25T23:16:14+00:00",
    "remotive": "2026-10-25T11:25:57+00:00",
    "arbeitnow": "2026-10-25T11:25:57+00:00"
   }
@@ -1460,7 +1460,7 @@
    "title": "Data Engineer-Data Platforms-Azure",
    "company": "IBM",
    "location": "Bengaluru, Karnataka, India",
-   "url": "https://www.linkedin.com/jobs/view/4481063192",
+   "url": "https://www.linkedin.com/jobs/view/4481045961",
    "source": "linkedin",
    "remote": false,
    "posted_date": "2026-10-24T00:00:00+00:00",
@@ -1502,7 +1502,7 @@
    "id": "7ca1a91ca8e6",
    "contact_emails": [],
    "outreach": {},
-   "apply_url": "https://www.linkedin.com/jobs/view/4481063192",
+   "apply_url": "https://www.linkedin.com/jobs/view/4481045961",
    "apply_type": "unknown",
    "apply_evidence": "LinkedIn page; the apply method isn't shown in the listing data",
    "work_mode": "hybrid"
@@ -3284,49 +3284,6 @@
    "work_mode": ""
   },
   {
-   "title": "Azure Data Engineer",
-   "company": "EXL",
-   "location": "Pune Division, Maharashtra, India",
-   "url": "https://www.linkedin.com/jobs/view/4446571702",
-   "source": "linkedin",
-   "remote": false,
-   "posted_date": "2026-10-24T00:00:00+00:00",
-   "description_snippet": "Key Responsibilities Design, build, and maintain data pipelines using Azure services Develop and optimize solutions using Azure Synapse Analytics (pipelines, Spark, SQL pools) Implement ETL/ELT processes for ingesting and transforming data from multiple sources Design and manage data models to suppo",
-   "score": 76,
-   "status": "new",
-   "matched_keywords": [
-    "Azure",
-    "SQL",
-    "ETL/ELT",
-    "Spark",
-    "Synapse"
-   ],
-   "score_breakdown": {
-    "title": 25,
-    "skills": 16,
-    "location": 20,
-    "experience": 5,
-    "recency": 10,
-    "penalty": 0,
-    "location_label": "Pune",
-    "location_eligible": true,
-    "walk_in": false,
-    "walk_in_eligible": true,
-    "years_required": null,
-    "years_max": null,
-    "experience_eligible": true,
-    "age_days": 1
-   },
-   "first_seen": "2026-10-24T15:56:02+00:00",
-   "id": "721cd2574341",
-   "contact_emails": [],
-   "outreach": {},
-   "apply_url": "https://www.linkedin.com/jobs/view/4446571702",
-   "apply_type": "unknown",
-   "apply_evidence": "LinkedIn page; the apply method isn't shown in the listing data",
-   "work_mode": ""
-  },
-  {
    "title": "Data Engineer",
    "company": "Clover Infotech",
    "location": "Mumbai, Navi Mumbai, Mumbai (All Areas), India",
@@ -3532,6 +3489,45 @@
    "apply_type": "unknown",
    "apply_evidence": "LinkedIn page; the apply method isn't shown in the listing data",
    "work_mode": "remote"
+  },
+  {
+   "title": "Azure Data Engineer",
+   "company": "EXL",
+   "location": "Pune Division, Maharashtra, India",
+   "url": "https://www.linkedin.com/jobs/view/4446571702",
+   "source": "linkedin",
+   "remote": false,
+   "posted_date": "2026-10-24T00:00:00+00:00",
+   "description_snippet": "",
+   "score": 64,
+   "status": "new",
+   "matched_keywords": [
+    "Azure"
+   ],
+   "score_breakdown": {
+    "title": 25,
+    "skills": 4,
+    "location": 20,
+    "experience": 5,
+    "recency": 10,
+    "penalty": 0,
+    "location_label": "Pune",
+    "location_eligible": true,
+    "walk_in": false,
+    "walk_in_eligible": true,
+    "years_required": null,
+    "years_max": null,
+    "experience_eligible": true,
+    "age_days": 1
+   },
+   "first_seen": "2026-10-24T15:56:02+00:00",
+   "id": "721cd2574341",
+   "contact_emails": [],
+   "outreach": {},
+   "apply_url": "https://www.linkedin.com/jobs/view/4446571702",
+   "apply_type": "unknown",
+   "apply_evidence": "LinkedIn page; the apply method isn't shown in the listing data",
+   "work_mode": ""
   },
   {
    "title": "Azure Data Engineer",
@@ -3808,6 +3804,45 @@
    "apply_type": "unknown",
    "apply_evidence": "LinkedIn page; the apply method isn't shown in the listing data",
    "work_mode": "onsite"
+  },
+  {
+   "title": "Big data Engineer (Spark/Scala)",
+   "company": "Wipro",
+   "location": "Pune Division, Maharashtra, India",
+   "url": "https://www.linkedin.com/jobs/view/4482826801",
+   "source": "linkedin",
+   "remote": false,
+   "posted_date": "2026-10-23T00:00:00+00:00",
+   "description_snippet": "",
+   "score": 61,
+   "status": "new",
+   "matched_keywords": [
+    "Spark"
+   ],
+   "score_breakdown": {
+    "title": 25,
+    "skills": 3,
+    "location": 20,
+    "experience": 5,
+    "recency": 8,
+    "penalty": 0,
+    "location_label": "Pune",
+    "location_eligible": true,
+    "walk_in": false,
+    "walk_in_eligible": true,
+    "years_required": null,
+    "years_max": null,
+    "experience_eligible": true,
+    "age_days": 2
+   },
+   "first_seen": "2026-10-25T23:16:14+00:00",
+   "id": "89d5bcb26dff",
+   "contact_emails": [],
+   "outreach": {},
+   "apply_url": "https://www.linkedin.com/jobs/view/4482826801",
+   "apply_type": "unknown",
+   "apply_evidence": "LinkedIn page; the apply method isn't shown in the listing data",
+   "work_mode": ""
   },
   {
    "title": "Azure Data Engineer",
