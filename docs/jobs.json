@@ -1,6 +1,6 @@
 {
  "version": 1,
- "generated_at": "2026-10-25T16:16:27+00:00",
+ "generated_at": "2026-10-25T20:49:46+00:00",
  "sources_available": [
   "greenhouse",
   "lever",
@@ -14,48 +14,48 @@
   "role": "Azure Data Engineer"
  },
  "stats": {
-  "total": 92,
+  "total": 93,
   "new_this_run": 1,
-  "fetched_raw": 6566,
+  "fetched_raw": 6583,
   "by_source": {
    "linkedin": 59,
-   "naukri": 32,
+   "naukri": 33,
    "smartrecruiters": 1
   },
   "dropped": {
-   "irrelevant_title": 6311,
+   "irrelevant_title": 6304,
    "location": 91,
-   "experience": 54,
+   "experience": 61,
    "walk_in": 1,
    "too_old": 0,
    "low_score": 0,
-   "duplicates": 72
+   "duplicates": 83
   },
   "source_runs": {
    "greenhouse": {
     "status": "ok",
-    "count": 5310,
-    "seconds": 3.6
+    "count": 5307,
+    "seconds": 2.1
    },
    "lever": {
     "status": "ok",
     "count": 476,
-    "seconds": 4.0
+    "seconds": 1.0
    },
    "ashby": {
     "status": "ok",
     "count": 585,
-    "seconds": 0.5
+    "seconds": 0.3
    },
    "smartrecruiters": {
     "status": "ok",
     "count": 35,
-    "seconds": 7.6
+    "seconds": 7.5
    },
    "jobspy": {
     "status": "ok",
-    "count": 160,
-    "seconds": 144.0
+    "count": 180,
+    "seconds": 156.4
    },
    "adzuna": {
     "status": "disabled",
@@ -83,11 +83,11 @@
  },
  "state": {
   "last_fetched": {
-   "greenhouse": "2026-10-25T16:16:27+00:00",
-   "lever": "2026-10-25T16:16:27+00:00",
-   "ashby": "2026-10-25T16:16:27+00:00",
-   "smartrecruiters": "2026-10-25T16:16:27+00:00",
-   "jobspy": "2026-10-25T16:16:27+00:00",
+   "greenhouse": "2026-10-25T20:49:46+00:00",
+   "lever": "2026-10-25T20:49:46+00:00",
+   "ashby": "2026-10-25T20:49:46+00:00",
+   "smartrecruiters": "2026-10-25T20:49:46+00:00",
+   "jobspy": "2026-10-25T20:49:46+00:00",
    "remotive": "2026-10-25T11:25:57+00:00",
    "arbeitnow": "2026-10-25T11:25:57+00:00"
   }
@@ -1711,6 +1711,55 @@
    "work_mode": "onsite"
   },
   {
+   "title": "Azure Data Engineer - A Con- MFT KGS CH",
+   "company": "KPMG India",
+   "location": "Bengaluru, Karnataka, India",
+   "url": "https://www.linkedin.com/jobs/view/4481672560",
+   "source": "linkedin",
+   "remote": false,
+   "posted_date": "2026-10-23T00:00:00+00:00",
+   "description_snippet": "Job Description Azure Data Engineer is responsible for designing and developing data solutions/pipelines using Microsoft Azure cloud services. The role involves creating scalable data pipelines, integrating data from multiple sources, and implementing strong data security and privacy controls. The A",
+   "score": 93,
+   "status": "new",
+   "matched_keywords": [
+    "ADF",
+    "Databricks",
+    "PySpark",
+    "ADLS Gen2",
+    "Azure",
+    "SQL",
+    "ETL/ELT",
+    "Python",
+    "Data Warehousing",
+    "Data Governance",
+    "Synapse"
+   ],
+   "score_breakdown": {
+    "title": 25,
+    "skills": 35,
+    "location": 20,
+    "experience": 5,
+    "recency": 8,
+    "penalty": 0,
+    "location_label": "Bangalore",
+    "location_eligible": true,
+    "walk_in": false,
+    "walk_in_eligible": true,
+    "years_required": null,
+    "years_max": null,
+    "experience_eligible": true,
+    "age_days": 2
+   },
+   "first_seen": "2026-10-23T21:20:29+00:00",
+   "id": "d522df3a3820",
+   "contact_emails": [],
+   "outreach": {},
+   "apply_url": "https://www.linkedin.com/jobs/view/4481672560",
+   "apply_type": "unknown",
+   "apply_evidence": "LinkedIn page; the apply method isn't shown in the listing data",
+   "work_mode": ""
+  },
+  {
    "title": "Data Engineer - ETL, SQL, Databricks",
    "company": "Optum India",
    "location": "Hyderabad, Telangana, India",
@@ -1814,55 +1863,6 @@
    "contact_emails": [],
    "outreach": {},
    "apply_url": "https://www.linkedin.com/jobs/view/4481974101",
-   "apply_type": "unknown",
-   "apply_evidence": "LinkedIn page; the apply method isn't shown in the listing data",
-   "work_mode": ""
-  },
-  {
-   "title": "Azure Data Engineer - A Con- MFT KGS CH",
-   "company": "KPMG India",
-   "location": "Bengaluru, Karnataka, India",
-   "url": "https://www.linkedin.com/jobs/view/4481672560",
-   "source": "linkedin",
-   "remote": false,
-   "posted_date": "2026-10-23T00:00:00+00:00",
-   "description_snippet": "Job Description Azure Data Engineer is responsible for designing and developing data solutions/pipelines using Microsoft Azure cloud services. The role involves creating scalable data pipelines, integrating data from multiple sources, and implementing strong data security and privacy controls. The A",
-   "score": 93,
-   "status": "new",
-   "matched_keywords": [
-    "ADF",
-    "Databricks",
-    "PySpark",
-    "ADLS Gen2",
-    "Azure",
-    "SQL",
-    "ETL/ELT",
-    "Python",
-    "Data Warehousing",
-    "Data Governance",
-    "Synapse"
-   ],
-   "score_breakdown": {
-    "title": 25,
-    "skills": 35,
-    "location": 20,
-    "experience": 5,
-    "recency": 8,
-    "penalty": 0,
-    "location_label": "Bangalore",
-    "location_eligible": true,
-    "walk_in": false,
-    "walk_in_eligible": true,
-    "years_required": null,
-    "years_max": null,
-    "experience_eligible": true,
-    "age_days": 2
-   },
-   "first_seen": "2026-10-23T21:20:29+00:00",
-   "id": "d522df3a3820",
-   "contact_emails": [],
-   "outreach": {},
-   "apply_url": "https://www.linkedin.com/jobs/view/4481672560",
    "apply_type": "unknown",
    "apply_evidence": "LinkedIn page; the apply method isn't shown in the listing data",
    "work_mode": ""
@@ -2063,6 +2063,52 @@
    "apply_url": "https://jobs.smartrecruiters.com/NielsenIQ/744000157384439",
    "apply_type": "company_site",
    "apply_evidence": "Employer's careers portal (SmartRecruiters)",
+   "work_mode": ""
+  },
+  {
+   "title": "Data Engineer (Python/Pyspark)",
+   "company": "Tata Consultancy Services",
+   "location": "Kolkata, Chennai, Bengaluru, India",
+   "url": "https://www.naukri.com/job-listings-data-engineer-python-pyspark-tata-consultancy-services-kolkata-chennai-bengaluru-4-to-8-years-251026005490",
+   "source": "naukri",
+   "remote": false,
+   "posted_date": "2026-10-25T00:00:00+00:00",
+   "description_snippet": "Role- Data Engineer (Python/PySpark) Desired Experience Range - 4-8 yrs Location - Kolkata, Chennai, Bangalore Mandatory Skills Python PySpark Apache Spark SQL ETL / Data Pipelines Data transformation and processing Cloud exposure: AWS / Azure / GCP Git and CI/CD Roles & Responsibilities- Develop sc",
+   "score": 91,
+   "status": "new",
+   "matched_keywords": [
+    "PySpark",
+    "Azure",
+    "SQL",
+    "ETL/ELT",
+    "Python",
+    "Spark",
+    "Azure DevOps",
+    "Git"
+   ],
+   "score_breakdown": {
+    "title": 25,
+    "skills": 26,
+    "location": 20,
+    "experience": 10,
+    "recency": 10,
+    "penalty": 0,
+    "location_label": "Bangalore",
+    "location_eligible": true,
+    "walk_in": false,
+    "walk_in_eligible": true,
+    "years_required": 4,
+    "years_max": 8,
+    "experience_eligible": true,
+    "age_days": 0
+   },
+   "first_seen": "2026-10-25T20:49:46+00:00",
+   "id": "904ecd9531ca",
+   "contact_emails": [],
+   "outreach": {},
+   "apply_url": "https://www.naukri.com/job-listings-data-engineer-python-pyspark-tata-consultancy-services-kolkata-chennai-bengaluru-4-to-8-years-251026005490",
+   "apply_type": "unknown",
+   "apply_evidence": "Naukri page; the apply method isn't shown in the listing data",
    "work_mode": ""
   },
   {
