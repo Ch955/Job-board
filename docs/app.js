@@ -11,15 +11,29 @@ const K = {
   section: "jobradar.section",
   mode: "jobradar.mode",       // "local" = chose to use without sync
   dirty: "jobradar.dirty",     // unsynced local changes
+  collapsed: "jobradar.collapsed", // which panels you folded, per browser
+  phoneOnly: "jobradar.phoneOnly",
+  sortNew: "jobradar.sortNew",     // "best" | "newest" in To apply
 };
 const APPLIED = ["applied", "interview", "offer", "rejected"];
 const KEEP = ["later", "applied", "interview", "offer", "rejected"];
 // An empty list means "all": All application types, All permitted sources, every location
-const DEFAULT_FILTERS = { q: "", minScore: 40, location: [], source: [], remote: [], apply: [] };
-const MULTI = ["apply", "source", "location", "remote"];
+const DEFAULT_FILTERS = { q: "", minScore: 40, location: [], source: [], remote: [], apply: [], band: [], status: [],
+  skills: [], skillMode: "all", dateField: "found", datePreset: "any", dateFrom: "", dateTo: "" };
+const MULTI = ["band", "status", "apply", "source", "location", "remote"];
+const BANDS = [["strong", "Strong 85+"], ["good", "Good 70–84"], ["fair", "Fair 55–69"], ["low", "Low <55"]];
+const bandOf = (job) => (job.score == null ? "none" : job.score >= 85 ? "strong" : job.score >= 70 ? "good" : job.score >= 55 ? "fair" : "low");
+const DATE_PRESETS = [["any", "Any time"], ["1", "Today"], ["3", "Last 3 days"], ["7", "Last 7 days"], ["14", "Last 14 days"],
+  ["30", "Last 30 days"], ["custom", "Custom range…"]];
 const APPLY_TYPES = [["easy_apply", "Easy Apply"], ["company_site", "Company website"], ["external", "External application"],
   ["unknown", "Application type unknown"]];
-const ALL_LABEL = { apply: "All application types", source: "All permitted sources", location: "All locations", remote: "Any work mode" };
+const ALL_LABEL = { apply: "All application types", source: "All sources", location: "All locations", remote: "Any work mode",
+  band: "Any fit", status: "All statuses" };
+// One colour per job source, used on filter chips and job cards
+const SOURCE_COLORS = { naukri: "#4a7bd0", linkedin: "#0a66c2", indeed: "#2557a7", glassdoor: "#0caa41", google: "#ea4335",
+  greenhouse: "#24a47f", lever: "#6b5bd2", ashby: "#c2410c", smartrecruiters: "#0e7490", adzuna: "#b45309", jooble: "#be185d",
+  remotive: "#0d9488", arbeitnow: "#7c3aed", email: "#64748b" };
+const sourceColor = (s) => SOURCE_COLORS[s] || "#8a8f98";
 const SOURCE_LABELS = { naukri: "Naukri", linkedin: "LinkedIn", indeed: "Indeed", glassdoor: "Glassdoor", google: "Google",
   greenhouse: "Greenhouse", lever: "Lever", ashby: "Ashby", smartrecruiters: "SmartRecruiters", adzuna: "Adzuna",
   jooble: "Jooble", remotive: "Remotive", arbeitnow: "Arbeitnow", email: "Gmail" };
@@ -34,10 +48,15 @@ const SECTIONS = [
   { id: "rejected", label: "Rejected", icon: "✖️", tile: "var(--done)", hint: "Kept for your records." },
   { id: "skipped", label: "Skipped", icon: "🙈", tile: "var(--done)", hint: "You can still apply from here: tap Apply, then Applied." },
 ];
+const PANEL_SECTIONS = [
+  { id: "pipeline", label: "Pipeline", icon: "📋", tile: "var(--primary)" },
+  { id: "skills", label: "Skill match", icon: "🧩", tile: "var(--good)" },
+];
+const STAGE_ORDER = ["offer", "interview", "applied", "new", "later", "rejected", "skipped"];
 const WALKIN_SECTION = { id: "walkins", label: "Walk-in interviews", icon: "🚶", tile: "var(--s-mid)" };
 const GMAIL_SECTIONS = [
   { id: "mail", label: "Recruiter emails", icon: "✉️", tile: "var(--primary)" },
-  { id: "reply", label: "Inbox updates", icon: "📥", tile: "var(--interview)" },
+  { id: "reply", label: "Needs your reply", icon: "📥", tile: "var(--interview)" },
 ];
 // Main buttons for jobs you haven't applied to, and "move to" buttons for the rest
 const MAIN_ACTIONS = {
@@ -52,7 +71,8 @@ const MOVE_ACTIONS = {
   offer: [["interview", "↩ Interview"]],
   rejected: [["applied", "↩ Applied"], ["interview", "Interview"]],
 };
-const ALL_SECTIONS = [...SECTIONS, WALKIN_SECTION, ...GMAIL_SECTIONS];
+const ALL_SECTIONS = [...SECTIONS, ...PANEL_SECTIONS, WALKIN_SECTION, ...GMAIL_SECTIONS];
+const JOB_SECTIONS = SECTIONS.map((x) => x.id).concat("pipeline"); // sections the job filters apply to
 const sectionLabel = (id) => ALL_SECTIONS.find((x) => x.id === id)?.label || id;
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -66,6 +86,10 @@ let reloading = false;
 let session = null;  // {uid, email, name, photo} when signed in
 let appConfig = {};  // docs/app-config.json: Firebase settings (public by design)
 let syncInfo = { state: "off", at: null, error: "" };
+let readOnly = "";    // why changes can't be saved (no write access), or ""
+let loadFailed = false;
+const showAll = {};   // sections where you tapped "Show all"
+const PAGE = 25;
 
 // ------------------------------------------------------------------ storage
 function readJSON(key, fallback, area = localStorage) {
@@ -106,10 +130,10 @@ function snapshot(job) {
            score_breakdown, description_snippet, outreach, contact_emails };
 }
 
-function setStatus(job, status) {
+function setStatus(job, status, extra = {}) {
   const prev = store.statuses[job.id];
   const now = new Date().toISOString();
-  const rec = { status, at: now };
+  const rec = { status, at: now, ...extra };
   const appliedAt = prev?.appliedAt || (APPLIED.includes(status) ? now : null);
   if (appliedAt) rec.appliedAt = appliedAt;
   store.statuses[job.id] = rec; // "new" is a record too, so an undo syncs to other devices
@@ -120,6 +144,7 @@ function setStatus(job, status) {
 }
 
 function changed() {
+  if (readOnly) toast(`Not saved: ${readOnly}`);
   saveLocal();
   if (session) {
     writeJSON(K.dirty, true);
@@ -249,8 +274,10 @@ async function load({ quiet = false } = {}) {
     }
     data.jobs = Array.isArray(data.jobs) ? data.jobs : [];
     lastFetch = Date.now();
+    loadFailed = false;
     if (!quiet) toast(`Updated · ${data.jobs.length} jobs`);
   } catch {
+    loadFailed = true;
     if (!quiet) toast(navigator.onLine ? "Couldn't load jobs" : "Offline: showing saved jobs");
   } finally {
     $("#refresh").classList.remove("spinning");
@@ -280,28 +307,60 @@ function applyTypeOf(job) {
   return "unknown";
 }
 const applyLabel = (t) => (APPLY_TYPES.find(([k]) => k === t) || APPLY_TYPES[3])[1];
-const FIELD_VALUE = { source: (j) => j.source, location: locationLabel, remote: modeOf, apply: applyTypeOf };
+const FIELD_VALUE = { source: (j) => j.source, location: locationLabel, remote: modeOf, apply: applyTypeOf, band: bandOf,
+  status: (j) => statusOf(j) };
+const skillsOf = (job) => [...new Set([...(job.matched_keywords || []), ...(job.match?.missing_skills || [])])];
+// Found date or (for jobs you applied to) applied date, as a Date or null
+function dateOf(job, field) {
+  const iso = field === "applied" ? store.statuses[job.id]?.appliedAt : job.first_seen || job.posted_date;
+  const d = iso ? new Date(iso) : null;
+  return d && !isNaN(d) ? d : null;
+}
+function dateRange(f = filters) {
+  if (f.datePreset === "any") return null;
+  if (f.datePreset === "custom") {
+    const from = f.dateFrom ? new Date(f.dateFrom + "T00:00:00") : null;
+    const to = f.dateTo ? new Date(f.dateTo + "T23:59:59") : null;
+    return from || to ? [from, to] : null;
+  }
+  const from = startOfToday();
+  from.setDate(from.getDate() - (Number(f.datePreset) - 1));
+  return [from, null];
+}
+function inDateRange(job, f = filters) {
+  const r = dateRange(f);
+  if (!r) return true;
+  const d = dateOf(job, f.dateField);
+  return !!d && (!r[0] || d >= r[0]) && (!r[1] || d <= r[1]);
+}
 
 // ------------------------------------------------------------------ filters
 function matchesFilters(job, ignore) {
-  const status = statusOf(job);
-  if ((job.score ?? 100) < filters.minScore && (status === "new" || status === "skipped")) return false;
+  if (ignore !== "minScore" && (job.score ?? 100) < filters.minScore) return false;
   for (const k of MULTI) {
+    if (k === "status" && section !== "pipeline") continue; // the other sections are a status already
     if (k !== ignore && filters[k].length && !filters[k].includes(FIELD_VALUE[k](job))) return false;
   }
+  if (ignore !== "date" && !inDateRange(job)) return false;
+  if (ignore !== "skills" && filters.skills.length) {
+    const have = skillsOf(job).map((x) => x.toLowerCase());
+    const hit = (s) => have.includes(s.toLowerCase());
+    if (filters.skillMode === "any" ? !filters.skills.some(hit) : !filters.skills.every(hit)) return false;
+  }
   if (filters.q) {
-    const hay = `${job.title} ${job.company} ${job.location} ${(job.matched_keywords || []).join(" ")}`.toLowerCase();
+    const hay = `${job.title} ${job.company} ${job.location} ${locationLabel(job)}`.toLowerCase();
     if (!filters.q.toLowerCase().split(/\s+/).every((w) => hay.includes(w))) return false;
   }
   return true;
 }
 function normalizeFilters(f) {
   const out = { ...DEFAULT_FILTERS, ...f };
-  for (const k of MULTI) {
+  for (const k of [...MULTI, "skills"]) {
     const v = out[k];
     out[k] = Array.isArray(v) ? v.filter(Boolean) : v ? [v] : [];
   }
-  delete out.status;
+  if (!["all", "any"].includes(out.skillMode)) out.skillMode = "all";
+  if (!DATE_PRESETS.some(([v]) => v === out.datePreset)) out.datePreset = "any";
   return out;
 }
 // Filter choices are kept per account on this device (and for "this device only" use)
@@ -314,14 +373,40 @@ function setFilters(patch) {
   writeJSON(filterKey(), filters);
   render();
 }
-const activeFilterCount = () => (filters.minScore !== DEFAULT_FILTERS.minScore ? 1 : 0) + MULTI.filter((k) => filters[k].length).length;
+const activeFilters = () => {
+  const out = [];
+  if (filters.q) out.push(["q", `“${filters.q}”`]);
+  if (filters.minScore !== DEFAULT_FILTERS.minScore) out.push(["minScore", `Fit ≥ ${filters.minScore}`]);
+  const names = { band: (v) => BANDS.find(([k]) => k === v)?.[1] || v, status: sectionLabel, apply: applyLabel,
+    source: (v) => SOURCE_LABELS[v] || v, location: (v) => v, remote: (v) => WORK_MODES.find(([k]) => k === v)?.[1] || v };
+  for (const k of MULTI) {
+    if (filters[k].length && !(k === "status" && section !== "pipeline")) out.push([k, filters[k].map(names[k]).join(", ")]);
+  }
+  if (dateRange()) {
+    const label = filters.datePreset === "custom" ? `${filters.dateFrom || "…"} – ${filters.dateTo || "…"}`
+      : DATE_PRESETS.find(([v]) => v === filters.datePreset)[1].toLowerCase();
+    out.push(["date", `${filters.dateField === "applied" ? "Applied" : "Found"} ${label}`]);
+  }
+  if (filters.skills.length) out.push(["skills", `${filters.skillMode === "any" ? "Any of" : "All of"}: ${filters.skills.join(", ")}`]);
+  return out;
+};
+const activeFilterCount = () => activeFilters().filter(([k]) => k !== "q").length;
+function clearFilters() {
+  filters = { ...DEFAULT_FILTERS };
+  writeJSON(filterKey(), filters);
+  applyFiltersToInputs();
+  render();
+  toast("Filters cleared");
+}
 
 function buildFilterChips() {
   const all = allJobs();
-  const inSection = all.filter((j) => statusOf(j) === section);
+  const inSection = section === "pipeline" ? all : all.filter((j) => statusOf(j) === section);
   // Sources: every enabled, permitted source, plus any your own saved jobs came from
   const available = data.sources_available || [];
   const groups = {
+    band: BANDS,
+    status: STAGE_ORDER.filter((st) => all.some((j) => statusOf(j) === st)).map((st) => [st, sectionLabel(st)]),
     apply: APPLY_TYPES,
     source: [...new Set([...available, ...all.map((j) => j.source)])].sort()
       .map((v) => [v, (SOURCE_LABELS[v] || v) + (available.length && !available.includes(v) && v !== "email" ? " (saved only)" : "")]),
@@ -339,7 +424,8 @@ function buildFilterChips() {
     allChip.addEventListener("click", () => setFilters({ [key]: [] }));
     $(`#f-${key}`).replaceChildren(allChip, ...groups[key].map(([value, label]) => {
       const on = filters[key].includes(value);
-      const b = el("button", { type: "button", className: "chip" }, label,
+      const b = el("button", { type: "button", className: "chip" },
+        key === "source" ? el("span", { className: "src-dot", style: `background:${sourceColor(value)}` }) : null, label,
         el("span", { className: "chip-count", textContent: base.filter((j) => FIELD_VALUE[key](j) === value).length }));
       b.dataset.chip = `${key}:${value}`;
       b.setAttribute("aria-pressed", String(on));
@@ -347,7 +433,55 @@ function buildFilterChips() {
       return b;
     }));
   }
+  $("#status-field").hidden = section !== "pipeline";
+
+  // Skills: the ones these jobs mention, most common first; counts given every other filter
+  const skillBase = inSection.filter((j) => matchesFilters(j, "skills"));
+  const freq = new Map();
+  for (const j of skillBase) for (const k of skillsOf(j)) freq.set(k, (freq.get(k) || 0) + 1);
+  const picked = filters.skills.filter((k) => !freq.has(k));
+  const skillList = [...picked.map((k) => [k, 0]), ...[...freq].sort((a, b) => b[1] - a[1]).slice(0, 30)];
+  $("#f-skills").replaceChildren(...skillList.map(([k]) => {
+    const on = filters.skills.includes(k);
+    const would = on ? skillBase.filter((j) => matchesFilters(j)).length
+      : skillBase.filter((j) => {
+          const have = skillsOf(j).map((x) => x.toLowerCase());
+          const sel = [...filters.skills, k];
+          return filters.skillMode === "any" ? sel.some((x) => have.includes(x.toLowerCase())) : sel.every((x) => have.includes(x.toLowerCase()));
+        }).length;
+    const b = el("button", { type: "button", className: "chip" }, k, el("span", { className: "chip-count", textContent: would }));
+    b.dataset.chip = `skills:${k}`;
+    b.setAttribute("aria-pressed", String(on));
+    b.addEventListener("click", () => setFilters({ skills: on ? filters.skills.filter((x) => x !== k) : [...filters.skills, k] }));
+    return b;
+  }));
+  if (!skillList.length) $("#f-skills").replaceChildren(el("span", { className: "muted", textContent: "No skills listed on these jobs." }));
+  $("#f-skills-all").setAttribute("aria-pressed", String(filters.skillMode === "all"));
+  $("#f-skills-any").setAttribute("aria-pressed", String(filters.skillMode === "any"));
+
+  // Date presets, each with the number of jobs it would show
+  const dateBase = inSection.filter((j) => matchesFilters(j, "date"));
+  const sel = $("#f-date-preset");
+  sel.replaceChildren(...DATE_PRESETS.map(([v, label]) => {
+    const n = v === "custom" ? null : dateBase.filter((j) => inDateRange(j, { ...filters, datePreset: v })).length;
+    return el("option", { value: v, textContent: n == null ? label : `${label} (${n})`, selected: filters.datePreset === v });
+  }));
+  $("#f-date-field").value = filters.dateField;
+  $("#date-custom").hidden = filters.datePreset !== "custom";
+  $("#f-date-from").value = filters.dateFrom;
+  $("#f-date-to").value = filters.dateTo;
   if (focused) document.querySelector(`[data-chip="${CSS.escape(focused)}"]`)?.focus();
+}
+
+function renderFilterSummary(shown, total) {
+  const box = $("#filter-summary");
+  const act = activeFilters();
+  box.hidden = !act.length || !JOB_SECTIONS.includes(section);
+  if (box.hidden) return;
+  const clear = el("button", { type: "button", className: "link-btn", textContent: "Clear all" });
+  clear.addEventListener("click", clearFilters);
+  box.replaceChildren(el("b", { textContent: `${shown} of ${total} jobs` }),
+    ...act.map(([, label]) => el("span", { className: "fs-chip", textContent: label })), clear);
 }
 function applyFiltersToInputs() {
   $("#f-search").value = filters.q;
@@ -357,68 +491,119 @@ function applyFiltersToInputs() {
 
 // ------------------------------------------------------------------- render
 function sectionJobs(id, jobs = allJobs()) {
-  return jobs.filter((j) => statusOf(j) === id && matchesFilters(j));
+  return jobs.filter((j) => (id === "pipeline" || statusOf(j) === id) && matchesFilters(j));
 }
+const byFit = (a, b) => (b.score || 0) - (a.score || 0);
+const foundAt = (j) => String(j.first_seen || j.posted_date || "");
 function sortFor(id) {
   const at = (j) => store.statuses[j.id]?.at || "";
   if (id === "applied") return (a, b) => (store.statuses[b.id]?.appliedAt || "").localeCompare(store.statuses[a.id]?.appliedAt || "");
-  if (["interview", "offer", "rejected", "later", "skipped"].includes(id)) return (a, b) => at(b).localeCompare(at(a));
-  // To apply: jobs you opened but didn't confirm come first, then by score
-  return (a, b) => (isPending(b) - isPending(a)) || (b.score || 0) - (a.score || 0) ||
-    String(b.posted_date || b.first_seen || "").localeCompare(String(a.posted_date || a.first_seen || ""));
+  if (id === "later") return (a, b) => String(a.company).localeCompare(String(b.company), undefined, { sensitivity: "base" }) || byFit(a, b);
+  if (["interview", "offer", "rejected", "skipped"].includes(id)) return (a, b) => at(b).localeCompare(at(a));
+  if (readJSON(K.sortNew, "best") === "newest") return (a, b) => foundAt(b).localeCompare(foundAt(a)) || byFit(a, b);
+  // Best order: jobs you opened but didn't confirm, then quick (phone-friendly) applies, then the rest; each by fit
+  return (a, b) => (isPending(b) - isPending(a)) || ((JRDesk.deviceOf(b) === "phone") - (JRDesk.deviceOf(a) === "phone")) ||
+    byFit(a, b) || foundAt(b).localeCompare(foundAt(a));
 }
 
 function appliedTimes() {
   return Object.values(store.statuses).filter((s) => APPLIED.includes(s.status) && s.appliedAt).map((s) => new Date(s.appliedAt));
 }
+const fmtDateTime = (iso) => (iso ? new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) : "");
+
+function renderHeader(jobs) {
+  for (const st of ["new", "later", "applied", "interview", "offer", "rejected"]) {
+    countUp($(`#st-${st}`), jobs.filter((j) => statusOf(j) === st).length);
+  }
+  for (const b of document.querySelectorAll(".stage")) b.setAttribute("aria-current", String(b.dataset.go === section));
+  const weekAgo = Date.now() - 7 * 86400e3;
+  const n7 = appliedTimes().filter((d) => d.getTime() >= weekAgo).length;
+  const runAt = data.run?.at || data.generated_at;
+  $("#runinfo").textContent = `${runAt ? `Last run ${fmtDateTime(runAt)}` : "No run yet"} · ${n7} applied in the last 7 days`;
+  const failed = JRDesk.failedSources();
+  const warn = $("#src-warn");
+  warn.hidden = !failed.length;
+  if (failed.length) {
+    warn.textContent = `⚠ ${failed.length} source${failed.length > 1 ? "s" : ""} failed`;
+    warn.title = failed.map((f) => `${SOURCE_LABELS[f.source] || f.source}: ${f.reason}`).join("\n");
+  }
+  const offline = !navigator.onLine || loadFailed;
+  $("#net-banner").hidden = !offline;
+  $("#net-banner").textContent = offline ? `Offline: can't reach the job data, so you're seeing what this device saved${data.generated_at ? ` (${ago(data.generated_at)})` : ""}. Your changes are kept and sync when you're back online.` : "";
+  $("#ro-banner").hidden = !readOnly;
+  $("#ro-banner").textContent = readOnly ? `Read-only: ${readOnly}. Buttons that change things are turned off.` : "";
+  document.body.classList.toggle("read-only", !!readOnly);
+}
 
 function render() {
   const jobs = allJobs();
-  const isGmail = GMAIL_SECTIONS.some((g) => g.id === section) || section === "walkins";
-  const shown = isGmail ? [] : sectionJobs(section, jobs).sort(sortFor(section));
+  const cards = SECTIONS.some((x) => x.id === section);
+  const filtered = JOB_SECTIONS.includes(section);
+  const all = cards ? sectionJobs(section, jobs).sort(sortFor(section)) : [];
+  const phoneCount = section === "new" ? all.filter((j) => JRDesk.deviceOf(j) === "phone").length : 0;
+  const phoneOnly = section === "new" && readJSON(K.phoneOnly, false);
+  const shown = phoneOnly ? all.filter((j) => JRDesk.deviceOf(j) === "phone") : all;
   const list = $("#list");
 
   $("#section-name").textContent = sectionLabel(section);
-  $("#section-count").textContent = isGmail ? "–" : shown.length;
-  $("#section-hint").textContent = isGmail ? "" : SECTIONS.find((x) => x.id === section)?.hint || "";
-  $(".filter-row").hidden = isGmail;
-  $("#filter-panel").hidden = isGmail || $("#toggle-filters").getAttribute("aria-expanded") !== "true";
+  const multiCount = JRAccount.enabled();
+  $("#section-count").textContent = cards ? shown.length : section === "pipeline" ? sectionJobs("pipeline", jobs).length
+    : section === "mail" && multiCount ? JRAccount.mailCount() : section === "reply" && multiCount ? JRAccount.inboxOpen()
+    : section === "skills" && multiCount ? JRDesk.missingSkills().length : "–";
+  $("#section-hint").textContent = SECTIONS.find((x) => x.id === section)?.hint || "";
+  $(".filter-row").hidden = !filtered;
+  $("#filter-panel").hidden = !filtered || $("#toggle-filters").getAttribute("aria-expanded") !== "true";
   document.title = `${sectionLabel(section)} · Job Radar`;
 
-  if (isGmail) {
-    const multi = JRAccount.enabled();
-    list.replaceChildren(section === "walkins" ? (multi ? JRAccount.renderWalkins()
+  const multi = JRAccount.enabled();
+  const top = section === "new" ? JRDesk.applyBar(phoneCount, all.length) : [];
+  if (!cards) {
+    list.replaceChildren(section === "pipeline" ? JRDesk.renderPipeline(jobs)
+      : section === "skills" ? JRDesk.renderSkills()
+      : section === "walkins" ? (multi ? JRAccount.renderWalkins()
         : el("div", { className: "empty" }, el("b", { textContent: "Sign in to see walk-ins" }), "Walk-ins use your own cities and profile."))
       : section === "mail" ? (multi ? JRAccount.renderDrafts() : renderMailSection())
       : multi ? JRAccount.renderInbox() : renderInboxSection());
   } else if (!shown.length) {
     const any = jobs.some((j) => statusOf(j) === section);
-    list.replaceChildren(el("div", { className: "empty" },
-      el("b", { textContent: any ? "No jobs match these filters" : !data.jobs.length && section === "new" ? "No jobs yet" : `Nothing in ${sectionLabel(section)} yet` }),
-      any ? "Try lowering the minimum score or resetting filters."
-        : section === "new" && JRAccount.enabled() && JRAccount.me?.missing?.length ? "Add your resume or profile (Settings → Your account) and your matches appear here."
+    list.replaceChildren(...top, el("div", { className: "empty" },
+      el("b", { textContent: phoneOnly && all.length ? "No phone-friendly jobs here" : any ? "No jobs match these filters" : !data.jobs.length && section === "new" ? "No jobs yet" : `Nothing in ${sectionLabel(section)} yet` }),
+      phoneOnly && all.length ? `Turn off “Phone only” to see the ${all.length} laptop jobs.`
+        : any ? "Try lowering the minimum fit or clearing filters."
+        : section === "new" && multi && JRAccount.me?.missing?.length ? "Add your resume or profile (Settings → Your account) and your matches appear here."
         : section === "new" && data.searching ? "Searching for jobs that fit your profile. This usually takes a few minutes; matches appear here on their own."
-        : section === "new" && JRAccount.enabled() ? `Nothing at or above your threshold (${JRAccount.profile().threshold ?? 70}) yet. New jobs are checked every 3 hours; you can lower the threshold in your profile.`
+        : section === "new" && multi ? `Nothing at or above your threshold (${JRAccount.profile().threshold ?? 70}) yet. New jobs are checked every 3 hours; you can lower the threshold in your profile.`
         : section === "new" ? "The next run (every 3 hours) fills this in."
         : section === "applied" ? "Tap Applied on a job and it moves here." : ""));
   } else {
-    list.replaceChildren(...shown.map((job, i) => renderCard(job, i)));
+    const limit = showAll[section] ? shown.length : PAGE;
+    const more = shown.length > limit ? el("button", { className: "btn show-all", type: "button", textContent: `Show all ${shown.length} jobs` }) : null;
+    if (more) {
+      more.dataset.safe = "1";
+      more.addEventListener("click", () => {
+        showAll[section] = true;
+        render();
+      });
+    }
+    list.replaceChildren(...top, ...shown.slice(0, limit).map((job, i) => renderCard(job, i)), ...(more ? [more] : []));
   }
   animateNext = false;
+  if (readOnly) for (const b of list.querySelectorAll("button:not([data-safe])")) b.disabled = true;
 
-  const times = appliedTimes();
-  const today = startOfToday(), week = startOfWeek();
-  countUp($("#stat-today"), times.filter((d) => d >= today).length);
-  countUp($("#stat-week"), times.filter((d) => d >= week).length);
-  countUp($("#stat-toapply"), sectionJobs("new", jobs).length);
-  countUp($("#stat-interview"), jobs.filter((j) => statusOf(j) === "interview").length);
+  renderHeader(jobs);
   $("#updated").textContent = data.searching ? `Searching for new jobs… started ${ago(new Date(data.search_started * 1000).toISOString())}`
     : data.generated_at ? `Jobs updated ${ago(data.generated_at)} · ${data.jobs.length} found` : "Waiting for the first run";
 
   const n = activeFilterCount();
   $("#toggle-filters").textContent = n ? `Filters (${n})` : "Filters";
   $("#toggle-filters").classList.toggle("has-filters", n > 0);
-  if (!isGmail) buildFilterChips();
+  if (filtered) {
+    buildFilterChips();
+    const base = section === "pipeline" ? jobs : jobs.filter((j) => statusOf(j) === section);
+    renderFilterSummary(section === "pipeline" ? sectionJobs("pipeline", jobs).length : shown.length, base.length);
+  } else {
+    $("#filter-summary").hidden = true;
+  }
   renderNav(jobs);
   renderSyncBadges();
 }
@@ -456,8 +641,30 @@ function renderCard(job, index) {
   ab.title = job.apply_evidence || (at === "unknown" ? "How to apply isn't shown in the listing" : "From the job's link");
   meta.append(ab);
   if (job.work_mode === "hybrid") meta.append(el("span", { className: "badge", textContent: "hybrid" }));
-  for (const p of [job.location, job.remote ? "Remote" : null, SOURCE_LABELS[job.source] || job.source, ago(job.posted_date || job.first_seen)].filter(Boolean)) {
-    meta.append(el("span", { textContent: p }));
+  if (["new", "later"].includes(status)) {
+    const dev = status === "later" ? "laptop" : JRDesk.deviceOf(job);
+    const db = el("span", { className: `badge device device-${dev}`, textContent: dev === "phone" ? "📱 Phone OK" : "💻 Laptop" });
+    db.title = JRDesk.deviceWhy(job, status);
+    meta.append(db);
+  }
+  const yrs = job.score_breakdown?.years_required;
+  for (const p of [locationLabel(job), job.remote ? "Remote" : null]) if (p) meta.append(el("span", { textContent: p }));
+  meta.append(el("span", { className: "src" }, el("span", { className: "src-dot", style: `background:${sourceColor(job.source)}` }),
+    SOURCE_LABELS[job.source] || job.source));
+  meta.append(el("span", { textContent: job.posted_date ? `posted ${ago(job.posted_date)}` : `found ${ago(job.first_seen)}` }));
+  if (yrs != null) meta.append(el("span", { textContent: `${yrs}${job.score_breakdown.years_max ? `–${job.score_breakdown.years_max}` : "+"} yrs` }));
+
+  // Why it fits / the gap, in one line each; parked reason; another job at this company parked
+  const [why, gap] = JRDesk.fitLines(job);
+  if (why) Object.assign($(".why-line", card), { hidden: false, textContent: why });
+  if (gap) Object.assign($(".gap-line", card), { hidden: false, textContent: gap });
+  const warn = $(".warn-line", card);
+  if (status === "later" && rec) {
+    Object.assign(warn, { hidden: false, className: "warn-line parked", textContent: `Parked ${fmtDate(rec.at)}${rec.reason ? ` · ${rec.reason}` : ""}` });
+  } else if (status === "new") {
+    const co = JRDesk.companyKey(job.company);
+    const other = allJobs().find((j) => j.id !== job.id && statusOf(j) === "later" && JRDesk.companyKey(j.company) === co);
+    if (other) Object.assign(warn, { hidden: false, textContent: `⚠ You parked another ${job.company} job in Apply later: ${other.title}` });
   }
 
   const kw = $(".keywords", card);
@@ -518,11 +725,13 @@ function renderCard(job, index) {
     actions.append(done);
   }
   for (const [to, label] of MAIN_ACTIONS[status] || []) {
-    const btn = el("button", { className: `btn${to === "applied" ? " go-applied" : ""}`, type: "button", textContent: label });
+    const btn = el("button", { className: `btn${to === "applied" ? " go-applied" : ""}`, type: "button",
+      textContent: to === "skipped" && status === "new" ? "Not interested" : label });
     btn.dataset.to = to;
-    btn.addEventListener("click", () => moveJob(job, to, card));
+    btn.addEventListener("click", () => (to === "later" ? JRDesk.askLater(job, card) : moveJob(job, to, card)));
     actions.append(btn);
   }
+
   const move = $(".move-row", card);
   const moves = MOVE_ACTIONS[status] || [];
   if (moves.length) {
@@ -534,20 +743,27 @@ function renderCard(job, index) {
       move.append(btn);
     }
   }
+  if (["new", "later"].includes(status)) {
+    const copy = el("button", { className: "mini-btn", type: "button", textContent: "📋 Copy answers", title: "Copy your standard form answers for this job" });
+    copy.dataset.safe = "1";
+    copy.addEventListener("click", () => JRDesk.copyAnswers(job));
+    $(".outreach-row", card).append(copy);
+  }
   renderOutreach(job, status, $(".outreach-row", card));
   JRAccount.decorateCard(job, card);
   return card;
 }
 
-function moveJob(job, to, card) {
+function moveJob(job, to, card, extra) {
   const before = statusOf(job);
   const prevRec = store.statuses[job.id] ? { ...store.statuses[job.id] } : null;
   const prevSaved = store.saved[job.id];
   const prevPending = store.pending[job.id] ? { ...store.pending[job.id] } : null;
   const finish = () => {
-    setStatus(job, to);
+    setStatus(job, to, extra);
     render();
-    toast(to === "new" ? "Back in To apply" : `Moved to ${sectionLabel(to)}`, {
+    toast(to === "new" ? "Back in To apply" : to === "applied" ? `Marked applied · ${fmtDate(new Date().toISOString())}`
+      : `Moved to ${sectionLabel(to)}${extra?.reason ? ` · ${extra.reason}` : ""}`, {
       label: "Undo",
       run: () => {
         // The undo is itself a change (so it syncs), restoring the earlier status and applied time
@@ -584,7 +800,7 @@ function renderNav(jobs) {
   const counts = {};
   for (const j of jobs) {
     const st = statusOf(j);
-    if (st === "new" && !matchesFilters(j)) continue;
+    if (!matchesFilters(j)) continue;
     counts[st] = (counts[st] || 0) + 1;
   }
   const item = (sec, count) => {
@@ -609,11 +825,12 @@ function renderNav(jobs) {
   $("#nav-list").replaceChildren(
     el("p", { className: "nav-group", textContent: "Jobs" }),
     ...SECTIONS.map((sec) => item(sec, counts[sec.id] || 0)),
+    item(PANEL_SECTIONS[0], jobs.filter((j) => matchesFilters(j)).length),
+    item(PANEL_SECTIONS[1], JRAccount.enabled() ? JRDesk.missingSkills().length : null),
     ...(JRAccount.enabled() ? [item(WALKIN_SECTION, null)] : []),
     el("p", { className: "nav-group", textContent: "Gmail" }),
-    item(GMAIL_SECTIONS[0], JRAccount.enabled() ? Object.keys(store.drafts).length : jobs.filter((j) => j.outreach?.draft_id).length),
-    item(GMAIL_SECTIONS[1], JRAccount.enabled() ? (store.gmail.review || []).filter((r) => !store.reviews[r.id]).length || (store.gmail.events || []).length
-      : (store.gmail.events || []).length),
+    item(GMAIL_SECTIONS[0], JRAccount.enabled() ? JRAccount.mailCount() : jobs.filter((j) => j.outreach?.draft_id).length),
+    item(GMAIL_SECTIONS[1], JRAccount.enabled() ? JRAccount.inboxOpen() : (store.gmail.events || []).length),
     el("p", { className: "nav-group", textContent: "Tools" }),
     tool("📊", "Export to Excel (.csv)", () => {
       closeOverlay($("#nav"));
@@ -912,10 +1129,13 @@ async function syncNow() {
       store = JRSync.merge(store, merged); // keep anything you changed while it was saving
       saveLocal();
       if (v === localVersion) writeJSON(K.dirty, false);
+      readOnly = "";
       setSync("ok");
       render();
     } catch (e) {
+      if (String(e?.code || "").includes("permission-denied")) readOnly = "this account can't save changes here (no write access)";
       setSync(navigator.onLine ? "error" : "offline", cloudError(e));
+      render();
     }
   })();
   try {
@@ -934,10 +1154,15 @@ function listen() {
     saveLocal();
     setSync("ok");
     render();
-  }, (e) => setSync("error", cloudError(e)));
+  }, (e) => {
+    if (String(e?.code || "").includes("permission-denied")) readOnly = "this account can't read or save its data here (no access)";
+    setSync("error", cloudError(e));
+    render();
+  });
 }
 
 function onUserChanged(user) {
+  readOnly = "";
   if (user) {
     session = user;
     loadFilters();
@@ -1276,16 +1501,12 @@ function bind() {
     $("#f-score-val").textContent = e.target.value;
     setFilters({ minScore: Number(e.target.value) });
   });
-  $("#reset-filters").addEventListener("click", () => {
-    filters = { ...DEFAULT_FILTERS };
-    writeJSON(filterKey(), filters);
-    applyFiltersToInputs();
-    render();
-  });
+  $("#reset-filters").addEventListener("click", clearFilters);
   $("#toggle-filters").addEventListener("click", () => {
     const open = $("#toggle-filters").getAttribute("aria-expanded") !== "true";
     $("#toggle-filters").setAttribute("aria-expanded", String(open));
     $("#filter-panel").hidden = !open;
+    JRDesk.setCollapsed("filters", !open);
   });
   $("#refresh").addEventListener("click", () => {
     if (section === "walkins" && JRAccount.enabled()) JRAccount.refreshWalkins();
@@ -1310,7 +1531,17 @@ function bind() {
     d.addEventListener("close", () => onOverlayClosed(d));
     d.addEventListener("click", (e) => e.target === d && d.close()); // tap outside closes
   }
-  for (const s of document.querySelectorAll(".stat")) s.addEventListener("click", () => setSection(s.dataset.go));
+  for (const s of document.querySelectorAll(".stage")) s.addEventListener("click", () => setSection(s.dataset.go));
+  $("#src-warn").addEventListener("click", () => toast(`Failed in the last run: ${JRDesk.failedSources()
+    .map((f) => `${SOURCE_LABELS[f.source] || f.source} (${f.reason})`).join("; ")}`));
+  $("#f-date-field").addEventListener("change", (e) => setFilters({ dateField: e.target.value }));
+  $("#f-date-preset").addEventListener("change", (e) => setFilters({ datePreset: e.target.value }));
+  $("#f-date-from").addEventListener("change", (e) => setFilters({ dateFrom: e.target.value }));
+  $("#f-date-to").addEventListener("change", (e) => setFilters({ dateTo: e.target.value }));
+  $("#f-skills-all").addEventListener("click", () => setFilters({ skillMode: "all" }));
+  $("#f-skills-any").addEventListener("click", () => setFilters({ skillMode: "any" }));
+  window.addEventListener("offline", () => render());
+  window.addEventListener("online", () => render());
   for (const b of document.querySelectorAll("[data-export]")) b.addEventListener("click", () => exportCSV(b.dataset.export));
   $("#export").addEventListener("click", exportBackup);
   $("#import-file").addEventListener("change", (e) => {
@@ -1351,6 +1582,7 @@ async function init() {
   history.replaceState({ s: section }, "", location.pathname + location.search + location.hash);
   bind();
   applyFiltersToInputs();
+  $("#toggle-filters").setAttribute("aria-expanded", String(!JRDesk.isCollapsed("filters", true)));
   $("#list").replaceChildren(...[0, 1, 2].map(() => el("div", { className: "skeleton" })));
 
   if ("serviceWorker" in navigator) {

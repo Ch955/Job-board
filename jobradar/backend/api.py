@@ -282,8 +282,44 @@ def create_app(settings: Settings | None = None, store: Store | None = None, ses
     @app.get("/api/matches")
     def get_matches(u: dict = Depends(user)):
         m = store.get("matches", u["uid"]) or {}
+        meta = store.get("pool", "meta") or {}
         return {"jobs": m.get("jobs", []), "updated": m.get("updated"), "threshold": m.get("threshold"),
-                "sources_available": permitted_sources(base), **search.status()}
+                "sources_available": permitted_sources(base), "skills_scan": m.get("skills_scan"),
+                "run": {"at": meta.get("updated"), "failed": tasks.failed_sources(meta.get("sources") or {})},
+                **search.status()}
+
+    @app.post("/api/skills")
+    def edit_skills(body: dict, u: dict = Depends(verified)):
+        """Add a skill to your profile (it then counts as matched everywhere), remove one, or hide/unhide it in Skill match."""
+        action, skill = (body or {}).get("action"), str((body or {}).get("skill") or "").strip()
+        if action not in ("add", "remove", "hide", "unhide") or not skill or len(skill) > 40:
+            raise HTTPException(422, "Give an action (add, remove, hide, unhide) and a skill.")
+        if action in ("add", "remove"):  # these re-score your matches
+            limits.check(u["uid"], f"to {action} a skill", 1)
+        p = dict(store.get("profiles", u["uid"]) or {})
+        same = lambda xs: [x for x in xs or [] if x.lower() != skill.lower()]  # noqa: E731
+        if action == "add":
+            p["skills"] = same(p.get("skills")) + [skill]
+            p["added_skills"] = same(p.get("added_skills")) + [skill]
+            p["hidden_skills"] = same(p.get("hidden_skills"))
+        elif action == "remove":
+            p["skills"], p["added_skills"] = same(p.get("skills")), same(p.get("added_skills"))
+        elif action == "hide":
+            p["hidden_skills"] = same(p.get("hidden_skills")) + [skill]
+        else:
+            p["hidden_skills"] = same(p.get("hidden_skills"))
+        try:
+            p = {**clean(p), "updated": _now().isoformat(timespec="seconds")}
+        except ProfileError as e:
+            raise HTTPException(422, str(e)) from None
+        store.set("profiles", u["uid"], p)
+        count = None
+        if action in ("add", "remove") and not is_complete(p):
+            try:
+                count = tasks.match_user(store, base, u["uid"], profile=p).get("count")
+            except Exception as e:  # noqa: BLE001 - saved; matches refresh next run
+                log.warning("match after skill edit failed: %s", type(e).__name__)
+        return {"profile": p, "count": count}
 
     # ----------------------------------------------------------------- gmail
     @app.post("/api/gmail/connect")

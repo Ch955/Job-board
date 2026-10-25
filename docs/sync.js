@@ -3,7 +3,8 @@
 
    State: {statuses:{id:{status,at,appliedAt?,source?}}, saved:{id:job}, sent:{id:iso},
            pending:{id:{at,open}}, gmail:{last_check, processed, events, review},
-           reviews:{reviewId:{job_id|null, at}}, drafts:{key:{id, thread_id, job_id, type, at}}}
+           reviews:{reviewId:{job_id|null, at}}, drafts:{key:{id, thread_id, job_id, type, at, sent?, followup_sent?, replied?, closed?}},
+           done:{inboxItemId:{on, at}}}
    Per job the newest change wins, the first applied time is never lost, and
    removing a status is a newer "new" record, so undo travels between devices.
 
@@ -12,8 +13,8 @@
 
 const JRSync = (() => {
   const KEEP = ["later", "applied", "interview", "offer", "rejected"];
-  const MAPS = ["statuses", "saved", "sent", "pending", "gmail", "reviews", "drafts", "walkins"];
-  const NEWEST = ["pending", "reviews", "drafts", "walkins"]; // per key, the record with the later "at" wins
+  const MAPS = ["statuses", "saved", "sent", "pending", "gmail", "reviews", "drafts", "walkins", "done"];
+  const NEWEST = ["pending", "reviews", "drafts", "walkins", "done"]; // per key, the record with the later "at" wins
   const empty = () => Object.fromEntries(MAPS.map((k) => [k, {}]));
   function normalize(s) {
     const out = { ...empty(), ...(s || {}) };

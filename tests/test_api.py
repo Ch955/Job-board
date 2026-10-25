@@ -309,3 +309,25 @@ def test_walkins_endpoint_uses_your_own_walkin_cities(env):
     assert [e["company"] for e in a["upcoming"]] == ["Northwind"] and a["upcoming"][0]["status"] == "confirmed"
     assert b["upcoming"] == [] and b["cities"] == ["Chennai"]
     assert c.get("/api/walkins").status_code == 401
+
+
+def test_skills_add_hide_remove_and_matches_carry_scan_and_run_info(env):
+    c, store, _ = env
+    assert c.put("/api/profile", headers=H("tok-alice"), json=PROFILE).status_code == 200
+    store.set("pool", "meta", {"updated": "2026-10-25T06:00:00+00:00", "sources": {
+        "greenhouse": {"status": "ok", "count": 9, "warnings": ["greenhouse/acme: HTTP 404"]},
+        "remotive": {"status": "error", "error": "ConnectionError: boom"},
+        "jobspy": {"status": "ok", "count": 5, "warnings": ["glassdoor 'Data Engineer': HTTPError: 403 Forbidden"]}}})
+    r = c.post("/api/skills", headers=H("tok-alice"), json={"action": "add", "skill": "pyspark"}).json()
+    assert "PySpark" in r["profile"]["skills"] and r["profile"]["added_skills"] == ["PySpark"]
+    r = c.post("/api/skills", headers=H("tok-alice"), json={"action": "hide", "skill": "Kafka"}).json()
+    assert r["profile"]["hidden_skills"] == ["Kafka"]
+    r = c.post("/api/skills", headers=H("tok-alice"), json={"action": "remove", "skill": "PySpark"}).json()
+    assert "PySpark" not in r["profile"]["skills"] and r["profile"]["added_skills"] == []
+    assert c.post("/api/skills", headers=H("tok-alice"), json={"action": "delete-all", "skill": "x"}).status_code == 422
+    assert c.post("/api/skills", headers=H("tok-bob"), json={"action": "add", "skill": "x"}).status_code in (200, 422)
+    assert "PySpark" not in (store.get("profiles", "bob") or {}).get("skills", [])  # bob's call never touches alice
+    m = c.get("/api/matches", headers=H("tok-alice")).json()
+    assert m["run"]["at"] == "2026-10-25T06:00:00+00:00"
+    assert {f["source"] for f in m["run"]["failed"]} == {"remotive", "glassdoor"}   # one company's 404 isn't a failure
+    assert m["skills_scan"]["days"] == 30

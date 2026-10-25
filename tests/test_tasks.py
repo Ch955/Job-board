@@ -193,3 +193,24 @@ def test_unexpected_errors_log_a_traceback_without_secrets(caplog, monkeypatch):
     r = tasks.gmail_sync_user(store, CFG, Google({"rt-a": []}), "alice", NOW)
     assert r == {"error": "ZeroDivisionError"} and "ZeroDivisionError" in store.get("gmail", "alice")["last_error"]
     assert "Traceback" in caplog.text and "rt-a" not in caplog.text
+
+
+def test_skill_scan_counts_relevant_postings_once_each():
+    from datetime import datetime, timezone
+    from jobradar.backend import tasks
+    from jobradar.backend.matching import UserMatcher
+    from jobradar.config import load_config
+    from jobradar.models import Job
+    now = datetime(2026, 10, 25, tzinfo=timezone.utc)
+    p = {"target_roles": ["Data Engineer"], "skills": ["Python", "Airflow"], "years_experience": 3}
+
+    def job(i, title, text):
+        return Job(id=f"j{i}", title=title, company="C", location="Hyderabad", url=f"https://x/{i}", source="greenhouse",
+                   description=text, posted_date="2026-10-24")
+    pool = [job(1, "Data Engineer", "Python, Kafka and Kafka again. 2-5 years"),
+            job(2, "Senior Data Engineer", "Python Airflow. 3+ years"),
+            job(3, "Sales Manager", "Python Kafka")]                      # not your role: not counted
+    scan = tasks.skill_scan(UserMatcher(load_config(), p), pool, p, now)
+    counts = dict(scan["skills"])
+    assert scan["scanned"] == 2 and counts["Python"] == 2 and counts["Kafka"] == 1 and counts["Airflow"] == 1
+    assert scan["coverage"] == 75   # 3 of 4 mentions are skills you have

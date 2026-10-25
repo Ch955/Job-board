@@ -12,13 +12,14 @@ from .. import skills_vocab
 
 DEFAULT_THRESHOLD = 70
 LIMITS = {"full_name": 80, "email": 120, "phone": 25, "linkedin": 120, "current_role": 80, "current_company": 80,
-          "notice": 60, "location": 60}
+          "notice": 60, "location": 60, "current_ctc": 40, "expected_ctc": 40, "portfolio": 160}
 WORK_MODES = ("onsite", "hybrid", "remote")
 SCOPES = ("selected", "india")           # only my cities / anywhere in India
 RELOCATION = ("yes", "no", "flexible")
 LISTS = {"skills": (60, 40), "target_roles": (8, 60), "locations": (10, 40), "education": (6, 160),
          "work_modes": (3, 10), "walkin_cities": (10, 40), "walkin_roles": (8, 60), "walkin_industries": (8, 40),
-         "certifications": (12, 140), "projects": (10, 200), "highlights": (3, 240), "degree_levels": (4, 20)}
+         "certifications": (12, 140), "projects": (10, 200), "highlights": (3, 240), "degree_levels": (4, 20),
+         "added_skills": (60, 40), "hidden_skills": (200, 40)}  # added from the Skill match list / hidden from it
 EMAIL = re.compile(r"[^@\s<>]+@[^@\s<>]+\.[A-Za-z]{2,24}")
 
 
@@ -63,7 +64,7 @@ def clean(raw: dict) -> dict:
         items, seen = [], set()
         for x in v:
             x = re.sub(r"\s+", " ", x).strip()
-            if k == "skills":
+            if k in ("skills", "added_skills", "hidden_skills"):
                 x = skills_vocab.canonical(x)
             if x and x.lower() not in seen and len(x) <= n:
                 seen.add(x.lower())
@@ -111,6 +112,8 @@ def clean(raw: dict) -> dict:
     # Keep the older switches in step with the new preferences (read by older app versions)
     out["remote_ok"] = "remote" in out["work_modes"]
     out["anywhere_in_india"] = out["search_scope"] == "india"
+    have = {x.lower() for x in out["skills"]}
+    out["added_skills"] = [x for x in out["added_skills"] if x.lower() in have]
     if out["walkin_same_as_jobs"]:
         out["walkin_cities"] = list(out["locations"])
     return out

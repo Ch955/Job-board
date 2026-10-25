@@ -95,6 +95,11 @@ const JRCloud = {
     }, onError);
   },
 
+  // cb(data or null) whenever one of your read-only server documents (matches, profiles, gmail) changes
+  watch(collection, uid, cb, onError) {
+    return F.onSnapshot(F.doc(db, collection, uid), (snap) => cb(snap.exists() ? snap.data() : null), onError || (() => {}));
+  },
+
   // Read-merge-write in one transaction, so two devices saving at once both win
   async save(uid, email, mergeWith) {
     const ref = F.doc(db, "users", uid);

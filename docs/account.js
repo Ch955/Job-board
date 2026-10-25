@@ -85,6 +85,27 @@ const JRAccount = (() => {
     handleReturn();
     if (me.email_verified && me.missing?.length) openOnboarding();
     load({ quiet: true });
+    watchLive();
+  }
+
+  // Live updates: when the server re-scores your jobs, edits your profile (another device)
+  // or syncs Gmail, the page refreshes that part by itself, no reload needed.
+  let unwatch = [];
+  function watchLive() {
+    unwatch.forEach((u) => u());
+    unwatch = [];
+    if (!window.JRCloud?.watch || !session) return;
+    const seen = {};
+    const on = (col, run) => unwatch.push(JRCloud.watch(col, session.uid, (d) => {
+      const v = d?.updated || d?.last_attempt || d?.connected_at || "";
+      if (seen[col] === undefined) return void (seen[col] = v);  // first snapshot: what we already loaded
+      if (v === seen[col]) return;
+      seen[col] = v;
+      run();
+    }));
+    on("matches", () => load({ quiet: true }));
+    on("profiles", () => refreshMe().then(render).catch(() => null));
+    on("gmail", () => refreshMe().then(render).catch(() => null));
   }
 
   // ------------------------------------------------------ email verification
@@ -246,7 +267,7 @@ const JRAccount = (() => {
     return {
       jobs: m.jobs || [], generated_at: m.updated, alert_score: p.threshold ?? 70,
       searching: !!m.searching, search_started: m.search_started, pool_count: m.pool_count,
-      sources_available: m.sources_available || [],
+      sources_available: m.sources_available || [], run: m.run || null, skills_scan: m.skills_scan || null,
       outreach: { profile: { name: (p.full_name || "").split(" ")[0], full_name: p.full_name, role: p.current_role,
         years_experience: p.years_experience, notice: p.notice, linkedin: p.linkedin }, my_skills: p.skills || [] },
     };
@@ -256,11 +277,16 @@ const JRAccount = (() => {
     if (!enabled()) return;
     const m = job.match;
     if (m) {
-      const why = el("div", { className: "why" }, el("p", { textContent: m.summary }));
+      // Missing skills, each with + to add it to your profile (then it counts as matched on every job)
       if (m.missing_skills?.length) {
-        why.append(el("ul", { className: "keywords missing" }, ...m.missing_skills.slice(0, 6).map((k) => el("li", { textContent: k }))));
+        const ul = el("ul", { className: "keywords missing" }, ...m.missing_skills.slice(0, 8).map((k) => {
+          const b = el("button", { type: "button", className: "add-skill", textContent: `+ ${k}`, title: `I have ${k}: add it to my skills` });
+          b.addEventListener("click", () => JRDesk.editSkill("add", k));
+          return el("li", {}, b);
+        }));
+        card.querySelector(".keywords").after(ul);
       }
-      card.querySelector(".snippet").before(why);
+      card.querySelector(".snippet").title = m.summary || "";
     }
     const status = statusOf(job);
     if (job.source === "email" || !["new", "later", "skipped", "applied", "interview"].includes(status)) return;
@@ -508,17 +534,22 @@ const JRAccount = (() => {
           el("p", { className: "muted", textContent: `${fmtDate(r.at)} · from ${r.from} · ${r.reason}` }), choices));
       }
     }
-    const events = store.gmail.events || [];
-    wrap.append(el("h3", { className: "panel-h", textContent: "Recent job emails" }));
+    const all = store.gmail.events || [];
+    const isDone = (ev) => !!store.done[ev.id]?.on;
+    const events = [...all].sort((a, b) => isDone(a) - isDone(b) || String(b.at).localeCompare(String(a.at)));
+    const open = all.filter((ev) => !isDone(ev)).length;
+    wrap.append(el("h3", { className: "panel-h", textContent: `Needs your reply · ${open} open` }),
+      el("p", { className: "muted", textContent: "Job emails from your Gmail, sorted open first. Only the subject's meaning is shown, never the email text." }));
     if (!events.length) {
       wrap.append(el("div", { className: "empty" }, el("b", { textContent: "No job emails yet" }),
         "Confirmations, tests, interview invites, rejections, offers and recruiter replies appear here."));
       return wrap;
     }
-    for (const ev of events.slice(0, 60)) {
+    for (const ev of events.slice(0, 80)) {
       const row = el("div", { className: "row" });
       if (ev.job_id) {
         const show = el("button", { className: "btn", type: "button", textContent: "Show job" });
+        show.dataset.safe = "1";
         show.addEventListener("click", () => focusJob(ev.job_id));
         row.append(show);
       }
@@ -526,7 +557,7 @@ const JRAccount = (() => {
         for (const [kind, label] of REPLY_DRAFTS[ev.type] || []) {
           const rec = store.drafts[`${kind}:${ev.thread_id}`];
           if (rec) {
-            row.append(el("a", { className: "btn", href: "https://mail.google.com/mail/u/0/#drafts", target: "_blank", rel: "noopener", textContent: `${DRAFT_LABEL[kind]} draft ready ↗` }));
+            row.append(el("a", { className: "btn", href: gmailDraftUrl(rec), target: "_blank", rel: "noopener", textContent: `${DRAFT_LABEL[kind]} draft ready ↗` }));
           } else {
             const b = el("button", { className: "btn", type: "button", textContent: label });
             b.addEventListener("click", () => createDraft({ type: kind, message_id: ev.id, job_id: ev.job_id || undefined }, b));
@@ -534,33 +565,148 @@ const JRAccount = (() => {
           }
         }
       }
-      const chip = ev.applied ? `st-${ev.status}` : ev.needs_reply ? "st-interview" : "st-rejected";
-      wrap.append(el("article", { className: "panel-item" },
-        el("div", { className: "panel-top" }, el("b", { textContent: ev.company || ev.from }),
-          el("span", { className: `st-chip ${chip}`, textContent: TYPE_LABEL[ev.type] || ev.type })),
-        el("p", { textContent: ev.title || ev.subject }),
-        el("p", { className: "muted", textContent: `${fmtDate(ev.at)} · ${ev.subject}${ev.applied ? " · status updated" : ev.needs_reply ? " · may need a reply" : ""}` }),
-        row.children.length ? row : null));
+      const done = isDone(ev);
+      const box = el("input", { type: "checkbox", checked: done, className: "done-box" });
+      box.setAttribute("aria-label", `Mark ${ev.company || ev.from} ${done ? "not done" : "done"}`);
+      box.addEventListener("change", () => {
+        store.done[ev.id] = { on: box.checked, at: new Date().toISOString() };
+        changed();
+        render();
+        toast(box.checked ? "Marked done" : "Marked open again");
+      });
+      const cat = INBOX_CAT[ev.type] || "Action";
+      const summary = `${TYPE_LABEL[ev.type] || ev.type}${ev.title ? `: ${ev.title}` : ""}${ev.applied ? " · status updated" : ""}`;
+      const item = el("article", { className: `panel-item inbox-item${done ? " is-done" : ""}` },
+        el("div", { className: "panel-top" },
+          el("label", { className: "done-wrap" }, box, el("b", { textContent: ev.company || ev.from })),
+          el("span", { className: `type-badge type-${cat.toLowerCase()}`, textContent: cat })),
+        el("p", { textContent: summary, title: ev.subject || "" }),
+        el("p", { className: "muted", textContent: `${ev.from ? `${ev.from} · ` : ""}Gmail · ${fmtDate(ev.at)}` }),
+        row.children.length ? row : null);
+      wrap.append(item);
     }
     return wrap;
   }
 
+  // ------------------------------------------------------ recruiter emails
+  const INBOX_CAT = { applied: "Applied", acknowledged: "Applied", rejected: "Rejected", recruiter_reply: "Recruiter",
+    shortlisted: "Action", assessment: "Action", scheduling: "Action", interview: "Action", offer: "Action" };
+  const JOB_DRAFTS = ["application", "outreach"];
+  const STAGES = ["draft", "nodraft", "sent", "followup", "replied", "closed"];
+  const STAGE_LABEL = { draft: "Draft ready", nodraft: "No draft yet", sent: "Sent", followup: "Follow-up sent", replied: "Replied", closed: "Closed" };
+  const gmailDraftUrl = (rec) => (rec?.message_id
+    ? `https://mail.google.com/mail/u/0/#drafts?compose=${encodeURIComponent(rec.message_id)}` : "https://mail.google.com/mail/u/0/#drafts");
+  // Working days (Mon–Fri) from `iso` to now
+  function workingDaysSince(iso) {
+    const d = new Date(iso);
+    if (isNaN(d)) return 0;
+    let n = 0;
+    const end = startOfToday();
+    d.setHours(0, 0, 0, 0);
+    while (d < end) {
+      d.setDate(d.getDate() + 1);
+      if (d.getDay() !== 0 && d.getDay() !== 6) n++;
+    }
+    return n;
+  }
+  const FOLLOW_UP_DAYS = 5;
+  const stageOf = (rec) => (!rec ? "nodraft" : rec.closed ? "closed" : rec.replied ? "replied" : rec.followup_sent ? "followup" : rec.sent ? "sent" : "draft");
+  const isDue = (rec) => stageOf(rec) === "sent" && workingDaysSince(rec.sent) >= FOLLOW_UP_DAYS;
+
+  function setDraft(key, patch, msg) {
+    if (readOnly) return toast(`Not saved: ${readOnly}`);
+    store.drafts[key] = { ...store.drafts[key], ...patch, at: new Date().toISOString() };
+    changed();
+    render();
+    toast(msg);
+  }
+
+  function recruiterEntries() {
+    const jobs = new Map(allJobs().map((j) => [j.id, j]));
+    const out = new Map();
+    for (const [key, rec] of Object.entries(store.drafts || {})) {
+      if (!JOB_DRAFTS.includes(rec.type) || !rec.job_id) continue;
+      const cur = out.get(rec.job_id);
+      if (!cur || rec.type === "outreach") out.set(rec.job_id, { key, rec, job: jobs.get(rec.job_id) });
+    }
+    for (const j of jobs.values()) {
+      if (!out.has(j.id) && (j.contact_emails || []).length && statusOf(j) !== "skipped") out.set(j.id, { key: null, rec: null, job: j });
+    }
+    return [...out.values()].map((e) => ({ ...e, stage: stageOf(e.rec), due: isDue(e.rec),
+      followUp: store.drafts[`follow_up:${e.rec?.job_id || e.job?.id}`] }));
+  }
+
   function renderDrafts() {
     const wrap = el("div", { className: "panel-list" });
-    const recs = Object.entries(store.drafts || {}).sort((a, b) => String(b[1].at).localeCompare(String(a[1].at)));
-    wrap.append(el("p", { className: "muted", textContent: draftsOn() ? "Drafts are created in your Gmail and never sent by Job Radar. Review and send them yourself."
-      : me?.gmail?.connected ? "Drafts are turned off in Settings." : "Connect Gmail in Settings to create drafts." }),
-    el("div", { className: "row" }, el("a", { className: "btn", href: "https://mail.google.com/mail/u/0/#drafts", target: "_blank", rel: "noopener", textContent: "All Gmail drafts ↗" })));
-    if (!recs.length) {
-      wrap.append(el("div", { className: "empty" }, el("b", { textContent: "No drafts yet" }), "Use ✉️ on a job, or a reply button under Inbox updates."));
-      return wrap;
+    const entries = recruiterEntries().sort((a, b) => (b.due - a.due) || STAGES.indexOf(a.stage) - STAGES.indexOf(b.stage) ||
+      String(b.rec?.at || b.job?.first_seen || "").localeCompare(String(a.rec?.at || a.job?.first_seen || "")));
+    const toReview = entries.filter((e) => e.stage === "draft").length, due = entries.filter((e) => e.due).length;
+    wrap.append(el("div", { className: "mail-summary" },
+      el("span", { className: "stat-pill" }, el("b", { textContent: toReview }), " drafts to review"),
+      el("span", { className: `stat-pill${due ? " warn" : ""}` }, el("b", { textContent: due }), ` follow-up${due === 1 ? "" : "s"} due`)),
+    el("p", { className: "muted", textContent: draftsOn() ? `Drafts are created in your Gmail and never sent by Job Radar. A follow-up is due ${FOLLOW_UP_DAYS} working days after you mark one sent.`
+      : me?.gmail?.connected ? "Drafts are turned off in Settings." : "Connect Gmail in Settings to create drafts. You can still copy them from the editor." }));
+    if (!entries.length) {
+      wrap.append(el("div", { className: "empty" }, el("b", { textContent: "No recruiter emails yet" }),
+        "When a job lists a recruiter's email, or you create a draft with ✉️ on a job, it shows up here."));
     }
-    for (const [, d] of recs) {
-      const job = d.job_id && allJobs().find((j) => j.id === d.job_id);
-      wrap.append(el("article", { className: "panel-item" },
-        el("div", { className: "panel-top" }, el("b", { textContent: job?.company || d.to }), el("span", { className: "st-chip st-interview", textContent: DRAFT_LABEL[d.type] || d.type })),
-        el("p", { textContent: d.subject }),
-        el("p", { className: "muted", textContent: `To ${d.to} · ${ago(d.at)}${d.attached ? " · resume attached" : ""}` })));
+    for (const e of entries) {
+      const { job, rec, key } = e;
+      const to = rec?.to || (job?.contact_emails || [])[0] || "";
+      const yrs = job?.score_breakdown?.years_required;
+      const gap = job ? JRDesk.fitLines(job)[1] : "";
+      const row = el("div", { className: "row" });
+      const btn = (label, run, primary) => {
+        const b = el("button", { className: `btn${primary ? " btn-primary" : ""}`, type: "button", textContent: label });
+        b.addEventListener("click", run);
+        row.append(b);
+      };
+      if (rec?.id) row.append(el("a", { className: "btn btn-primary", href: gmailDraftUrl(rec), target: "_blank", rel: "noopener", textContent: "Open draft ↗" }));
+      else if (job) btn("✉️ Draft email", () => openDraft(job, "outreach"), true);
+      if (e.followUp?.id) row.append(el("a", { className: "btn btn-primary", href: gmailDraftUrl(e.followUp), target: "_blank", rel: "noopener", textContent: "Open follow-up ↗" }));
+      else if (e.due && job) btn("✉️ Draft follow-up", () => openDraft(job, "follow_up"), true);
+      const url = safeUrl(job?.url);
+      if (url) row.append(el("a", { className: "btn", href: url, target: "_blank", rel: "noopener", textContent: "Recruiter post ↗" }));
+      if (rec) {
+        const now = new Date().toISOString();
+        if (e.stage === "draft") btn("Mark sent", () => setDraft(key, { sent: now }, `Marked sent · follow-up due in ${FOLLOW_UP_DAYS} working days`));
+        if (e.stage === "sent") btn("Follow-up sent", () => setDraft(key, { followup_sent: now }, "Follow-up marked sent"));
+        if (["sent", "followup"].includes(e.stage)) btn("Replied", () => setDraft(key, { replied: now }, "Marked replied"));
+        if (e.stage !== "closed") btn("Close", () => setDraft(key, { closed: now }, "Closed"));
+        else btn("Reopen", () => setDraft(key, { closed: null }, "Reopened"));
+        const note = el("button", { className: "link-btn", type: "button", textContent: rec.note ? "Edit note" : "Add note" });
+        note.addEventListener("click", () => {
+          const v = prompt("Note (only you see it):", rec.note || "");
+          if (v !== null) setDraft(key, { note: v.trim().slice(0, 300) }, "Note saved");
+        });
+        row.append(note);
+      }
+      const when = rec?.closed ? `closed ${fmtDate(rec.closed)}` : rec?.replied ? `replied ${fmtDate(rec.replied)}`
+        : rec?.followup_sent ? `follow-up sent ${fmtDate(rec.followup_sent)}` : rec?.sent ? `sent ${fmtDate(rec.sent)}` : rec ? `drafted ${ago(rec.at)}` : "";
+      wrap.append(el("article", { className: `panel-item${e.due ? " due" : ""}` },
+        el("div", { className: "panel-top" }, el("b", { textContent: job?.company || to || "Recruiter" }),
+          el("span", { className: `st-chip mail-${e.stage}`, textContent: e.due ? "Follow-up due" : STAGE_LABEL[e.stage] })),
+        el("p", { textContent: [job?.title, rec ? DRAFT_LABEL[rec.type] : null].filter(Boolean).join(" · ") }),
+        el("p", { className: "muted", textContent: [to ? `To ${to}` : "No recruiter email in the post", job ? locationLabel(job) : "",
+          yrs != null ? `${yrs}${job.score_breakdown.years_max ? `–${job.score_breakdown.years_max}` : "+"} yrs` : "", when,
+          rec?.attached ? "resume attached" : ""].filter(Boolean).join(" · ") }),
+        gap ? el("p", { className: "gap-line", textContent: gap }) : null,
+        rec?.note ? el("p", { className: "note-line", textContent: `Note: ${rec.note}` }) : null,
+        row));
+    }
+    // Replies, availability, thank-yous… (drafted from Inbox updates)
+    const other = Object.values(store.drafts || {}).filter((d) => !JOB_DRAFTS.includes(d.type) && d.type !== "follow_up")
+      .sort((a, b) => String(b.at).localeCompare(String(a.at)));
+    if (other.length) {
+      wrap.append(el("h3", { className: "panel-h", textContent: `Other drafts (${other.length})` }));
+      for (const d of other) {
+        const job = d.job_id && allJobs().find((j) => j.id === d.job_id);
+        wrap.append(el("article", { className: "panel-item" },
+          el("div", { className: "panel-top" }, el("b", { textContent: job?.company || d.to }), el("span", { className: "st-chip st-interview", textContent: DRAFT_LABEL[d.type] || d.type })),
+          el("p", { textContent: d.subject }),
+          el("div", { className: "row" }, el("a", { className: "btn", href: gmailDraftUrl(d), target: "_blank", rel: "noopener", textContent: "Open draft ↗" }),
+            el("span", { className: "muted", textContent: `To ${d.to} · ${ago(d.at)}` }))));
+      }
     }
     return wrap;
   }
@@ -681,6 +827,9 @@ const JRAccount = (() => {
         text("min_years", p.min_years, { type: "number", min: 0, max: 50, placeholder: "min" }),
         text("max_years", p.max_years, { type: "number", min: 0, max: 50, placeholder: "max" })), "optional"),
       field("Notice period", text("notice", p.notice, { placeholder: "e.g. Immediate joiner, 30 days" })),
+      field("Current CTC", text("current_ctc", p.current_ctc, { placeholder: "e.g. 8 LPA" }), "optional, for form answers"),
+      field("Expected CTC", text("expected_ctc", p.expected_ctc, { placeholder: "e.g. 12 LPA" }), "optional, for form answers"),
+      field("Portfolio / GitHub", text("portfolio", p.portfolio, { type: "url", placeholder: "https://" }), "optional"),
       field("Education", area("education", p.education), "one per line"),
       field("Certifications", area("certifications", p.certifications), "one per line"),
       field("Highlights for drafts", area("highlights", p.highlights), "up to 3 lines, your own words"),
@@ -716,6 +865,9 @@ const JRAccount = (() => {
         walkin_radius_km: num("walkin_radius_km"), walkin_from: f.get("walkin_from") || null, walkin_to: f.get("walkin_to") || null,
         walkin_min_years: num("walkin_min_years"), walkin_max_years: num("walkin_max_years"), walkin_min_score: Number(wScore.value),
         min_years: num("min_years"), max_years: num("max_years"), notice: f.get("notice"),
+        current_ctc: f.get("current_ctc"), expected_ctc: f.get("expected_ctc"), portfolio: f.get("portfolio"),
+        added_skills: (p.added_skills || []).filter((k) => skills.some((x) => x.toLowerCase() === k.toLowerCase())),
+        hidden_skills: p.hidden_skills || [],
         education: rows(f.get("education")), certifications: rows(f.get("certifications")),
         highlights: rows(f.get("highlights")).slice(0, 3),
         degree_levels: p.degree_levels || [], projects: p.projects || [],
@@ -974,12 +1126,18 @@ const JRAccount = (() => {
   }
 
   function signedOut() {
+    unwatch.forEach((u) => u());
+    unwatch = [];
     me = null;
     matchesCache = null;
     $("#acct-banner").hidden = true;
   }
 
-  return { enabled, api, refreshMe, onSignedIn, loadMatches, decorateCard, renderInbox, renderDrafts, renderSettings,
+  const mailCount = () => recruiterEntries().filter((e) => !["closed", "replied"].includes(e.stage)).length;
+  const inboxOpen = () => (store.gmail.events || []).filter((ev) => !store.done[ev.id]?.on).length +
+    (store.gmail.review || []).filter((r) => !store.reviews[r.id]).length;
+
+  return { enabled, api, refreshMe, mailCount, inboxOpen, onSignedIn, loadMatches, decorateCard, renderInbox, renderDrafts, renderSettings,
     openOnboarding, pushKey, savePush, signedOut, profile, handleReturn, checkVerification, refreshNow, renderWalkins,
     refreshWalkins: () => loadWalkins(true).then(() => section === "walkins" && render()).catch((e) => toast(e.message)), get me() { return me; } };
 })();

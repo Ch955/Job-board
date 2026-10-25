@@ -8,8 +8,8 @@ State: {"statuses":{id:{status,at,appliedAt?,source?}}, "saved":{id:job}, "sent"
 from __future__ import annotations
 
 KEEP = ("later", "applied", "interview", "offer", "rejected")
-MAPS = ("statuses", "saved", "sent", "pending", "gmail", "reviews", "drafts", "walkins")
-NEWEST = ("pending", "reviews", "drafts", "walkins")  # per key, the record with the later "at" wins
+MAPS = ("statuses", "saved", "sent", "pending", "gmail", "reviews", "drafts", "walkins", "done")
+NEWEST = ("pending", "reviews", "drafts", "walkins", "done")  # per key, the record with the later "at" wins
 
 
 def normalize(s: dict | None) -> dict:

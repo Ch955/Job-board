@@ -269,7 +269,8 @@ def create(client: gmail.GmailClient, state: dict, profile: dict, kind: str, *, 
     body = (body or "").strip()[:20000] or auto_body
     d = client.create_draft(to=to, subject=subject, body=body, attachment=attachment, sender=profile.get("email"),
                             thread_id=thread_id, in_reply_to=in_reply_to)
-    rec = {"id": d["id"], "thread_id": d.get("thread_id") or thread_id or "", "job_id": job.get("id"), "type": kind,
+    rec = {"id": d["id"], "message_id": d.get("message_id", ""), "thread_id": d.get("thread_id") or thread_id or "",
+           "job_id": job.get("id"), "type": kind,
            "to": to, "subject": subject[:140], "attached": bool(attachment),
            "at": (now or datetime.now(timezone.utc)).isoformat(timespec="seconds")}
     drafts[key] = rec

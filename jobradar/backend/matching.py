@@ -23,6 +23,9 @@ DEGREE_ASK = [(re.compile(p, re.I), lvl) for p, lvl in (
     (r"\b(bachelor'?s|b\.?\s?tech|b\.?e\.?|graduate|degree)\b", "Bachelor's"),
 )]
 LEVEL = {"Diploma": 1, "Bachelor's": 2, "Master's": 3, "PhD": 4}
+# The listing says you must upload files: an application for the laptop, not the phone
+FILES_REQUIRED = re.compile(r"upload (your |an updated )?(resume|cv)|attach (your )?(resume|cv)|cover letter (is )?(required|mandatory)"
+                            r"|portfolio (is )?required", re.I)
 
 # One name per city for the app's Location filter ("Bangalore Urban, Karnataka" and "KA, IN" -> Bengaluru)
 CITIES = [
@@ -144,6 +147,7 @@ class UserMatcher:
             "role_fit": "match" if title_pts >= 18 else "related" if title_pts else "different",
             "qualifications": {"degree_asked": need, "fits": qual_ok},
             "location": {"label": loc_label, "fits": loc_ok}, "walk_in": walk_in, "age_days": days,
+            "files_required": bool(FILES_REQUIRED.search(text)),
             "summary": " ".join(parts),
         }
 

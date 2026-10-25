@@ -13,7 +13,7 @@ import json
 import logging
 from datetime import datetime, timezone
 
-from .. import apply_type, gmail, gmail_status, push
+from .. import apply_type, gmail, gmail_status, push, skills_vocab
 from ..models import Job
 from ..pipeline import dedupe, fetch_all, permitted
 from ..scoring import Scorer, age_days
@@ -157,15 +157,65 @@ def match_user(store: Store, base: dict, uid: str, pool: list[Job] | None = None
     if not p or is_complete(p):
         return {"skipped": "profile incomplete"}
     pool = load_pool(store) if pool is None else pool
-    jobs = UserMatcher(base, p).match(pool, now)[:MAX_MATCHES]
+    matcher = UserMatcher(base, p)
+    jobs = matcher.match(pool, now)[:MAX_MATCHES]
     old = store.get("matches", uid) or {}
     seen = set(old.get("seen") or [])
     new = [j for j in jobs if j["id"] not in seen]
     for j in jobs:
         j.pop("description", None)
     store.set("matches", uid, {"jobs": jobs, "threshold": p.get("threshold", 70), "updated": _iso(now),
-                               "count": len(jobs), "seen": sorted(seen | {j["id"] for j in jobs})[-3000:]})
+                               "count": len(jobs), "seen": sorted(seen | {j["id"] for j in jobs})[-3000:],
+                               "skills_scan": skill_scan(matcher, pool, p, now)})
     return {"count": len(jobs), "new": [j["id"] for j in new]}
+
+
+SCAN_DAYS = 30
+NOT_FAILED = ("ok", "disabled", "not permitted", "throttled", "skipped")
+
+
+def failed_sources(runs: dict) -> list[dict]:
+    """Sources that broke in the last pool run: a whole source erroring, or JobSpy sites whose searches failed.
+
+    One company's careers board missing (a 404 on Greenhouse etc.) isn't a source failure, so it isn't listed.
+    """
+    out = []
+    for name, r in runs.items():
+        if r.get("status") not in NOT_FAILED:
+            out.append({"source": name, "reason": str(r.get("error") or r.get("status"))[:160]})
+        elif name == "jobspy":
+            sites: dict = {}
+            for w in r.get("warnings") or []:
+                site = w.split(" ", 1)[0]
+                sites.setdefault(site, w.split(": ", 1)[-1][:160])
+            out += [{"source": site, "reason": why} for site, why in sites.items()]
+    return out
+
+
+def skill_scan(matcher: UserMatcher, pool: list[Job], p: dict, now: datetime) -> dict:
+    """Which skills recent postings for your roles and experience ask for, and how many of those mentions you cover.
+
+    Counted over real pool postings only: role related to yours, experience range overlapping yours, last 30 days.
+    Each posting counts a skill once.
+    """
+    s = matcher.scorer
+    counts: Counter = Counter()
+    scanned = 0
+    for job in pool:
+        if (age_days(job, now) or 0) > SCAN_DAYS or s.title_points(job.title) < 18:
+            continue
+        text = job.description or job.description_snippet
+        if not s.experience_points(text)[3]:
+            continue
+        scanned += 1
+        counts.update(set(skills_vocab.find_skills(f"{job.title} {text}")))
+    mine = {k.lower() for k in p.get("skills") or []}
+    total = sum(counts.values())
+    covered = sum(n for k, n in counts.items() if k.lower() in mine)
+    lo, hi = matcher.cfg["experience"]["min_years"], matcher.cfg["experience"]["max_years"]
+    return {"scanned": scanned, "days": SCAN_DAYS, "band": [lo, hi], "updated": _iso(now),
+            "coverage": round(100 * covered / total) if total else None, "mentions": total,
+            "skills": [[k, n] for k, n in counts.most_common(80)]}
 
 
 def notify_user(store: Store, uid: str, new_jobs: list[dict], vapid_key: str, subject: str, session) -> int:

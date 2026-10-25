@@ -76,12 +76,20 @@
     <div id="acct-banner" class="acct-banner" role="status" hidden></div>
     <div id="ptr" class="ptr" aria-hidden="true"><span></span></div>
 
-    <section class="stats" aria-label="Your activity">
-      <button class="stat" data-go="applied" type="button"><b id="stat-today">0</b><span>applied today</span></button>
-      <button class="stat" data-go="applied" type="button"><b id="stat-week">0</b><span>this week</span></button>
-      <button class="stat" data-go="new" type="button"><b id="stat-toapply">0</b><span>to apply</span></button>
-      <button class="stat" data-go="interview" type="button"><b id="stat-interview">0</b><span>interviews</span></button>
+    <div id="net-banner" class="net-banner" role="status" hidden></div>
+    <div id="ro-banner" class="ro-banner" role="alert" hidden></div>
+    <section class="strip" aria-label="Your applications by stage">
+      <button class="stage" data-go="new" type="button"><b id="st-new">0</b><span>To apply</span></button>
+      <button class="stage" data-go="later" type="button"><b id="st-later">0</b><span>Apply later</span></button>
+      <button class="stage" data-go="applied" type="button"><b id="st-applied">0</b><span>Applied</span></button>
+      <button class="stage" data-go="interview" type="button"><b id="st-interview">0</b><span>In process</span></button>
+      <button class="stage" data-go="offer" type="button"><b id="st-offer">0</b><span>Offers</span></button>
+      <button class="stage" data-go="rejected" type="button"><b id="st-rejected">0</b><span>Rejected</span></button>
     </section>
+    <div class="runline">
+      <span id="runinfo" class="muted"></span>
+      <button id="src-warn" class="warn-chip" type="button" hidden></button>
+    </div>
 
     <section class="filters" aria-label="Filters">
       <div class="filter-row">
@@ -91,11 +99,43 @@
         </label>
         <button id="toggle-filters" class="chip-btn" aria-expanded="false" aria-controls="filter-panel">Filters</button>
       </div>
+      <div id="filter-summary" class="filter-summary" hidden></div>
       <div id="filter-panel" class="filter-panel" hidden>
         <label class="field">
-          <span>Min score <output id="f-score-val">40</output></span>
+          <span>Minimum fit <output id="f-score-val">40</output></span>
           <input id="f-score" type="range" min="40" max="100" step="5" value="40">
         </label>
+        <div class="field chip-field" role="group" aria-labelledby="l-band">
+          <span id="l-band">Fit band</span>
+          <div id="f-band" class="chips"></div>
+        </div>
+        <div class="field chip-field" role="group" aria-labelledby="l-status" id="status-field" hidden>
+          <span id="l-status">Status</span>
+          <div id="f-status" class="chips"></div>
+        </div>
+        <div class="field" role="group" aria-labelledby="l-date">
+          <span id="l-date">Date</span>
+          <div class="row date-row">
+            <select id="f-date-field" aria-label="Which date">
+              <option value="found">Found</option>
+              <option value="applied">Applied</option>
+            </select>
+            <select id="f-date-preset" aria-label="Date range"></select>
+          </div>
+          <div class="row date-row" id="date-custom" hidden>
+            <label>From <input type="date" id="f-date-from"></label>
+            <label>To <input type="date" id="f-date-to"></label>
+          </div>
+        </div>
+        <div class="field chip-field" role="group" aria-labelledby="l-skills">
+          <span id="l-skills">Skills
+            <span class="seg" role="radiogroup" aria-label="Skill match">
+              <button type="button" id="f-skills-all" class="seg-btn" aria-pressed="true">all of</button>
+              <button type="button" id="f-skills-any" class="seg-btn" aria-pressed="false">any of</button>
+            </span>
+          </span>
+          <div id="f-skills" class="chips"></div>
+        </div>
         <div class="field chip-field" role="group" aria-labelledby="l-apply">
           <span id="l-apply">Application type <small class="muted">· tap several</small></span>
           <div id="f-apply" class="chips"></div>
@@ -112,7 +152,7 @@
           <span id="l-remote">Work mode</span>
           <div id="f-remote" class="chips"></div>
         </div>
-        <button id="reset-filters" class="link-btn" type="button">Reset filters</button>
+        <button id="reset-filters" class="link-btn" type="button">Clear all filters</button>
       </div>
       <p id="section-hint" class="section-hint muted"></p>
     </section>
@@ -131,6 +171,9 @@
         </div>
       </div>
       <div class="breakdown" hidden></div>
+      <p class="why-line" hidden></p>
+      <p class="gap-line" hidden></p>
+      <p class="warn-line" hidden></p>
       <ul class="keywords"></ul>
       <p class="snippet"></p>
       <div class="pending-bar" hidden>
@@ -229,11 +272,23 @@
     <section class="menu-section" id="draft-body"></section>
   </dialog>
 
+  <dialog id="later-dlg" class="sheet" aria-label="Apply later">
+    <form method="dialog" class="menu-head">
+      <h2>Apply later</h2>
+      <button class="icon-btn" aria-label="Close">✕</button>
+    </form>
+    <section class="menu-section">
+      <p class="muted" id="later-job"></p>
+      <div class="reason-list" id="later-reasons"></div>
+    </section>
+  </dialog>
+
   <div id="toast" class="toast" role="status" hidden></div>
 
   <script src="sync.js" defer></script>
   <script src="native.js" defer></script>
   <script src="account.js" defer></script>
+  <script src="desk.js" defer></script>
   <script src="app.js" defer></script>
   <script type="module" src="cloud.js"></script>
 </body>
