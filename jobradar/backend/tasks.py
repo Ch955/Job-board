@@ -234,7 +234,8 @@ def skill_scan(matcher: UserMatcher, pool: list[Job], p: dict, now: datetime) ->
     lo, hi = matcher.cfg["experience"]["min_years"], matcher.cfg["experience"]["max_years"]
     return {"scanned": scanned, "days": SCAN_DAYS, "band": [lo, hi], "updated": _iso(now),
             "coverage": round(100 * covered / total) if total else None, "mentions": total,
-            "skills": [[k, n] for k, n in counts.most_common(80)],
+            # objects, not [name, count] pairs: Firestore can't store a list inside a list
+            "skills": [{"skill": k, "count": n} for k, n in counts.most_common(80)],
             "implied": sorted(k for k in counts if k.lower() in mine and k.lower() not in {x.lower() for x in p.get("skills") or []})}
 
 

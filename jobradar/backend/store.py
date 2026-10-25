@@ -48,6 +48,18 @@ class Store:
         raise NotImplementedError
 
 
+def _firestore_shape(v, in_list: bool = False) -> None:
+    """Reject what Firestore rejects, so tests catch it: a list directly inside a list."""
+    if isinstance(v, dict):
+        for x in v.values():
+            _firestore_shape(x)
+    elif isinstance(v, (list, tuple)):
+        if in_list:
+            raise ValueError("Firestore can't store a list inside a list")
+        for x in v:
+            _firestore_shape(x, True)
+
+
 class MemoryStore(Store):
     def __init__(self):
         self.docs: dict[tuple[str, str], tuple[dict, str]] = {}
@@ -66,9 +78,11 @@ class MemoryStore(Store):
                 raise Conflict()
             if if_version is not None and (not cur or cur[1] != if_version):
                 raise Conflict()
+            _firestore_shape(data)
             self.docs[(collection, doc_id)] = (copy.deepcopy(data), f"v{next(self._clock)}")
 
     def update(self, collection, doc_id, fields):
+        _firestore_shape(fields)
         with self._lock:
             cur = self.docs.get((collection, doc_id))
             data = copy.deepcopy(cur[0]) if cur else {}

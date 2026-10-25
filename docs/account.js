@@ -267,7 +267,9 @@ const JRAccount = (() => {
     return {
       jobs: m.jobs || [], generated_at: m.updated, alert_score: p.threshold ?? 70,
       searching: !!m.searching, search_started: m.search_started, pool_count: m.pool_count,
-      sources_available: m.sources_available || [], run: m.run || null, skills_scan: m.skills_scan || null,
+      sources_available: m.sources_available || [], run: m.run || null,
+      // the server stores {skill, count} objects; the page works with [skill, count] pairs
+      skills_scan: m.skills_scan ? { ...m.skills_scan, skills: (m.skills_scan.skills || []).map((x) => (Array.isArray(x) ? x : [x.skill, x.count])) } : null,
       outreach: { profile: { name: (p.full_name || "").split(" ")[0], full_name: p.full_name, role: p.current_role,
         years_experience: p.years_experience, notice: p.notice, linkedin: p.linkedin }, my_skills: p.skills || [] },
     };

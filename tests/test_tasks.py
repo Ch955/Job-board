@@ -211,7 +211,7 @@ def test_skill_scan_counts_relevant_postings_once_each():
             job(2, "Senior Data Engineer", "Python Airflow. 3+ years"),
             job(3, "Sales Manager", "Python Kafka")]                      # not your role: not counted
     scan = tasks.skill_scan(UserMatcher(load_config(), p), pool, p, now)
-    counts = dict(scan["skills"])
+    counts = {x["skill"]: x["count"] for x in scan["skills"]}
     assert scan["scanned"] == 2 and counts["Python"] == 2 and counts["Kafka"] == 1 and counts["Airflow"] == 1
     assert scan["coverage"] == 75   # 3 of 4 mentions are skills you have
 
