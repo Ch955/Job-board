@@ -135,3 +135,32 @@ def test_revoked_access_disconnects_with_a_message():
         gmail_link.access_for(store, CFG, g, "alice")
     assert store.get("secrets", "alice") is None
     assert "Connect Gmail again" in store.get("gmail", "alice")["last_error"]
+
+
+RATE = {"error": {"code": 403, "message": "Quota exceeded for quota metric 'Queries' per minute per user.",
+                  "errors": [{"reason": "rateLimitExceeded"}]}}
+
+
+class Flaky:
+    def __init__(self, fails):
+        self.fails, self.calls = fails, 0
+    def get(self, url, headers=None, params=None):
+        self.calls += 1
+        if self.calls <= self.fails:
+            return Resp(403, RATE)
+        return Resp(200, {"emailAddress": "a@gmail.com"})
+
+
+def test_rate_limit_is_retried_with_backoff():
+    waits = []
+    s = Flaky(fails=2)
+    assert gmail.GmailClient(s, "t", sleep=waits.append).profile()["emailAddress"] == "a@gmail.com"
+    assert s.calls == 3 and [w for w in waits if w >= 1] == [2, 4]
+
+
+def test_persistent_rate_limit_explains_with_googles_message():
+    s = Flaky(fails=99)
+    with pytest.raises(gmail.GmailApiError) as e:
+        gmail.GmailClient(s, "t", sleep=lambda w: None).profile()
+    assert e.value.status == 429 and "per minute per user" in e.value.user_message
+    assert s.calls == gmail.GmailClient.RETRIES + 1

@@ -11,6 +11,7 @@ import json
 import os
 import secrets
 import threading
+import time
 import urllib.parse
 import webbrowser
 from email.message import EmailMessage
@@ -156,11 +157,29 @@ def revoke(session, token: str) -> bool:
 class GmailClient:
     """Thin Gmail REST client bound to one user's access token."""
 
-    def __init__(self, session, token: str):
-        self.session, self.token = session, token
+    def __init__(self, session, token: str, sleep=time.sleep):
+        self.session, self.token, self.sleep = session, token, sleep
+        self._last = 0.0
+
+    RATE_REASONS = ("rateLimitExceeded", "userRateLimitExceeded", "RATE_LIMIT_EXCEEDED")
+    MIN_GAP = 0.1      # seconds between requests: ~10/s, well under Gmail's per-user quota
+    RETRIES = 4        # on "slow down": wait 2, 4, 8, 16 s (or what Google asks), then give up
 
     def _get(self, path: str, params=None) -> dict:
-        r = self.session.get(f"{API}{path}", headers={"Authorization": f"Bearer {self.token}"}, params=params)
+        for attempt in range(self.RETRIES + 1):
+            gap = self.MIN_GAP - (time.monotonic() - self._last)
+            if gap > 0:
+                self.sleep(gap)
+            self._last = time.monotonic()
+            r = self.session.get(f"{API}{path}", headers={"Authorization": f"Bearer {self.token}"}, params=params)
+            limited = r.status_code == 429 or (r.status_code == 403 and google_error(r)[0] in self.RATE_REASONS)
+            if not limited or attempt == self.RETRIES:
+                break
+            try:
+                wait = float(r.headers.get("Retry-After") or 0)
+            except (TypeError, ValueError, AttributeError):
+                wait = 0
+            self.sleep(min(max(wait, 2 ** (attempt + 1)), 60))
         if r.status_code == 401:
             raise GmailAuthError("Gmail access expired or was revoked", revoked=True)
         if r.status_code >= 400:
@@ -170,8 +189,10 @@ class GmailClient:
                 raise GmailApiError(403, msg, reason or "SERVICE_DISABLED",
                                     "The Gmail API isn't enabled for this app's Google Cloud project. The app owner must enable "
                                     "it (Google Cloud → APIs & Services → Gmail API → Enable), then tap Sync now again.")
-            if r.status_code == 403 and reason in ("rateLimitExceeded", "userRateLimitExceeded", "RATE_LIMIT_EXCEEDED"):
-                raise GmailApiError(429, msg, reason, "Gmail is limiting requests right now. Try again in a few minutes.")
+            if r.status_code == 429 or (r.status_code == 403 and reason in self.RATE_REASONS):
+                raise GmailApiError(429, msg, reason or "429",
+                                    f"Gmail is still limiting requests after several retries ({reason or 'rate limit'}: "
+                                    f"{msg[:140] or 'no detail from Google'}). It will try again on the next run.")
             if r.status_code == 403:  # insufficientPermissions / ACCESS_TOKEN_SCOPE_INSUFFICIENT
                 raise GmailAuthError(f"Gmail permission missing ({reason or 'forbidden'})", revoked=True)
             raise GmailApiError(r.status_code, msg, reason)
