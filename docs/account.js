@@ -636,16 +636,47 @@ const JRAccount = (() => {
       followUp: store.drafts[`follow_up:${e.rec?.job_id || e.job?.id}`] }));
   }
 
+  function morningBox() {
+    const p = profile();
+    const last = me?.gmail?.last_auto;
+    if (!p.auto_drafts) {
+      const on = el("button", { className: "link-btn", type: "button", textContent: "Turn on morning recruiter drafts" });
+      on.addEventListener("click", () => openOnboarding());
+      return el("div", { className: "note" }, "Want drafts made for you every morning at 9? ", on);
+    }
+    const run = el("button", { className: "btn", type: "button", textContent: "Run now" });
+    run.addEventListener("click", async () => {
+      await withBusy(run, "Working…", async () => {
+        try {
+          const { report: r } = await api("/api/drafts/auto", { method: "POST" });
+          toast(`${r.created} new draft${r.created === 1 ? "" : "s"}, ${r.follow_ups} follow-up${r.follow_ups === 1 ? "" : "s"}` +
+            (r.sent || r.replied ? ` · noticed ${r.sent} sent, ${r.replied} replied` : "") + (r.created ? " · open Gmail Drafts to send" : ""));
+        } catch (e) {
+          toast(e.message);
+        }
+        await refreshMe().catch(() => null);
+        render();
+      });
+    });
+    const summary = !last ? "Runs every morning at 9:00. Nothing yet."
+      : last.error ? `Last run ${ago(last.at)} stopped: ${last.error}`
+      : `Last run ${ago(last.at)}: ${last.created} new draft${last.created === 1 ? "" : "s"}, ${last.follow_ups} follow-up${last.follow_ups === 1 ? "" : "s"}` +
+        `${last.sent || last.replied ? `, noticed ${last.sent} sent and ${last.replied} replied` : ""}. ${last.candidates ? `${last.candidates} recruiter email${last.candidates === 1 ? " was" : "s were"} waiting.` : ""}`;
+    return el("div", { className: "note morning" }, el("b", { textContent: `☀️ Morning drafts on · up to ${p.auto_draft_limit ?? 5} a day` }),
+      el("p", { textContent: summary }), el("div", { className: "row" }, run));
+  }
+
   function renderDrafts() {
     const wrap = el("div", { className: "panel-list" });
     const entries = recruiterEntries().sort((a, b) => (b.due - a.due) || STAGES.indexOf(a.stage) - STAGES.indexOf(b.stage) ||
       String(b.rec?.at || b.job?.first_seen || "").localeCompare(String(a.rec?.at || a.job?.first_seen || "")));
     const toReview = entries.filter((e) => e.stage === "draft").length, due = entries.filter((e) => e.due).length;
     wrap.append(el("div", { className: "mail-summary" },
-      el("span", { className: "stat-pill" }, el("b", { textContent: toReview }), " drafts to review"),
+      el("span", { className: "stat-pill" }, el("b", { textContent: toReview }), ` draft${toReview === 1 ? "" : "s"} to review`),
       el("span", { className: `stat-pill${due ? " warn" : ""}` }, el("b", { textContent: due }), ` follow-up${due === 1 ? "" : "s"} due`)),
-    el("p", { className: "muted", textContent: draftsOn() ? `Drafts are created in your Gmail and never sent by Job Radar. A follow-up is due ${FOLLOW_UP_DAYS} working days after you mark one sent.`
-      : me?.gmail?.connected ? "Drafts are turned off in Settings." : "Connect Gmail in Settings to create drafts. You can still copy them from the editor." }));
+    el("p", { className: "muted", textContent: draftsOn() ? `Drafts are created in your Gmail and never sent by Job Radar. A follow-up is due ${FOLLOW_UP_DAYS} working days after you send one.`
+      : me?.gmail?.connected ? "Drafts are turned off in Settings." : "Connect Gmail in Settings to create drafts. You can still copy them from the editor." }),
+    morningBox());
     if (!entries.length) {
       wrap.append(el("div", { className: "empty" }, el("b", { textContent: "No recruiter emails yet" }),
         "When a job lists a recruiter's email, or you create a draft with ✉️ on a job, it shows up here."));
@@ -685,7 +716,8 @@ const JRAccount = (() => {
         : rec?.followup_sent ? `follow-up sent ${fmtDate(rec.followup_sent)}` : rec?.sent ? `sent ${fmtDate(rec.sent)}` : rec ? `drafted ${ago(rec.at)}` : "";
       wrap.append(el("article", { className: `panel-item${e.due ? " due" : ""}` },
         el("div", { className: "panel-top" }, el("b", { textContent: job?.company || to || "Recruiter" }),
-          el("span", { className: `st-chip mail-${e.stage}`, textContent: e.due ? "Follow-up due" : STAGE_LABEL[e.stage] })),
+          el("span", { className: "chip-row" }, rec?.auto ? el("span", { className: "badge", textContent: "auto", title: "Made by the 9 AM run" }) : null,
+            el("span", { className: `st-chip mail-${e.stage}`, textContent: e.due ? "Follow-up due" : STAGE_LABEL[e.stage] }))),
         el("p", { textContent: [job?.title, rec ? DRAFT_LABEL[rec.type] : null].filter(Boolean).join(" · ") }),
         el("p", { className: "muted", textContent: [to ? `To ${to}` : "No recruiter email in the post", job ? locationLabel(job) : "",
           yrs != null ? `${yrs}${job.score_breakdown.years_max ? `–${job.score_breakdown.years_max}` : "+"} yrs` : "", when,
@@ -786,6 +818,7 @@ const JRAccount = (() => {
     const wCities = chipList(p.walkin_cities, "Type a city, e.g. Hyderabad", true);
     const wRoles = chipList(p.walkin_roles, "Add a role and press Enter");
     const wInd = chipList(p.walkin_industries, "e.g. Banking, IT services");
+    const exclCos = chipList(p.excluded_companies, "Company name, then Enter");
     const copyCities = el("button", { type: "button", className: "link-btn", textContent: "Use my job cities for walk-ins" });
     copyCities.addEventListener("click", () => wCities.set(cities.get()));
     const wScore = el("input", { name: "walkin_min_score", type: "range", min: 0, max: 100, step: 5, value: p.walkin_min_score ?? 50 });
@@ -848,6 +881,11 @@ const JRAccount = (() => {
       el("label", { className: "lg-field" }, el("span", {}, "Walk-ins scoring at least ", wOut), wScore),
       reset,
       check("drafts_enabled", p.drafts_enabled ?? true, "Allow Gmail drafts (never sent automatically)"),
+      el("h4", { className: "pf-h", textContent: "Morning recruiter drafts" }),
+      el("p", { className: "muted", textContent: "Every day at 9:00 AM, Job Radar looks at your matches for recruiters who wrote their email in the job post, and creates a draft to each one in your Gmail with your resume attached. You review and send them yourself. It also notices when you've sent one or got a reply, and drafts a follow-up in the same thread after 5 working days. Needs Gmail connected." }),
+      check("auto_drafts", p.auto_drafts ?? false, "Create recruiter drafts every morning"),
+      field("Most drafts per morning", text("auto_draft_limit", p.auto_draft_limit ?? 5, { type: "number", min: 1, max: 15 }), "1–15"),
+      el("div", { className: "lg-field" }, el("span", {}, "Never draft to these companies", el("small", { className: "muted", textContent: " · e.g. your current employer" })), exclCos.node),
       check("notify", p.notify ?? true, "Notify me about new matches"),
       err, el("div", { className: "row" }, save)].filter(Boolean));
     form.addEventListener("submit", async (e) => {
@@ -868,6 +906,7 @@ const JRAccount = (() => {
         current_ctc: f.get("current_ctc"), expected_ctc: f.get("expected_ctc"), portfolio: f.get("portfolio"),
         added_skills: (p.added_skills || []).filter((k) => skills.some((x) => x.toLowerCase() === k.toLowerCase())),
         hidden_skills: p.hidden_skills || [],
+        auto_drafts: f.get("auto_drafts") === "on", auto_draft_limit: num("auto_draft_limit") ?? 5, excluded_companies: exclCos.get(),
         education: rows(f.get("education")), certifications: rows(f.get("certifications")),
         highlights: rows(f.get("highlights")).slice(0, 3),
         degree_levels: p.degree_levels || [], projects: p.projects || [],

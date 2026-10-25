@@ -222,6 +222,25 @@ class GmailClient:
     def create_draft(self, **kw) -> dict:
         return create_draft(self.session, self.token, **kw)
 
+    def draft_exists(self, draft_id: str) -> bool:
+        """False once the draft was sent or deleted (Gmail answers 404)."""
+        try:
+            self._get(f"/drafts/{draft_id}", {"format": "minimal"})
+            return True
+        except GmailApiError as e:
+            if e.status == 404:
+                return False
+            raise
+
+    def thread(self, thread_id: str) -> dict | None:
+        """A conversation's messages: labels, date, From and Message-ID only (no text). None if it's gone."""
+        try:
+            return self._get(f"/threads/{thread_id}", {"format": "metadata", "metadataHeaders": ["From", "Message-ID", "Subject"]})
+        except GmailApiError as e:
+            if e.status == 404:
+                return None
+            raise
+
 
 def message_text(msg: dict, limit: int = 6000) -> str:
     """Plain text of a 'full' message (first text/plain part, else stripped HTML). Used, never stored."""

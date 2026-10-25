@@ -331,3 +331,17 @@ def test_skills_add_hide_remove_and_matches_carry_scan_and_run_info(env):
     assert m["run"]["at"] == "2026-10-25T06:00:00+00:00"
     assert {f["source"] for f in m["run"]["failed"]} == {"remotive", "glassdoor"}   # one company's 404 isn't a failure
     assert m["skills_scan"]["days"] == 30
+
+
+def test_auto_drafts_now_needs_opt_in_and_gmail(env, monkeypatch):
+    c, store, _ = env
+    assert c.put("/api/profile", headers=H("tok-alice"), json=PROFILE).status_code == 200
+    assert c.post("/api/drafts/auto", headers=H("tok-alice")).status_code == 409          # not turned on
+    assert c.put("/api/profile", headers=H("tok-alice"), json={**PROFILE, "auto_drafts": True}).status_code == 200
+    r = c.post("/api/drafts/auto", headers=H("tok-alice"))
+    assert r.status_code == 409 and "Connect Gmail" in r.json()["detail"]
+    store.set("secrets", "alice", {"gmail_refresh": "x"})
+    monkeypatch.setattr(api.autodraft, "run_user", lambda *a, **k: {"created": 1, "follow_ups": 0})
+    assert c.post("/api/drafts/auto", headers=H("tok-alice")).json()["report"]["created"] == 1
+    assert c.post("/api/drafts/auto", headers=H("tok-alice")).status_code == 429          # not more than every 2 min
+    assert c.post("/api/drafts/auto", headers=H("tok-unverified")).status_code == 403

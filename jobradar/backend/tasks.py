@@ -13,7 +13,7 @@ import json
 import logging
 from datetime import datetime, timezone
 
-from .. import apply_type, gmail, gmail_status, push, skills_vocab
+from .. import apply_type, gmail, gmail_status, outreach, push, skills_vocab
 from ..models import Job
 from ..pipeline import dedupe, fetch_all, permitted
 from ..scoring import Scorer, age_days
@@ -111,6 +111,7 @@ def refresh_pool(store: Store, base: dict, session, now: datetime | None = None,
         if not scorer.is_relevant(job) or (age_days(job, now) or 0) > 30 or not scorer.location_points(job)[2]:
             continue
         apply_type.annotate(job)
+        job.contact_emails = outreach.extract_emails(job.description) or job.contact_emails  # "send your resume to …"
         d = job.to_dict()
         # Walk-in details (date, venue, documents) are often further down: keep more of those
         d["description"] = (job.description or "")[:WALKIN_DESC_CHARS if walkins.is_walkin(job, cfg) else DESC_CHARS]

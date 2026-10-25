@@ -26,7 +26,7 @@ from .. import gmail, push
 from ..config import load_config
 from ..http import make_session
 from ..pipeline import permitted_sources
-from . import drafts, gmail_link, resume_intake, tasks, walkins
+from . import autodraft, drafts, gmail_link, resume_intake, tasks, walkins
 from .idtoken import InvalidToken, Verifier
 from .profile import ProfileError, clean, is_complete
 from .store import Conflict, FirestoreStore, MemoryStore, Store
@@ -223,7 +223,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None, ses
                 "profile": prof, "missing": is_complete(prof) if prof else ["resume or profile"],
                 "resume": store.get("resumes", uid),
                 "gmail": {k: g.get(k) for k in ("connected", "email", "connected_at", "last_success", "last_attempt",
-                                                "last_error", "last_report")},
+                                                "last_error", "last_report", "last_auto")},
                 "matches": {"count": m.get("count", 0), "updated": m.get("updated")},
                 "features": {"gmail": bool(settings.oauth()), "push": bool(settings.vapid_private_key)}}
 
@@ -377,6 +377,22 @@ def create_app(settings: Settings | None = None, store: Store | None = None, ses
         if job is None:
             raise HTTPException(404, "That job isn't in your list.")
         return job
+
+    @app.post("/api/drafts/auto")
+    def auto_drafts_now(u: dict = Depends(verified)):
+        """Run the morning recruiter drafts now, for this user only (same rules and daily limit)."""
+        cfg = oauth_cfg()
+        prof = store.get("profiles", u["uid"]) or {}
+        if not prof.get("auto_drafts"):
+            raise HTTPException(409, "Turn on Morning recruiter drafts in your profile first.")
+        if not store.get("secrets", u["uid"]):
+            raise HTTPException(409, "Connect Gmail first.")
+        limits.check(u["uid"], "running recruiter drafts", 120)
+        r = autodraft.run_user(store, cfg, session, u["uid"], vapid_key=settings.vapid_private_key,
+                               vapid_subject=settings.vapid_subject)
+        if r.get("error"):
+            raise HTTPException(502, f"Recruiter drafts stopped: {r['error']}")
+        return {"report": r}
 
     @app.get("/api/walkins")
     def get_walkins(u: dict = Depends(user)):

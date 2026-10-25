@@ -11,6 +11,7 @@ import re
 from .. import skills_vocab
 
 DEFAULT_THRESHOLD = 70
+MAX_AUTO_DRAFTS = 15     # recruiter drafts the morning run may create per day
 LIMITS = {"full_name": 80, "email": 120, "phone": 25, "linkedin": 120, "current_role": 80, "current_company": 80,
           "notice": 60, "location": 60, "current_ctc": 40, "expected_ctc": 40, "portfolio": 160}
 WORK_MODES = ("onsite", "hybrid", "remote")
@@ -19,7 +20,7 @@ RELOCATION = ("yes", "no", "flexible")
 LISTS = {"skills": (60, 40), "target_roles": (8, 60), "locations": (10, 40), "education": (6, 160),
          "work_modes": (3, 10), "walkin_cities": (10, 40), "walkin_roles": (8, 60), "walkin_industries": (8, 40),
          "certifications": (12, 140), "projects": (10, 200), "highlights": (3, 240), "degree_levels": (4, 20),
-         "added_skills": (60, 40), "hidden_skills": (200, 40)}  # added from the Skill match list / hidden from it
+         "added_skills": (60, 40), "hidden_skills": (200, 40), "excluded_companies": (50, 80)}  # added from the Skill match list / hidden from it
 EMAIL = re.compile(r"[^@\s<>]+@[^@\s<>]+\.[A-Za-z]{2,24}")
 
 
@@ -103,8 +104,9 @@ def clean(raw: dict) -> dict:
         out[k] = v
     if out["walkin_from"] and out["walkin_to"] and out["walkin_from"] > out["walkin_to"]:
         raise ProfileError("walk-in 'from' date is after the 'to' date")
+    out["auto_draft_limit"] = int(_num(raw.get("auto_draft_limit"), 1, MAX_AUTO_DRAFTS, "auto_draft_limit", 5))
     for k, default in (("remote_ok", True), ("anywhere_in_india", False), ("drafts_enabled", True), ("notify", True),
-                       ("walkin_same_as_jobs", False)):
+                       ("walkin_same_as_jobs", False), ("auto_drafts", False)):
         v = raw.get(k, default)
         if not isinstance(v, bool):
             raise ProfileError(f"{k} must be true or false")

@@ -848,3 +848,6 @@ dialog.sheet[open] { animation: rise .2s ease-out; }
 .fit-pill.mid { color: var(--s-mid); }
 .fit-pill.low { color: var(--s-low); }
 .pipe-table td:nth-child(2) { white-space: nowrap; }
+.chip-row { display: inline-flex; align-items: center; gap: 6px; }
+.note.morning b { display: block; }
+.note.morning p { margin: 4px 0 6px; }

@@ -83,10 +83,31 @@ def compose(kind: str, profile: dict, job: dict | None = None, reply_to: dict | 
                 "", " ".join(x for x in (intro, fit) if x) or None, highlight, notice_line, "",
                 ("My resume is attached. " if attached else "") + "I'd be glad to talk whenever it suits you.", "", *sign]
     elif kind == "outreach":
-        subject = f"{title}{where} - {name}" if title else f"Data roles{where} - {name}"
-        body = [hi, "", f"I saw the {title} opening{where} and wanted to reach out directly." if title else
+        # Subject: availability + role + key skills + experience, each only if the profile has it
+        avail = notice if notice and len(notice) <= 30 else None
+        parts = [x for x in (avail, title or role or None, ", ".join(skills[:3]) or None,
+                             f"{years_txt} yrs exp" if years_txt else None) if x]
+        subject = " | ".join(parts) + f" - {name}" if parts else f"Data roles{where} - {name}"
+        seen = f" (seen in your post: {job['url']})" if job.get("url") and job.get("source") != "email" else ""
+        facts = []
+        if profile.get("current_ctc"):
+            facts.append(f"Current CTC: {profile['current_ctc']}")
+        if profile.get("expected_ctc"):
+            facts.append(f"Expected CTC: {profile['expected_ctc']}")
+        if notice:
+            facts.append(f"Notice period: {notice}")
+        loc = (profile.get("locations") or [None])[0] or profile.get("location")
+        if loc:
+            facts.append(f"Location: {loc}")
+        certs = profile.get("certifications") or []
+        gap = [k for k in (job.get("missing_skills") or (job.get("match") or {}).get("missing_skills") or [])][:2]
+        body = [hi, "", f"I'm writing about the {title} role{where}{seen}." if title else
                 "I'm reaching out about open roles on your team.", "", " ".join(x for x in (intro, fit) if x) or None,
-                notice_line, "", ("My resume is attached. " if attached else "") + "Would you be open to a short call?", "", *sign]
+                *[f"- {h}" for h in (profile.get("highlights") or [])[:2]],
+                " | ".join(facts) or None,
+                f"Certified: {', '.join(certs[:2])}." if certs else None,
+                f"To be upfront: I haven't worked with {' or '.join(gap)} yet." if gap else None,
+                "", ("My resume is attached. " if attached else "") + "Would you be open to a short call?", "", *sign]
     elif kind == "follow_up":
         subject = f"Following up: {title}{where}" if title else "Following up on my application"
         body = [hi, "", f"I applied for the {title} role{where} and wanted to follow up." if title else
@@ -235,8 +256,12 @@ def key_for(kind: str, job_id: str | None = None, thread_id: str | None = None) 
 
 def create(client: gmail.GmailClient, state: dict, profile: dict, kind: str, *, job: dict | None = None,
            to: str = "", reply_to_message: str | None = None, resume: tuple[str, bytes] | None = None,
-           now: datetime | None = None, subject: str | None = None, body: str | None = None) -> dict:
-    """Create one draft in this user's Gmail and record it. Returns the record (existing one if a duplicate)."""
+           now: datetime | None = None, subject: str | None = None, body: str | None = None,
+           thread: tuple[str, str, str] | None = None, auto: bool = False) -> dict:
+    """Create one draft in this user's Gmail and record it. Returns the record (existing one if a duplicate).
+
+    `thread` = (thread id, Message-ID, subject) of an email you sent: a follow-up then lands in that conversation.
+    `auto` marks drafts made by the morning run."""
     if profile.get("drafts_enabled") is False:
         raise DraftError("Drafts are turned off in your settings.")
     job = job or {}
@@ -253,6 +278,9 @@ def create(client: gmail.GmailClient, state: dict, profile: dict, kind: str, *, 
         thread_id, in_reply_to = m.get("threadId"), hdr.get("message-id")
         name_m = re.match(r'\s*"?([^"<]+?)"?\s*<', sender)
         reply_ctx = {"subject": hdr.get("subject", ""), "from_name": name_m.group(1) if name_m else ""}
+    elif thread and kind == "follow_up":
+        thread_id, in_reply_to, orig = thread
+        subject = subject or (orig if orig.lower().startswith("re:") else f"Re: {orig}")
     key = key_for(kind, job.get("id"), thread_id)
     drafts = state.setdefault("drafts", {})
     if key in drafts and drafts[key].get("id"):
@@ -269,9 +297,11 @@ def create(client: gmail.GmailClient, state: dict, profile: dict, kind: str, *, 
     body = (body or "").strip()[:20000] or auto_body
     d = client.create_draft(to=to, subject=subject, body=body, attachment=attachment, sender=profile.get("email"),
                             thread_id=thread_id, in_reply_to=in_reply_to)
+    at = (now or datetime.now(timezone.utc)).isoformat(timespec="seconds")
     rec = {"id": d["id"], "message_id": d.get("message_id", ""), "thread_id": d.get("thread_id") or thread_id or "",
            "job_id": job.get("id"), "type": kind,
-           "to": to, "subject": subject[:140], "attached": bool(attachment),
-           "at": (now or datetime.now(timezone.utc)).isoformat(timespec="seconds")}
+           "to": to, "subject": subject[:140], "attached": bool(attachment), "at": at, "created": at}
+    if auto:
+        rec["auto"] = True
     drafts[key] = rec
     return rec

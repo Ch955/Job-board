@@ -146,7 +146,23 @@ both were found; otherwise the event is "unconfirmed". Past dates are hidden; re
 and Naukri off, walk-ins are rare: they mostly appear on Indian job boards, so expect few until Adzuna/Jooble
 keys are added (and even then, few). Travel radius uses city-to-city distances, not street addresses.
 
-## 8. Known limitations
+## 8. Morning recruiter drafts
+
+`.github/workflows/recruiter-drafts.yml` runs `python -m jobradar.backend auto-drafts` at 09:00 IST
+(`jobradar/backend/autodraft.py`). Only for users who tick **Create recruiter drafts every morning** in their
+profile, with Gmail connected. For each: their matches whose posting contains an email address (no-reply style
+addresses, excluded companies, jobs older than 7 days and addresses already contacted are skipped), best fit
+first, up to their daily limit (1–15, default 5). Each draft has their uploaded resume attached and is written
+from their confirmed profile only. Nothing is ever sent: the app can only create drafts.
+
+The same run reads labels and dates (never text) of those conversations: a draft that disappeared with a SENT
+message in its thread is marked sent; one that disappeared without is closed; a message from someone else after
+sending marks it replied. Five working days after sending with no reply, one follow-up draft is created as a reply
+in the same thread. The app's Recruiter emails page shows the last run and has **Run now** (once per 2 minutes).
+It uses the same GitHub Secrets as the multi-user run. Gmail's restricted scopes still limit this to the
+OAuth test users (section 6).
+
+## 9. Known limitations
 
 - Job sources: company boards (Greenhouse, Lever, Ashby, SmartRecruiters) and the keyed APIs
   (Adzuna, Jooble) are compliant. LinkedIn/Naukri/Indeed come from scraping (JobSpy), which

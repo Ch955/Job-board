@@ -1,0 +1,40 @@
+name: Morning recruiter drafts
+
+# Every morning at 09:00 IST: for each user who turned on "Morning recruiter drafts",
+# create Gmail drafts (never sent) for recruiters who wrote their email in a matching
+# job posting, notice sent emails and replies, and draft follow-ups after 5 working days.
+# Its own workflow (and queue) so it never bumps the 3-hourly fetch or the 08:55 summary.
+
+on:
+  schedule:
+    - cron: "30 3 * * *"   # 03:30 UTC = 09:00 IST (GitHub may start scheduled runs a few minutes late)
+  workflow_dispatch:        # "Run workflow" button in the Actions tab
+
+permissions:
+  contents: read
+
+concurrency:
+  group: recruiter-drafts
+  cancel-in-progress: false
+
+jobs:
+  drafts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -q -r requirements.txt -r requirements-server.txt
+      - name: Create drafts (never sends)
+        env:
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          APP_ENCRYPTION_KEY: ${{ secrets.APP_ENCRYPTION_KEY }}
+          GMAIL_WEB_CLIENT_ID: ${{ secrets.GMAIL_WEB_CLIENT_ID }}
+          GMAIL_WEB_CLIENT_SECRET: ${{ secrets.GMAIL_WEB_CLIENT_SECRET }}
+          API_URL: ${{ secrets.API_URL }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
+        run: python -m jobradar.backend auto-drafts
