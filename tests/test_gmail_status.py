@@ -241,3 +241,37 @@ def test_each_run_reads_at_most_per_run_emails():
     state = {}
     r = gs.run(state, [], FakeGmail(mails), "t", now=NOW, per_run=3)
     assert r["checked"] == 3 and r["remaining"] == 2 and "last_check" not in state["gmail"]
+
+
+def test_application_email_for_a_job_in_your_list_marks_it_instead_of_adding_a_copy():
+    jobs = [{"id": "c1", "title": "Junior Data Engineer", "company": "Crowe Capability Center - India", "source": "linkedin"}]
+    state = {}
+    g = FakeGmail([msg("m1", "Your application was sent to Crowe", sender="LinkedIn <jobs-noreply@linkedin.com>")])
+    r = gs.run(state, jobs, g, "t", now=NOW)
+    assert r["added"] == 0 and state["statuses"]["c1"]["status"] == "applied"
+    assert not [k for k in state["saved"] if k.startswith("mail-")]
+
+
+def test_existing_gmail_copy_is_merged_into_the_real_job():
+    mail = {"id": "mail-1", "title": "Application (from Gmail)", "company": "Crowe", "source": "email", "via": "linkedin"}
+    state = {"statuses": {"mail-1": {"status": "applied", "at": "2026-10-20T10:00:00+00:00", "appliedAt": "2026-10-20T10:00:00+00:00"},
+                          "c1": {"status": "new", "at": "2026-10-19T00:00:00+00:00"}},
+             "saved": {"mail-1": mail}, "gmail": {"last_check": "2026-10-23T00:00:00+00:00",
+                                                  "events": [{"id": "e", "job_id": "mail-1", "from": "LinkedIn"}]}}
+    jobs = [{"id": "c1", "title": "Junior Data Engineer", "company": "Crowe Capabilities Center – India", "source": "linkedin"}]
+    r = gs.run(state, jobs, FakeGmail([]), "t", now=NOW)
+    assert r["merged"] == 1
+    assert state["statuses"]["c1"]["status"] == "applied" and state["statuses"]["c1"]["appliedAt"] == "2026-10-20T10:00:00+00:00"
+    assert state["statuses"]["mail-1"] == {"status": "merged", "into": "c1", "at": NOW.isoformat(timespec="seconds")}
+    assert "mail-1" not in state["saved"] and state["gmail"]["events"][0]["job_id"] == "c1"
+
+
+def test_company_alone_is_still_not_enough_to_merge():
+    # The email came from Naukri, the only job at that company was listed on LinkedIn, and no title: keep both
+    mail = {"id": "mail-1", "title": "Application (from Gmail)", "company": "Crowe", "source": "email", "via": "naukri"}
+    state = {"statuses": {"mail-1": {"status": "applied", "at": "x"}}, "saved": {"mail-1": mail},
+             "gmail": {"last_check": "2026-10-23T00:00:00+00:00"}}
+    jobs = [{"id": "c1", "title": "Junior Data Engineer", "company": "Crowe", "source": "linkedin"},
+            {"id": "c2", "title": "Data Analyst", "company": "Crowe", "source": "naukri"}]
+    assert "merged" not in gs.run(state, jobs, FakeGmail([]), "t", now=NOW)
+    assert "mail-1" in state["saved"]

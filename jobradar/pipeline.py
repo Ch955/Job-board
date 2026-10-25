@@ -12,7 +12,7 @@ import requests
 from . import apply_type, outreach, push, store
 from .config import ROOT, env
 from .http import make_session
-from .models import Job
+from .models import Job, company_core, same_posting, title_core
 from .scoring import Scorer, age_days
 from .sources import REGISTRY
 from .sources.base import SourceContext, SourceSkipped
@@ -22,7 +22,7 @@ log = logging.getLogger("jobradar")
 # Earlier sources win on duplicates: a direct company board link beats an aggregator.
 SOURCE_PRIORITY = {name: i for i, name in enumerate(REGISTRY)}
 # JobSpy tags jobs with the real site name
-for _i, _site in enumerate(("naukri", "linkedin", "indeed", "glassdoor", "google")):
+for _i, _site in enumerate(("linkedin", "naukri", "indeed", "glassdoor", "google")):
     SOURCE_PRIORITY[_site] = SOURCE_PRIORITY["jobspy"] + _i / 10
 
 
@@ -45,6 +45,8 @@ def permitted(config: dict, source: str) -> bool:
     if source in USER_SOURCES:
         return True
     cfg = (config.get("sources") or {}).get(SITE_SOURCE.get(source, source)) or {}
+    if source in SITE_SOURCE and source not in (cfg.get("sites") or []):
+        return False  # a JobSpy site that isn't switched on (e.g. Indeed when only LinkedIn and Naukri are wanted)
     return bool(cfg.get("enabled", True)) and bool(cfg.get("permitted", True))
 
 
@@ -125,6 +127,33 @@ def dedupe(jobs: list[Job]) -> list[Job]:
     return list(best.values())
 
 
+def collapse(jobs: list) -> list:
+    """One entry per posting across sites: the same employer and title in the same city (or a listing
+    that names no single city) is one job, whichever sites listed it. Keeps the employer's own
+    careers site first, then LinkedIn, then Naukri; recruiter emails from every copy are kept.
+    Works on Job objects or job dicts."""
+    get = lambda j, k, d="": (j.get(k, d) if isinstance(j, dict) else getattr(j, k, d)) or d  # noqa: E731
+    groups: dict[tuple, list] = {}
+    for j in jobs:
+        groups.setdefault((company_core(get(j, "company")), title_core(get(j, "title"))), []).append(j)
+    out = []
+    for group in groups.values():
+        group.sort(key=lambda j: (SOURCE_PRIORITY.get(get(j, "source"), 99), -len(get(j, "description"))))
+        kept: list = []
+        for j in group:
+            twin = next((k for k in kept if same_posting(k, j)), None)
+            if twin is None:
+                kept.append(j)
+                continue
+            emails = list(dict.fromkeys([*get(twin, "contact_emails", []), *get(j, "contact_emails", [])]))[:3]
+            if isinstance(twin, dict):
+                twin["contact_emails"] = emails
+            else:
+                twin.contact_emails = emails
+        out += kept
+    return out
+
+
 def process(
     fetched: list[Job],
     previous: dict[str, Job],
@@ -150,7 +179,7 @@ def process(
             relevant.append(job)
         else:
             dropped["irrelevant_title"] += 1
-    unique = dedupe(relevant)
+    unique = collapse(dedupe(relevant))
     dropped["duplicates"] = len(relevant) - len(unique)
 
     final: dict[str, Job] = {}

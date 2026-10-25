@@ -285,9 +285,56 @@ async function load({ quiet = false } = {}) {
   render();
 }
 
+// Same rules as models.company_core / same_posting: one posting listed on several sites is one job
+const CORE_DROP = new Set(("inc llc llp ltd limited pvt private corp corporation co gmbh plc india indian in center centre capability " +
+  "capabilities global the and technologies technology tech solutions services consulting consultancy group software systems labs " +
+  "lab it pte company of gcc hub development").split(" "));
+const GENERIC_PLACES = new Set(["", "india", "remote", "pan", "anywhere", "multiple", "various", "hybrid"]);
+const normWords = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9 ]+/g, " ").split(/\s+/).filter(Boolean);
+const one = (w) => (w.length > 4 && w.endsWith("ies") ? w.slice(0, -3) + "y" : w.length > 4 && w.endsWith("s") ? w.slice(0, -1) : w);
+function companyCore(c) {
+  const core = normWords(c).filter((w) => !CORE_DROP.has(w) && !CORE_DROP.has(one(w))).map(one);
+  return core.join(" ") || normWords(c).join(" ");
+}
+const titleCore = (t) => normWords(String(t || "").replace(/\([^)]*\)|\[[^\]]*\]/g, " ")).join(" ");
+function placeOf(job) {
+  const loc = String(job.location || "");
+  if (/[|/;]|,.*,.*,/.test(loc)) return "";
+  const first = normWords(loc.replace(/bengaluru/i, "bangalore").replace(/gurugram/i, "gurgaon"))[0] || "";
+  return first;
+}
+function samePosting(a, b) {
+  if (companyCore(a.company) !== companyCore(b.company) || titleCore(a.title) !== titleCore(b.title)) return false;
+  const pa = placeOf(a), pb = placeOf(b);
+  return pa === pb || GENERIC_PLACES.has(pa) || GENERIC_PLACES.has(pb);
+}
+const STATUS_RANK = { offer: 6, interview: 5, rejected: 4, applied: 3, later: 2, new: 1, skipped: 0 };
+const SOURCE_PREF = ["greenhouse", "lever", "ashby", "smartrecruiters", "linkedin", "naukri"];
+const pref = (j) => (SOURCE_PREF.includes(j.source) ? SOURCE_PREF.indexOf(j.source) : 99);
+
 function allJobs() {
   const ids = new Set(data.jobs.map((j) => j.id));
-  return data.jobs.concat(Object.values(store.saved).filter((j) => j?.id && !ids.has(j.id)));
+  const jobs = data.jobs.concat(Object.values(store.saved).filter((j) => j?.id && !ids.has(j.id)))
+    .filter((j) => statusOf(j) !== "merged");   // a Gmail copy that was matched to the real job
+  // Duplicates: keep the copy you've done the most with (applied beats new), then the careers site, LinkedIn, Naukri
+  const groups = new Map();
+  for (const j of jobs) {
+    const k = `${companyCore(j.company)}|${titleCore(j.title)}`;
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(j);
+  }
+  const out = [];
+  for (const g of groups.values()) {
+    if (g.length === 1) {
+      out.push(g[0]);
+      continue;
+    }
+    g.sort((a, b) => (STATUS_RANK[statusOf(b)] ?? 1) - (STATUS_RANK[statusOf(a)] ?? 1) || pref(a) - pref(b) || (b.score || 0) - (a.score || 0));
+    const kept = [];
+    for (const j of g) if (!kept.some((k) => samePosting(k, j))) kept.push(j);
+    out.push(...kept);
+  }
+  return out;
 }
 const locationLabel = (job) => job.score_breakdown?.location_label || (job.remote ? "Remote (India)" : job.location || "India");
 const modeOf = (job) => (job.remote ? "remote" : "onsite");
@@ -506,8 +553,8 @@ function sortFor(id) {
     byFit(a, b) || foundAt(b).localeCompare(foundAt(a));
 }
 
-function appliedTimes() {
-  return Object.values(store.statuses).filter((s) => APPLIED.includes(s.status) && s.appliedAt).map((s) => new Date(s.appliedAt));
+function appliedTimes() {  // one per job you can see (duplicates and merged Gmail copies count once)
+  return allJobs().map((j) => store.statuses[j.id]).filter((s) => s && APPLIED.includes(s.status) && s.appliedAt).map((s) => new Date(s.appliedAt));
 }
 const fmtDateTime = (iso) => (iso ? new Date(iso).toLocaleString(undefined, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) : "");
 

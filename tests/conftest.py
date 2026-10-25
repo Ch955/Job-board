@@ -12,7 +12,9 @@ def config():
 
 @pytest.fixture
 def authorized_config():
-    """As if LinkedIn/Naukri/Indeed access were authorized: tests that the integration still works."""
+    """Every source switched on, so tests cover each integration even when config.yaml has some off."""
     c = copy.deepcopy(load_config())
-    c["sources"]["jobspy"].update(enabled=True, permitted=True)
+    c["sources"]["jobspy"].update(enabled=True, permitted=True, sites=["naukri", "linkedin", "indeed", "glassdoor", "google"])
+    for name in ("adzuna", "jooble", "remotive", "arbeitnow"):  # off in config.yaml; tests still cover them
+        c["sources"][name]["enabled"] = True
     return c

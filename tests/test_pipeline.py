@@ -77,9 +77,9 @@ def test_failing_source_does_not_stop_others(config, out, monkeypatch):
     assert any(j.source == "lever" for j in result.jobs)
 
 
-def test_missing_key_skips_source(config, out, monkeypatch):
+def test_missing_key_skips_source(authorized_config, out, monkeypatch):
     monkeypatch.delenv("JOOBLE_API_KEY", raising=False)
-    result = run(config, out)
+    result = run(authorized_config, out)
     assert result.source_runs["jooble"]["status"] == "skipped"
 
 
@@ -94,7 +94,7 @@ def test_throttle(config):
 def test_carry_over_and_age_out(config):
     now = datetime(2026, 10, 23, tzinfo=timezone.utc)
     def old_job(title, days, status="new"):
-        j = Job(title=title, company="C", location="Pune", url="u", source="remotive",
+        j = Job(title=title, company="C", location="Pune", url="u", source="greenhouse",
                 posted_date=(now - timedelta(days=days)).isoformat(), status=status)
         j.score, j.score_breakdown = 80, {"recency": 10}
         return j
@@ -111,7 +111,7 @@ def test_carry_over_drops_jobs_abroad_after_rule_change(config):
     """Old foreign jobs already in jobs.json are cleaned out on the next run."""
     now = datetime(2026, 10, 23, tzinfo=timezone.utc)
     def old(location, status="new"):
-        j = Job(title="Data Engineer", company=location, location=location, url="u", source="remotive",
+        j = Job(title="Data Engineer", company=location, location=location, url="u", source="greenhouse",
                 posted_date=(now - timedelta(days=1)).isoformat(), status=status)
         j.score, j.score_breakdown = 80, {"recency": 10}
         return j
@@ -186,9 +186,12 @@ def test_enabled_but_not_permitted_source_is_never_fetched(config, out):
     assert result.source_runs["jobspy"]["status"] == "not permitted"
 
 
-def test_owner_turned_linkedin_naukri_indeed_on(config):
+def test_only_linkedin_and_naukri_portals_plus_company_sites(config):
     assert config["sources"]["jobspy"]["enabled"] and config["sources"]["jobspy"]["permitted"]
-    assert {"naukri", "linkedin", "indeed"} <= set(pipeline.permitted_sources(config))
+    assert set(pipeline.permitted_sources(config)) == {"linkedin", "naukri", "greenhouse", "lever", "ashby", "smartrecruiters"}
+    for off in ("indeed", "glassdoor", "google", "adzuna", "jooble", "remotive", "arbeitnow"):
+        assert not pipeline.permitted(config, off)
+    assert pipeline.permitted(config, "email")   # jobs from your own Gmail always stay
 
 
 def test_switched_off_source_listings_are_dropped_but_tracked_ones_stay(config):
@@ -204,7 +207,30 @@ def test_switched_off_source_listings_are_dropped_but_tracked_ones_stay(config):
     assert {(x.source, x.status) for x in jobs} == {("linkedin", "applied"), ("greenhouse", "new"), ("email", "new")}
 
 
-def test_every_job_platform_is_on(config):
-    on = set(pipeline.permitted_sources(config))
-    assert {"naukri", "linkedin", "indeed", "glassdoor", "google", "greenhouse", "lever", "ashby",
-            "smartrecruiters", "adzuna", "jooble", "remotive", "arbeitnow"} <= on
+def test_switched_off_portal_listings_drop_out_but_tracked_ones_stay(config):
+    now = datetime(2026, 10, 23, tzinfo=timezone.utc)
+    def j(src, status="new"):
+        x = Job(title="Data Engineer", company=f"C {src} {status}", location="Pune, India", url="u", source=src,
+                posted_date=now.isoformat(), status=status)
+        x.score, x.score_breakdown = 80, {"recency": 10}
+        return x
+    previous = {x.id: x for x in (j("indeed"), j("indeed", "applied"), j("linkedin"), j("adzuna"))}
+    jobs, _, _ = pipeline.process([], previous, config, now)
+    assert {(x.source, x.status) for x in jobs} == {("indeed", "applied"), ("linkedin", "new")}
+
+def test_same_posting_on_several_sites_is_one_job():
+    def J(company, title, loc, src, emails=()):
+        return Job(title=title, company=company, location=loc, url=f"https://{src}/x", source=src, contact_emails=list(emails))
+    jobs = [J("Crowe Capabilities Center – India", "Junior Data Engineer", "Hyderabad, Telangana, India", "linkedin"),
+            J("Crowe Capability Center - India", "Junior Data Engineer", "Hyderabad", "naukri", ["hr@crowe.example"]),
+            J("Reveille Technologies,Inc", "Data Engineer – Azure Databricks", "India", "linkedin"),
+            J("Reveille Technologies", "Data Engineer – Azure Databricks", "Bengaluru, Karnataka", "linkedin"),
+            J("Infosys", "Data Engineer", "Pune", "naukri"), J("Infosys", "Data Engineer", "Hyderabad", "naukri"),
+            J("Northwind", "Data Engineer", "Hyderabad", "naukri"), J("Northwind Pvt Ltd", "Data Engineer", "Hyderabad", "greenhouse")]
+    out = pipeline.collapse(jobs)
+    keys = sorted((j.company, j.source, j.location) for j in out)
+    assert len(out) == 5                                          # Crowe x1, Reveille x1, Infosys x2 (two cities), Northwind x1
+    crowe = next(j for j in out if "Crowe" in j.company)
+    assert crowe.source == "linkedin" and crowe.contact_emails == ["hr@crowe.example"]   # emails kept from the twin
+    assert next(j for j in out if "Northwind" in j.company).source == "greenhouse"       # the careers site wins
+    assert sum(1 for j in out if j.company == "Infosys") == 2, keys

@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 
 from .. import apply_type, gmail, gmail_status, outreach, push, skills_vocab
 from ..models import Job
-from ..pipeline import dedupe, fetch_all, permitted
+from ..pipeline import collapse, dedupe, fetch_all, permitted
 from ..scoring import Scorer, age_days
 from . import gmail_link, walkins
 from .matching import UserMatcher, _role_patterns
@@ -126,6 +126,7 @@ def refresh_pool(store: Store, base: dict, session, now: datetime | None = None,
             d = old.to_dict()
             d["description"] = old.description[:DESC_CHARS]
             kept.append(d)
+    kept = collapse(kept)  # the same posting from LinkedIn, Naukri and the careers site is one job
     chunks = [kept[i:i + POOL_CHUNK] for i in range(0, len(kept), POOL_CHUNK)] or [[]]
     for i, c in enumerate(chunks):
         store.set("pool", f"c{i}", {"jobs": c})

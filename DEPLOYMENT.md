@@ -125,15 +125,18 @@ step and needs your approval. Everything else in Job Radar works without Gmail.
 
 ## 7. Job sources, application types and walk-ins
 
-**Sources in use:** company career boards via their public APIs (Greenhouse, Lever, Ashby, SmartRecruiters),
-Remotive, Arbeitnow, Adzuna and Jooble (with free API keys), and **LinkedIn, Naukri, Indeed, Glassdoor and Google Jobs via JobSpy**. JobSpy reads
-those sites' public search pages without logging in, which their terms of use don't allow; it is on by the app
-owner's decision for this private group. To stop it, set `sources.jobspy.enabled` and `permitted` to `false` in
-`config.yaml`: untracked listings from it then drop out, tracked ones stay. Naukri tends to refuse requests from
-Render's servers, so most Naukri jobs arrive through the GitHub Actions run.
+**Sources in use:** companies' own careers sites (Greenhouse, Lever, Ashby, SmartRecruiters boards) and, as job
+portals, **only LinkedIn and Naukri** (via JobSpy; the owner's choice, Oct 2026). Indeed, Glassdoor, Google Jobs,
+Adzuna, Jooble, Remotive and Arbeitnow are switched off in `config.yaml`; their untracked listings drop out, jobs
+you saved or applied to stay. JobSpy reads LinkedIn's and Naukri's public search pages without logging in, which
+their terms don't allow; it is on by the owner's decision for this private group. Naukri currently refuses
+JobSpy's requests (HTTP 406), so until JobSpy is updated, new portal jobs come from LinkedIn.
 
-To get more Indian jobs, add the free keys (developer.adzuna.com, jooble.org/api/about) as `ADZUNA_APP_ID`,
-`ADZUNA_APP_KEY` and `JOOBLE_API_KEY` in **both** GitHub Secrets and Render's Environment.
+**Duplicates:** the same posting listed on several sites (same employer and title, same city or a listing that
+names no single city) is kept once: careers site first, then LinkedIn, then Naukri (`pipeline.collapse`, mirrored
+in `docs/app.js`). An application email from Gmail for a job already in your list marks that job applied instead of
+adding an "Application (from Gmail)" copy, when the email names the job title or came from the portal that listed
+the only job at that company; earlier copies are merged the same way on the next Gmail sync.
 
 **Application type** (badge on each job) comes from evidence only (`jobradar/apply_type.py`): the employer's
 careers portal (an ATS board or a direct employer link) → *Company website*; an aggregator link → *External

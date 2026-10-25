@@ -17,7 +17,7 @@ import re
 from datetime import datetime, timedelta, timezone
 
 from . import gmail
-from .models import norm_company
+from .models import _CORE_DROP, company_core, norm_company
 
 log = logging.getLogger("jobradar.gmail_status")
 
@@ -103,7 +103,7 @@ def _words(s: str) -> set[str]:
 def company_key(company: str) -> str:
     """The distinctive part of a company name as a phrase ("Tiger Analytics" stays whole, so a generic
     word like "analytics" never matches on its own; "Celebal Technologies" -> "celebal")."""
-    words = [w for w in norm_company(company).split() if w not in STOP]
+    words = [w for w in norm_company(company).split() if w not in STOP and w not in _CORE_DROP]
     return " ".join(words) if words else norm_company(company)
 
 
@@ -111,7 +111,7 @@ def match_ex(jobs: list[dict], text: str, sender: str, thread_id: str = "", thre
              ) -> tuple[dict | None, str, list[dict]]:
     """(job, confidence, candidates). Confidence 'high' only with evidence beyond the company name:
     the email's thread is one we drafted in, the job title shows up, or it's the only job at that
-    company and you'd already applied to or opened it."""
+    company and you'd already applied to or opened it, or it came from the portal that listed it."""
     if thread_id and threads and threads.get(thread_id):
         jid = threads[thread_id]
         job = next((j for j in jobs if j["id"] == jid), None)
@@ -135,6 +135,8 @@ def match_ex(jobs: list[dict], text: str, sender: str, thread_id: str = "", thre
         return best, "high", [c[1] for c in cands]
     if len(cands) == 1 and (best.get("_status") not in (None, "new", "skipped") or best.get("_pending")):
         return best, "high", [best]
+    if len(cands) == 1 and best.get("source") and best.get("source") == portal_of(sender):
+        return best, "high", [best]   # e.g. a LinkedIn email about the only LinkedIn job you have at that company
     if len(cands) == 1:
         return best, "medium", [best]
     return None, "ambiguous", [c[1] for c in cands]
@@ -144,6 +146,65 @@ def match(jobs: list[dict], subject: str, snippet: str, sender: str) -> dict | N
     """Back-compat: the job only when the match is confident."""
     job, conf, _ = match_ex(jobs, f"{subject} {snippet}", sender)
     return job if conf == "high" else None
+
+
+PORTALS = ("linkedin", "naukri", "indeed", "glassdoor")
+GENERIC_TITLE = "Application (from Gmail)"
+
+
+def portal_of(sender: str) -> str:
+    """Which job portal sent this email ("LinkedIn <jobs-noreply@linkedin.com>" -> "linkedin"), or ""."""
+    low = (sender or "").lower()
+    return next((p for p in PORTALS if p in low), "")
+
+
+def same_job(pool: list[dict], company: str, title: str, via: str) -> dict | None:
+    """The job in your list an application email is about, only with evidence beyond the company name:
+    the email's job title matches, or the email came from the portal that listed the only job you have
+    at that company. Otherwise None (the email stays its own entry, or goes to your review list)."""
+    core = company_core(company)
+    cands = [j for j in pool if j.get("source") != "email" and company_core(j.get("company", "")) == core and core]
+    if not cands:
+        return None
+    if title and title != GENERIC_TITLE:
+        tw = _words(title)
+        scored = sorted(((len(tw & _words(j.get("title", ""))) / max(1, len(tw)), j) for j in cands), key=lambda x: -x[0])
+        if tw and scored[0][0] >= 0.6 and (len(scored) == 1 or scored[1][0] < scored[0][0]):
+            return scored[0][1]
+        return None
+    if len(cands) == 1 and via and cands[0].get("source") == via:
+        return cands[0]
+    return None
+
+
+def merge_mail_jobs(state: dict, pool: list[dict], now: datetime) -> int:
+    """Jobs added from Gmail ("Application (from Gmail)") that turn out to be a job already in your list:
+    move the applied status onto that job and retire the Gmail copy. Returns how many were merged."""
+    statuses, saved = state.setdefault("statuses", {}), state.setdefault("saved", {})
+    events = (state.get("gmail") or {}).get("events") or []
+    merged = 0
+    for jid, j in list(saved.items()):
+        if j.get("source") != "email" or (statuses.get(jid) or {}).get("status") == "merged":
+            continue
+        via = j.get("via") or next((portal_of(e.get("from", "")) for e in events if e.get("job_id") == jid and portal_of(e.get("from", ""))), "")
+        real = same_job([p for p in pool if p.get("id") != jid], j.get("company", ""), j.get("title", ""), via)
+        if not real:
+            continue
+        mine, cur = statuses.get(jid) or {}, statuses.get(real["id"]) or {"status": "new", "at": ""}
+        stamp = now.isoformat(timespec="seconds")
+        applied = sorted(x for x in (mine.get("appliedAt"), cur.get("appliedAt")) if x)
+        if RANK.get(mine.get("status", "applied"), 1) > RANK.get(cur.get("status"), 0):
+            statuses[real["id"]] = {**cur, "status": mine.get("status", "applied"), "at": stamp, "source": "gmail"}
+        if applied:
+            statuses[real["id"]] = {**statuses.get(real["id"], cur), "appliedAt": applied[0]}
+        statuses[jid] = {"status": "merged", "into": real["id"], "at": stamp}
+        saved.pop(jid, None)
+        saved[real["id"]] = {**saved.get(real["id"], {}), **{k: v for k, v in real.items() if not k.startswith("_")}}
+        for e in events:
+            if e.get("job_id") == jid:
+                e.update(job_id=real["id"], company=real.get("company", e.get("company")), title=real.get("title", ""))
+        merged += 1
+    return merged
 
 
 def extract_company(subject: str) -> str | None:
@@ -257,12 +318,18 @@ def run(state: dict, jobs: list[dict], client, token: str | None = None, now: da
         status = STATUS_FOR[kind]
         if job is None and mconf == "none":
             company = extract_company(subject)
-            if company and conf == "high" and kind in ("applied", "acknowledged"):
+            title_m = TITLE_IN_SUBJECT.search(subject)
+            twin = same_job(pool, company, title_m.group("title").strip() if title_m else "", portal_of(sender)) if company else None
+            if twin and conf == "high" and kind in ("applied", "acknowledged"):
+                job, mconf = twin, "high"   # the job you saw in Job Radar: no second copy from Gmail
+                event.update(job_id=twin["id"], company=twin.get("company", company), title=twin.get("title", ""))
+            elif company and conf == "high" and kind in ("applied", "acknowledged"):
                 # An application made outside the app (e.g. LinkedIn Easy Apply): add it rather than guess
                 jid = "mail-" + hashlib.sha1(company.lower().encode()).hexdigest()[:10]
                 title_m = TITLE_IN_SUBJECT.search(subject)
-                job = {"id": jid, "title": title_m.group("title").strip() if title_m else "Application (from Gmail)",
+                job = {"id": jid, "title": title_m.group("title").strip() if title_m else GENERIC_TITLE,
                        "company": company, "location": "", "source": "email", "score": None, "matched_keywords": [],
+                       "via": portal_of(sender),
                        "url": f"https://mail.google.com/mail/u/0/#all/{msg.get('threadId', mid)}", "_status": "new"}
                 pool.append(job)
                 mconf = "high"
@@ -295,6 +362,9 @@ def run(state: dict, jobs: list[dict], client, token: str | None = None, now: da
 
     g["processed"] = processed[-3000:]
     g["events"] = events[:100]
+    merged = merge_mail_jobs(state, pool, now)   # earlier Gmail copies of jobs now in your list
+    if merged:
+        report["merged"] = merged
     g["review"] = [r for r in review if r["id"] not in resolved][:50]
     if not report.get("partial"):
         g["last_check"] = now.isoformat(timespec="seconds")

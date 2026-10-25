@@ -38,6 +38,45 @@ def norm_company(company: str) -> str:
     return _WS_RE.sub(" ", _COMPANY_SUFFIX_RE.sub(" ", _norm(company))).strip()
 
 
+# Words that differ between listings of the same employer ("Crowe Capabilities Center – India" vs
+# "Crowe Capability Center - India", "Reveille Technologies, Inc" vs "Reveille Technologies")
+_CORE_DROP = {"inc", "llc", "llp", "ltd", "limited", "pvt", "private", "corp", "corporation", "co", "gmbh", "plc",
+              "india", "indian", "in", "center", "centre", "capability", "capabilities", "global", "the", "and",
+              "technologies", "technology", "tech", "solutions", "services", "consulting", "consultancy", "group",
+              "software", "systems", "labs", "lab", "it", "pte", "company", "of", "gcc", "hub", "development"}
+_GENERIC_PLACES = {"", "india", "remote", "pan", "anywhere", "multiple", "various", "hybrid"}
+
+
+def company_core(company: str) -> str:
+    """The employer's name without legal/location filler, for spotting the same employer across sites."""
+    def one(w: str) -> str:  # "capabilities" -> "capability", "analytics" -> "analytic"
+        return w[:-3] + "y" if len(w) > 4 and w.endswith("ies") else w[:-1] if len(w) > 4 and w.endswith("s") else w
+    core = [one(w) for w in _norm(company).split() if w not in _CORE_DROP and one(w) not in _CORE_DROP]
+    return " ".join(core) or _norm(company)
+
+
+def title_core(title: str) -> str:
+    """Job title without bracketed notes ("(Pan India)") or trailing location after a dash."""
+    t = re.sub(r"\([^)]*\)|\[[^\]]*\]", " ", title or "")
+    return _norm(t)
+
+
+def _place(job) -> str:
+    loc = job.get("location", "") if isinstance(job, dict) else job.location
+    if isinstance(loc, str) and re.search(r"[|/;]|,.*,.*,", loc):   # several cities in one listing
+        return ""
+    return norm_location(loc or "")
+
+
+def same_posting(a, b) -> bool:
+    """Same employer, same title, and the same city (or one of them doesn't name a single city)."""
+    get = lambda j, k: j.get(k, "") if isinstance(j, dict) else getattr(j, k, "")  # noqa: E731
+    if company_core(get(a, "company")) != company_core(get(b, "company")) or title_core(get(a, "title")) != title_core(get(b, "title")):
+        return False
+    pa, pb = _place(a), _place(b)
+    return pa == pb or pa in _GENERIC_PLACES or pb in _GENERIC_PLACES
+
+
 def norm_location(location: str) -> str:
     """First meaningful token of a location so 'Bengaluru, KA, India' == 'Bangalore'."""
     loc = _norm(location)

@@ -211,32 +211,35 @@ sources:
     # decision (Oct 2026) for this private group. Set both to false to stop it.
     enabled: true
     permitted: true
-    sites: [naukri, linkedin, indeed, glassdoor, google]   # google = Google Jobs search results
+    # Job portals: only LinkedIn and Naukri (owner's choice, Oct 2026). Indeed, Glassdoor and Google Jobs
+    # are off; companies' own careers sites (greenhouse, lever, ashby, smartrecruiters above) stay on.
+    sites: [linkedin, naukri]
     queries: ['azure data engineer', 'databricks data engineer', 'data engineer pyspark']
     location: India
     country_indeed: india
     results_wanted: 30       # per site per query
     hours_old: 72            # only recent postings; runs every 3h so this has slack
     fetch_description: true  # needed for skill scoring; slower (one extra request per job)
+  # Aggregator portals: off, only LinkedIn and Naukri are wanted (owner's choice, Oct 2026)
   adzuna:
-    enabled: true           # needs ADZUNA_APP_ID + ADZUNA_APP_KEY, skipped otherwise
+    enabled: false           # needs ADZUNA_APP_ID + ADZUNA_APP_KEY, skipped otherwise
     country: in
     queries: ['azure data engineer', 'data engineer databricks']
     where: ['Hyderabad', 'Bangalore', 'Pune', 'Mumbai']
     results_per_page: 50
     # 2 queries x 4 cities = 8 calls/run, 64/day: well under the free quota
   jooble:
-    enabled: true           # needs JOOBLE_API_KEY, skipped otherwise
+    enabled: false           # needs JOOBLE_API_KEY, skipped otherwise
     queries: ['azure data engineer', 'databricks data engineer']
     locations: ['Hyderabad', 'Bangalore', 'Pune', 'Mumbai', 'India']
     min_interval_hours: 6   # 10 calls/run x 4 runs/day, keeps the free key happy
   remotive:
-    enabled: true
+    enabled: false
     category: data
     search: data engineer
     min_interval_hours: 6   # Remotive asks for at most ~4 calls/day
   arbeitnow:
-    enabled: true           # mostly Europe; the India-only filter keeps any Indian / India-remote ones
+    enabled: false           # mostly Europe; the India-only filter keeps any Indian / India-remote ones
     pages: 3
     remote_only: true
 
