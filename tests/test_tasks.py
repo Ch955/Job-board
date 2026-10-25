@@ -214,3 +214,25 @@ def test_skill_scan_counts_relevant_postings_once_each():
     counts = dict(scan["skills"])
     assert scan["scanned"] == 2 and counts["Python"] == 2 and counts["Kafka"] == 1 and counts["Airflow"] == 1
     assert scan["coverage"] == 75   # 3 of 4 mentions are skills you have
+
+
+def test_pyspark_covers_spark_and_fabric_names_agree():
+    from datetime import datetime, timezone
+    from jobradar.backend.matching import UserMatcher
+    from jobradar.config import load_config
+    from jobradar.models import Job
+    p = {"target_roles": ["Data Engineer"], "skills": ["PySpark", "Fabric", "Databricks"], "years_experience": 3}
+    j = Job(id="j", title="Data Engineer", company="C", location="Hyderabad", url="https://x", source="greenhouse",
+            description="Spark, PySpark, Microsoft Fabric, Delta Lake. 2-5 years", posted_date="2026-10-24")
+    e = UserMatcher(load_config(), p).explain(j, datetime(2026, 10, 25, tzinfo=timezone.utc))
+    assert "Spark" not in e["missing_skills"] and "Microsoft Fabric" not in e["missing_skills"]
+    assert "Delta Lake" in e["missing_skills"]          # not implied by anything you have
+
+
+def test_known_source_blocks_in_plain_words():
+    from jobradar.backend import tasks
+    out = tasks.failed_sources({"jobspy": {"status": "ok", "warnings": [
+        "naukri 'data engineer': RuntimeError: Naukri rejected the request token (406); the public key may be out of date",
+        "google 'data engineer': RuntimeError: Google returned no job data"]}})
+    reasons = {f["source"]: f["reason"] for f in out}
+    assert reasons["naukri"].startswith("Naukri is refusing automated searches") and "Google Jobs" in reasons["google"]

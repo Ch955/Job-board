@@ -180,20 +180,27 @@ const JRDesk = (() => {
   }
 
   // ---------------------------------------------------- failed sources
+  // Same wording as tasks.KNOWN_BLOCKS, for jobs.json (single-user) runs
+  const KNOWN_BLOCKS = [
+    [/naukri.*406|406.*naukri|request token/i, "Naukri is refusing automated searches (it changed its request check). Nothing to fix on your side; Naukri jobs return when the JobSpy library is updated"],
+    [/google returned no job data/i, "Google Jobs isn't returning results to automated searches"],
+    [/glassdoor.*403|403.*glassdoor/i, "Glassdoor blocks searches from the server (403)"],
+  ];
+  const plain = (source, reason) => (KNOWN_BLOCKS.find(([rx]) => rx.test(`${source} ${reason}`)) || [null, reason])[1];
   function failedSources() {
     if (data.run?.failed) return data.run.failed;
     const runs = data.stats?.source_runs || {};  // jobs.json (single-user): same rule as tasks.failed_sources
     const ok = ["ok", "disabled", "not permitted", "throttled", "skipped"];
     const out = [];
     for (const [name, r] of Object.entries(runs)) {
-      if (!ok.includes(r.status)) out.push({ source: name, reason: String(r.error || r.status).slice(0, 160) });
+      if (!ok.includes(r.status)) out.push({ source: name, reason: plain(name, String(r.error || r.status)).slice(0, 200) });
       else if (name === "jobspy") {
         const seen = new Set();
         for (const w of r.warnings || []) {
           const site = w.split(" ")[0];
           if (!seen.has(site)) {
             seen.add(site);
-            out.push({ source: site, reason: w.split(": ").slice(1).join(": ").slice(0, 160) });
+            out.push({ source: site, reason: plain(site, w.split(": ").slice(1).join(": ")).slice(0, 200) });
           }
         }
       }
@@ -205,7 +212,7 @@ const JRDesk = (() => {
   const lower = (xs) => new Set((xs || []).map((x) => String(x).toLowerCase()));
   function missingSkills() {
     const p = JRAccount.profile();
-    const mine = lower(p.skills), hidden = lower(p.hidden_skills);
+    const mine = lower([...(p.skills || []), ...(data.skills_scan?.implied || [])]), hidden = lower(p.hidden_skills);
     return (data.skills_scan?.skills || []).filter(([k]) => !mine.has(k.toLowerCase()) && !hidden.has(k.toLowerCase()));
   }
   let showAllSkills = false;

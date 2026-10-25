@@ -96,7 +96,7 @@ class UserMatcher:
         self.profile = profile
         self.cfg = scorer_config(base_config, profile)
         self.scorer = Scorer(self.cfg)
-        self.mine = {s.lower() for s in profile.get("skills") or []}
+        self.mine = skills_vocab.covered(profile.get("skills") or [])  # PySpark also covers Spark, etc.
         self.threshold = int(profile.get("threshold", DEFAULT_THRESHOLD))
         self.level = max((LEVEL.get(d, 0) for d in profile.get("degree_levels") or []), default=None)
 

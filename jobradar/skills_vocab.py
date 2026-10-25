@@ -117,6 +117,29 @@ DEGREES = [
 ]
 
 
+# Having the first skill means you have these too (only clear-cut cases: PySpark *is* Spark)
+IMPLIES = {
+    "pyspark": ["Spark"],
+    "spark sql": ["Spark"],
+    "fabric": ["Microsoft Fabric"],
+    "microsoft fabric": ["Fabric"],
+    "adf": ["Azure Data Factory"],
+    "azure data factory": ["ADF"],
+    "azure databricks": ["Databricks"],
+    "adls": ["ADLS Gen2"],
+    "adls gen2": ["ADLS"],
+    "azure data lake storage": ["ADLS Gen2"],
+}
+
+
+def covered(skills: list[str]) -> set[str]:
+    """Lower-cased names of every skill your profile covers, including the ones implied above."""
+    out = {s.lower() for s in skills or []}
+    for s in list(out):
+        out.update(x.lower() for x in IMPLIES.get(s, []))
+    return out
+
+
 @lru_cache(maxsize=None)
 def _compiled() -> list[tuple[str, list[re.Pattern]]]:
     return [(name, [re.compile(p, re.I) for p in pats]) for name, pats in VOCAB.items()]

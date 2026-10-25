@@ -10,6 +10,7 @@ from __future__ import annotations
 import copy
 from collections import Counter
 import json
+import re
 import logging
 from datetime import datetime, timezone
 
@@ -173,6 +174,21 @@ def match_user(store: Store, base: dict, uid: str, pool: list[Job] | None = None
 
 SCAN_DAYS = 30
 NOT_FAILED = ("ok", "disabled", "not permitted", "throttled", "skipped")
+# Known blocks, in plain words (the raw error is kept after a dash for the curious)
+KNOWN_BLOCKS = [
+    (re.compile(r"naukri.*406|406.*naukri|request token", re.I),
+     "Naukri is refusing automated searches (it changed its request check). Nothing to fix on your side; "
+     "Naukri jobs return when the JobSpy library is updated"),
+    (re.compile(r"google returned no job data", re.I), "Google Jobs isn't returning results to automated searches"),
+    (re.compile(r"glassdoor.*403|403.*glassdoor", re.I), "Glassdoor blocks searches from the server (403)"),
+]
+
+
+def _plain(source: str, reason: str) -> str:
+    for rx, text in KNOWN_BLOCKS:
+        if rx.search(f"{source} {reason}"):
+            return text
+    return reason
 
 
 def failed_sources(runs: dict) -> list[dict]:
@@ -183,13 +199,13 @@ def failed_sources(runs: dict) -> list[dict]:
     out = []
     for name, r in runs.items():
         if r.get("status") not in NOT_FAILED:
-            out.append({"source": name, "reason": str(r.get("error") or r.get("status"))[:160]})
+            out.append({"source": name, "reason": _plain(name, str(r.get("error") or r.get("status")))[:200]})
         elif name == "jobspy":
             sites: dict = {}
             for w in r.get("warnings") or []:
                 site = w.split(" ", 1)[0]
                 sites.setdefault(site, w.split(": ", 1)[-1][:160])
-            out += [{"source": site, "reason": why} for site, why in sites.items()]
+            out += [{"source": site, "reason": _plain(site, why)[:200]} for site, why in sites.items()]
     return out
 
 
@@ -210,13 +226,14 @@ def skill_scan(matcher: UserMatcher, pool: list[Job], p: dict, now: datetime) ->
             continue
         scanned += 1
         counts.update(set(skills_vocab.find_skills(f"{job.title} {text}")))
-    mine = {k.lower() for k in p.get("skills") or []}
+    mine = skills_vocab.covered(p.get("skills") or [])
     total = sum(counts.values())
     covered = sum(n for k, n in counts.items() if k.lower() in mine)
     lo, hi = matcher.cfg["experience"]["min_years"], matcher.cfg["experience"]["max_years"]
     return {"scanned": scanned, "days": SCAN_DAYS, "band": [lo, hi], "updated": _iso(now),
             "coverage": round(100 * covered / total) if total else None, "mentions": total,
-            "skills": [[k, n] for k, n in counts.most_common(80)]}
+            "skills": [[k, n] for k, n in counts.most_common(80)],
+            "implied": sorted(k for k in counts if k.lower() in mine and k.lower() not in {x.lower() for x in p.get("skills") or []})}
 
 
 def notify_user(store: Store, uid: str, new_jobs: list[dict], vapid_key: str, subject: str, session) -> int:
