@@ -208,6 +208,11 @@ def write_state(store: Store, uid: str, state: dict, version: str | None, doc: d
         store.set("users", uid, new, if_missing=True)
 
 
+def _tag(uid: str) -> str:
+    import hashlib
+    return "user-" + hashlib.sha256(uid.encode()).hexdigest()[:10]
+
+
 def gmail_sync_user(store: Store, cfg: gmail_link.OAuthConfig, session, uid: str, now: datetime | None = None,
                     days: int = 14) -> dict:
     """Sync one user's Gmail into that user's own state. Status records the outcome either way."""
@@ -231,13 +236,21 @@ def gmail_sync_user(store: Store, cfg: gmail_link.OAuthConfig, session, uid: str
         store.update("gmail", uid, status)
         return report
     except gmail.GmailAuthError as e:
-        if not e.revoked:
-            status["last_error"] = "Gmail sign-in failed; will retry."
+        # Logged: our own message (no token or email data). Stored: what the user can do about it.
+        log.warning("gmail sync failed for %s: GmailAuthError: %s", _tag(uid), e)
+        if (store.get("gmail", uid) or {}).get("connected") is not False:  # else access_for already disconnected + explained
+            status["last_error"] = ("Gmail didn't allow reading your mail (permission missing). Disconnect Gmail in Settings, "
+                                    "then connect again and tick both boxes." if e.revoked else "Gmail sign-in failed; will retry.")
             store.update("gmail", uid, status)
         return {"error": "auth"}
+    except gmail.GmailApiError as e:
+        log.warning("gmail sync failed for %s: %s", _tag(uid), e)   # Google's status, reason and message only
+        status["last_error"] = e.user_message
+        store.update("gmail", uid, status)
+        return {"error": f"gmail {e.status}"}
     except Exception as e:  # noqa: BLE001 - isolate users from each other
-        log.warning("gmail sync failed for a user: %s", type(e).__name__)
-        status["last_error"] = "Gmail sync failed; will retry." + (f" ({e.status})" if isinstance(e, gmail.GmailApiError) else "")
+        log.exception("gmail sync failed for %s: %s", _tag(uid), type(e).__name__)  # traceback: code lines, no values
+        status["last_error"] = f"Gmail sync failed ({type(e).__name__}); will retry."
         store.update("gmail", uid, status)
         return {"error": type(e).__name__}
 

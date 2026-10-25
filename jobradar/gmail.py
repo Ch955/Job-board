@@ -39,9 +39,24 @@ class GmailAuthError(Exception):
 
 
 class GmailApiError(Exception):
-    def __init__(self, status: int, message: str):
-        super().__init__(f"Gmail API {status}: {message}")
-        self.status = status
+    def __init__(self, status: int, message: str, reason: str = "", user_message: str = ""):
+        super().__init__(f"Gmail API {status}{' ' + reason if reason else ''}: {message}")
+        self.status, self.reason = status, reason
+        self.user_message = user_message or f"Gmail returned an error ({status}{', ' + reason if reason else ''}). Will retry."
+
+
+def google_error(r) -> tuple[str, str]:
+    """(reason, message) from a Google API error body. Google's text, never request data."""
+    try:
+        err = r.json().get("error") or {}
+    except ValueError:
+        return "", (r.text or "")[:200]
+    if isinstance(err, str):
+        return err, ""
+    reasons = [d.get("reason", "") for d in err.get("details") or [] if isinstance(d, dict)]
+    reasons += [e.get("reason", "") for e in err.get("errors") or [] if isinstance(e, dict)]
+    reason = next((x for x in reasons if x), err.get("status", ""))
+    return reason, str(err.get("message", ""))[:200]
 
 
 def access_token(session, client_id: str, client_secret: str, refresh_token: str) -> str:
@@ -148,10 +163,18 @@ class GmailClient:
         r = self.session.get(f"{API}{path}", headers={"Authorization": f"Bearer {self.token}"}, params=params)
         if r.status_code == 401:
             raise GmailAuthError("Gmail access expired or was revoked", revoked=True)
-        if r.status_code == 403:
-            raise GmailAuthError("Gmail permission missing", revoked=True)
         if r.status_code >= 400:
-            raise GmailApiError(r.status_code, r.text[:200])
+            reason, msg = google_error(r)
+            if r.status_code == 403 and (reason in ("accessNotConfigured", "SERVICE_DISABLED")
+                                         or "has not been used" in msg or "is disabled" in msg):
+                raise GmailApiError(403, msg, reason or "SERVICE_DISABLED",
+                                    "The Gmail API isn't enabled for this app's Google Cloud project. The app owner must enable "
+                                    "it (Google Cloud → APIs & Services → Gmail API → Enable), then tap Sync now again.")
+            if r.status_code == 403 and reason in ("rateLimitExceeded", "userRateLimitExceeded", "RATE_LIMIT_EXCEEDED"):
+                raise GmailApiError(429, msg, reason, "Gmail is limiting requests right now. Try again in a few minutes.")
+            if r.status_code == 403:  # insufficientPermissions / ACCESS_TOKEN_SCOPE_INSUFFICIENT
+                raise GmailAuthError(f"Gmail permission missing ({reason or 'forbidden'})", revoked=True)
+            raise GmailApiError(r.status_code, msg, reason)
         return r.json()
 
     def profile(self) -> dict:

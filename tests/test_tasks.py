@@ -152,3 +152,44 @@ def test_delete_user_removes_everything():
     left = [k for k in store.docs if "alice" in k[1] or (store.docs[k][0].get("uid") == "alice")]
     assert left == [] and deleted == ["alice"]
     assert store.get("matches", "bob") is not None                       # nobody else touched
+
+
+class GmailSays(Google):
+    """Token works; the Gmail API answers with a given error."""
+    def __init__(self, status, body):
+        super().__init__({})
+        self.status, self.body = status, body
+    def get(self, url, headers=None, params=None):
+        return Resp(self.body, self.status)
+
+
+DISABLED = {"error": {"code": 403, "status": "PERMISSION_DENIED", "message": "Gmail API has not been used in project 1 before or it is disabled.",
+                      "details": [{"reason": "SERVICE_DISABLED"}]}}
+SCOPE = {"error": {"code": 403, "status": "PERMISSION_DENIED", "message": "Request had insufficient authentication scopes.",
+                   "details": [{"reason": "ACCESS_TOKEN_SCOPE_INSUFFICIENT"}]}}
+
+
+def test_gmail_api_not_enabled_is_explained(caplog):
+    store = MemoryStore()
+    connect(store, "alice", "rt-a")
+    r = tasks.gmail_sync_user(store, CFG, GmailSays(403, DISABLED), "alice", NOW)
+    g = store.get("gmail", "alice")
+    assert r == {"error": "gmail 403"} and "Gmail API isn't enabled" in g["last_error"]
+    assert store.get("secrets", "alice")                       # not disconnected: nothing wrong with the user's access
+    assert "SERVICE_DISABLED" in caplog.text and "alice" not in caplog.text and "rt-a" not in caplog.text
+
+
+def test_missing_permission_tells_the_user_to_reconnect():
+    store = MemoryStore()
+    connect(store, "alice", "rt-a")
+    tasks.gmail_sync_user(store, CFG, GmailSays(403, SCOPE), "alice", NOW)
+    assert "connect again and tick both boxes" in store.get("gmail", "alice")["last_error"]
+
+
+def test_unexpected_errors_log_a_traceback_without_secrets(caplog, monkeypatch):
+    store = MemoryStore()
+    connect(store, "alice", "rt-a")
+    monkeypatch.setattr(tasks.gmail_status, "run", lambda *a, **k: 1 / 0)
+    r = tasks.gmail_sync_user(store, CFG, Google({"rt-a": []}), "alice", NOW)
+    assert r == {"error": "ZeroDivisionError"} and "ZeroDivisionError" in store.get("gmail", "alice")["last_error"]
+    assert "Traceback" in caplog.text and "rt-a" not in caplog.text
