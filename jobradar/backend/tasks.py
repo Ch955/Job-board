@@ -377,6 +377,10 @@ def run_all(store: Store, base: dict, session, *, oauth: gmail_link.OAuthConfig 
         try:
             m = match_user(store, base, uid, pool, now, p)
             report["matched"] += 1
+            f = (store.get("matches", uid) or {}).get("funnel") or {}
+            log.info("%s: %d roles, %s recent jobs -> %s your roles -> %s your places -> %s at threshold %s",
+                     _tag(uid), len(f.get("roles") or []), f.get("recent"), f.get("role"), f.get("preferences"),
+                     f.get("threshold"), p.get("threshold", 70))
             if m.get("new"):
                 jobs = [j for j in (store.get("matches", uid) or {}).get("jobs", []) if j["id"] in set(m["new"])]
                 report["alerts"] += notify_user(store, uid, jobs, vapid_key, vapid_subject, session)
