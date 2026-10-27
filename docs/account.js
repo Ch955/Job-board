@@ -267,7 +267,7 @@ const JRAccount = (() => {
     return {
       jobs: m.jobs || [], generated_at: m.updated, alert_score: p.threshold ?? 70,
       searching: !!m.searching, search_started: m.search_started, pool_count: m.pool_count,
-      sources_available: m.sources_available || [], run: m.run || null,
+      sources_available: m.sources_available || [], run: m.run || null, funnel: m.funnel || null,
       // the server stores {skill, count} objects; the page works with [skill, count] pairs
       skills_scan: m.skills_scan ? { ...m.skills_scan, skills: (m.skills_scan.skills || []).map((x) => (Array.isArray(x) ? x : [x.skill, x.count])) } : null,
       outreach: { profile: { name: (p.full_name || "").split(" ")[0], full_name: p.full_name, role: p.current_role,
@@ -359,9 +359,24 @@ const JRAccount = (() => {
     const to = el("input", { type: "email", placeholder: "Optional: recruiter's email", autocomplete: "off" });
     const toInfo = el("small", { className: "muted" });
     const contacts = p.contacts || [];
+    const who = el("input", { placeholder: "Optional: their name, e.g. Priya Sharma", autocomplete: "off", maxLength: 60 });
+    const whoInfo = el("small", { className: "muted" });
+    const NAME_SRC = { posting: "named in the job post", address: "read from the email address", gmail: "from your Gmail" };
+    let msg = null;
+    const greet = () => {   // keep the message's first line in step with the name
+      if (!msg) return;
+      const first = who.value.trim().split(/\s+/)[0];
+      msg.value = msg.value.replace(/^(Hi|Dear)[^\n]*,/, first ? `Hi ${first},` : "Hi,");
+    };
+    who.addEventListener("input", () => { whoInfo.textContent = who.value.trim() ? "Used in “Hi …,” and the To line." : ""; greet(); });
     const checkTo = () => {
       const v = to.value.trim();
       const found = contacts.find((c) => c.email.toLowerCase() === v.toLowerCase());
+      if (found?.name && !who.dataset.typed) {
+        who.value = found.name;
+        whoInfo.textContent = `Name ${NAME_SRC[found.name_source] || "found"}. Check it before sending.`;
+        greet();
+      }
       toInfo.textContent = !v ? "Leave empty to add the recipient in Gmail later."
         : !EMAIL_OK.test(v) ? "That doesn't look like a valid email address."
         : found ? `Found in the job posting.` : "Added by you: not verified by Job Radar.";
@@ -369,15 +384,18 @@ const JRAccount = (() => {
     };
     to.addEventListener("input", checkTo);
     const chips = contacts.length ? el("div", { className: "chips" }, ...contacts.map((c) => {
-      const b = el("button", { type: "button", className: "chip" }, c.email, el("span", { className: "chip-count", textContent: c.source }));
+      const b = el("button", { type: "button", className: "chip" }, c.name ? `${c.name} · ${c.email}` : c.email,
+        el("span", { className: "chip-count", textContent: c.source }));
       b.addEventListener("click", () => { to.value = c.email; checkTo(); });
       return b;
     })) : el("small", { className: "muted", textContent: "No recruiter email in this posting. You can still copy the message, or create the Gmail draft and add the address there." });
     checkTo();
+    who.addEventListener("keydown", () => (who.dataset.typed = "1"));
     const subject = el("input", { value: p.subject });
-    const msg = el("textarea", { rows: 10, value: p.body });
+    msg = el("textarea", { rows: 10, value: p.body });
     parts.push(el("div", { className: "draft-box" }, el("b", { textContent: kind === "outreach" ? "Email to the recruiter" : "Email" }),
-      field("To", to), toInfo, chips, field("Subject", subject), field("Message", msg, "edit freely"),
+      field("To", to), toInfo, chips, field("Recruiter name", who, "only if you know it"), whoInfo,
+      field("Subject", subject), field("Message", msg, "edit freely"),
       el("div", { className: "row" }, copyBtn("Copy message", () => `${subject.value}\n\n${msg.value}`, "Message copied"))));
 
     // 4. Cover letter (application)
@@ -395,7 +413,9 @@ const JRAccount = (() => {
     save.addEventListener("click", async () => {
       const v = to.value.trim();
       if (v && !EMAIL_OK.test(v)) return toast("Fix the email address, or leave it empty.");
-      await createDraft({ type: kind, job_id: job.id, to: v, subject: subject.value, body: msg.value }, save);
+      const name = who.value.trim();
+      if (name && !/^[A-Za-z][A-Za-z .'-]*$/.test(name)) return toast("Use only letters, spaces, dots, hyphens or apostrophes in the name.");
+      await createDraft({ type: kind, job_id: job.id, to: v, to_name: name, subject: subject.value, body: msg.value }, save);
     });
     parts.push(el("div", { className: "draft-box" }, el("b", { textContent: "Gmail" }),
       draftsOn() ? el("p", { className: "muted", textContent: "Saved as a draft in your Gmail with your resume attached. Job Radar never sends it: you review and send it yourself." })
@@ -721,7 +741,7 @@ const JRAccount = (() => {
           el("span", { className: "chip-row" }, rec?.auto ? el("span", { className: "badge", textContent: "auto", title: "Made by the 9 AM run" }) : null,
             el("span", { className: `st-chip mail-${e.stage}`, textContent: e.due ? "Follow-up due" : STAGE_LABEL[e.stage] }))),
         el("p", { textContent: [job?.title, rec ? DRAFT_LABEL[rec.type] : null].filter(Boolean).join(" · ") }),
-        el("p", { className: "muted", textContent: [to ? `To ${to}` : "No recruiter email in the post", job ? locationLabel(job) : "",
+        el("p", { className: "muted", textContent: [to ? `To ${rec?.to_name ? `${rec.to_name} <${to}>` : to}` : "No recruiter email in the post", job ? locationLabel(job) : "",
           yrs != null ? `${yrs}${job.score_breakdown.years_max ? `–${job.score_breakdown.years_max}` : "+"} yrs` : "", when,
           rec?.attached ? "resume attached" : ""].filter(Boolean).join(" · ") }),
         gap ? el("p", { className: "gap-line", textContent: gap }) : null,

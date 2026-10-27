@@ -123,6 +123,7 @@ class Job:
     id: str = ""
     # Recruiter addresses found in the posting, and the Gmail draft made for it
     contact_emails: list[str] = field(default_factory=list)
+    contact_people: list[dict] = field(default_factory=list)   # [{email, name, source}] when the post names the recruiter
     outreach: dict = field(default_factory=dict)
     # How to apply (apply_type.py): set from the source and the real application link; optional
     apply_url: str = ""

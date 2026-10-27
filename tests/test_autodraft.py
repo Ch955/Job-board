@@ -27,7 +27,7 @@ class Resp:
 class FakeGmail:
     """Drafts you can 'send' (draft disappears, a SENT message appears in its thread) and replies."""
     def __init__(self):
-        self.drafts, self.threads, self.created = {}, {}, []
+        self.drafts, self.threads, self.created, self.senders = {}, {}, [], {}
 
     def post(self, url, json=None, headers=None, **kw):
         assert url.endswith("/drafts")  # nothing else is ever posted: no send endpoint
@@ -43,6 +43,12 @@ class FakeGmail:
         if "/threads/" in url:
             tid = url.rsplit("/", 1)[1]
             return Resp({"messages": self.threads.get(tid, [])}) if tid in self.threads else Resp({"error": {"code": 404}}, 404)
+        if url.endswith("/messages"):   # "from:<address>" lookups for the recruiter's name
+            addr = params["q"].split("from:", 1)[1]
+            return Resp({"messages": [{"id": "in-" + addr}]} if addr in self.senders else {})
+        if "/messages/in-" in url:
+            addr = url.split("/messages/in-", 1)[1]
+            return Resp({"payload": {"headers": [{"name": "From", "value": f"{self.senders[addr]} <{addr}>"}]}})
         raise AssertionError(url)
 
     def send(self, draft_id, when):
@@ -184,3 +190,22 @@ def test_one_users_failure_doesnt_stop_others(env, monkeypatch):
     monkeypatch.setattr(gmail_link, "access_for", access)
     out = autodraft.run_all(store, None, None, now=NOW)
     assert out["users"] == 2 and out["created"] == 1 and out["errors"] == 1
+
+
+def test_recruiter_name_from_post_then_gmail_then_address_never_guessed(env):
+    store, g = env
+    store.update("profiles", "asha", {"auto_draft_limit": 10})
+    g.senders["rk@three.example"] = "Ravi Kumar"
+    posted = job(1, "hr.desk@one.example")
+    posted["contact_people"] = [{"email": "hr.desk@one.example", "name": "Priya Sharma", "source": "posting"}]
+    store.set("matches", "asha", {"jobs": [posted, job(2, "anita.rao@two.example", 79), job(3, "rk@three.example", 78),
+                                           job(4, "careers@four.example", 77)]})
+    run(store)
+    recs = {d["to"]: d for d in drafts_of(store).values()}
+    assert (recs["hr.desk@one.example"]["to_name"], recs["hr.desk@one.example"]["to_name_source"]) == ("Priya Sharma", "posting")
+    assert (recs["rk@three.example"]["to_name"], recs["rk@three.example"]["to_name_source"]) == ("Ravi Kumar", "gmail")
+    assert (recs["anita.rao@two.example"]["to_name"], recs["anita.rao@two.example"]["to_name_source"]) == ("Anita Rao", "address")
+    assert "to_name" not in recs["careers@four.example"]                      # a role address: no name made up
+    raws = {c["_raw"].split("To: ", 1)[1].split("\n", 1)[0].strip(): c["_raw"] for c in g.created}
+    assert "Hi Priya," in raws["Priya Sharma <hr.desk@one.example>"]
+    assert "Hi," in raws["careers@four.example"] and "Hi Careers" not in raws["careers@four.example"]

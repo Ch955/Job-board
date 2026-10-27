@@ -176,17 +176,25 @@ class UserMatcher:
             return True, f"In {here}: you're open to relocating"
         return False, f"In {here}, outside your cities"
 
-    def match(self, pool: list[Job], now: datetime | None = None) -> list[dict]:
-        """Jobs at or above the user's threshold, best first, each with its explanation."""
+    def match(self, pool: list[Job], now: datetime | None = None, funnel: dict | None = None) -> list[dict]:
+        """Jobs at or above the user's threshold, best first, each with its explanation.
+        `funnel` (optional) is filled with how many jobs got past each step, to explain an empty list."""
         now = now or datetime.now(timezone.utc)
         out = []
+        f = funnel if funnel is not None else {}
+        f.update(pool=len(pool), recent=0, role=0, preferences=0, threshold=0, best_below=None)
         for job in pool:
             if (age_days(job, now) or 0) > 30:
                 continue
+            f["recent"] += 1
+            f["role"] += self.scorer.title_points(job.title) > 0   # counted only: scoring caps other roles at 45
             ok, why = self.fits_preferences(job)
             if not ok:
                 continue
+            f["preferences"] += 1
             e = self.explain(job, now)
+            if e["score"] < self.threshold:
+                f["best_below"] = max(f["best_below"] or 0, e["score"])
             if why:
                 e["summary"] += f" {why}."
             if e["score"] >= self.threshold:
@@ -194,4 +202,5 @@ class UserMatcher:
                 d.update(score=e["score"], matched_keywords=e["matched_skills"], score_breakdown=e["breakdown"], match=e)
                 out.append(d)
         out.sort(key=lambda d: (-d["score"], d.get("posted_date") or ""))
+        f["threshold"] = len(out)
         return out

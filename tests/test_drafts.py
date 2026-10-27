@@ -130,7 +130,7 @@ def test_outreach_kit_alternatives():
     assert len(p["linkedin_note"]) <= 200 and "Asha" in p["linkedin_note"]
     assert p["recruiter_search"].startswith("https://www.linkedin.com/search/results/people/")
     assert p["careers_link"] == JOB2["apply_url"]
-    assert p["contacts"] == [{"email": "hr@acme.example", "source": "found in the job posting"}]  # invalid one dropped
+    assert p["contacts"] == [{"email": "hr@acme.example", "source": "found in the job posting", "name": "", "name_source": ""}]  # invalid one dropped
 
 
 def test_long_titles_keep_the_note_under_200():
@@ -152,3 +152,17 @@ def test_nothing_is_ever_sent():
     g = FakeGmail()
     drafts.create(gmail.GmailClient(g, "tok"), {}, PROFILE, "application", job=JOB2, to="hr@acme.example")
     assert g.sent == [] and len(g.drafts) == 1
+
+
+def test_recruiter_names_only_from_evidence():
+    from jobradar import recruiter
+    post = "Hiring Azure Data Engineers. Share your updated CV with Priya Sharma - priya.sharma@acme.com. Immediate joiners."
+    assert recruiter.name_near(post, "priya.sharma@acme.com") == "Priya Sharma"
+    assert recruiter.name_near("Contact: Rahul Verma at rv@acme.com", "rv@acme.com") == "Rahul Verma"
+    assert recruiter.name_near("Interested candidates send resume to hr@acme.com", "hr@acme.com") == ""
+    assert recruiter.name_near("Send CVs to jobs@abc.com. Regards, Hiring Team", "jobs@abc.com") == ""
+    assert recruiter.name_from_address("priya.sharma@acme.com") == "Priya Sharma"
+    for role in ("hr@acme.com", "talent.team@x.com", "careers.india@x.com", "rk@x.com"):
+        assert recruiter.name_from_address(role) == ""
+    assert recruiter.display_name('"Priya Sharma" <priya@x.com>', "priya@x.com") == "Priya Sharma"
+    assert recruiter.display_name("Naukri Careers <priya@x.com>", "priya@x.com") == ""

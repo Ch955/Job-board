@@ -12,9 +12,9 @@ from collections import Counter
 import json
 import re
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
-from .. import apply_type, gmail, gmail_status, outreach, push, skills_vocab
+from .. import apply_type, gmail, gmail_status, outreach, push, recruiter, skills_vocab
 from ..models import Job
 from ..pipeline import collapse, dedupe, fetch_all, permitted
 from ..scoring import Scorer, age_days
@@ -28,7 +28,8 @@ POOL_CHUNK = 120          # jobs per pool document (Firestore docs are capped at
 DESC_CHARS = 2500         # enough of the description for skill matching
 WALKIN_DESC_CHARS = 6000
 MAX_MATCHES = 150
-MAX_QUERIES = 6
+MAX_QUERIES = 10          # role searches per run on LinkedIn/Naukri; beyond that, roles take turns
+COVERED_HOURS = 24        # a role searched this recently counts as covered
 
 
 def _now(now=None) -> datetime:
@@ -80,12 +81,32 @@ def pool_status(store: Store, profile: dict | None = None, now: datetime | None 
     return "stale" if age >= max_age_hours else None
 
 
-def pool_config(base: dict, users: dict[str, dict], first: str | None = None) -> dict:
-    """Search for every user's target roles; keep any posting at least one user could want."""
+def search_roles(users: dict[str, dict], first: str | None = None, searched: dict | None = None,
+                 limit: int = MAX_QUERIES) -> list[str]:
+    """The roles to search this run, fair to every user: one role from each user in turn (the `first`
+    user leads), and when there are more than `limit`, the ones searched longest ago go first, so every
+    user's roles get searched within a few runs rather than the first user's taking every slot."""
+    searched = searched or {}
+    order = ([users[first]] if first in users else []) + [p for u, p in users.items() if u != first]
+    lists = [roles_of(p) for p in order]
+    fair: list[str] = []
+    for i in range(max((len(x) for x in lists), default=0)):
+        for roles in lists:
+            if i < len(roles) and roles[i].lower() not in (x.lower() for x in fair):
+                fair.append(roles[i])
+    if len(fair) <= limit:
+        return fair
+    lead = roles_of(users[first])[:limit] if first in users else []
+    rest = sorted((r for r in fair if r not in lead), key=lambda r: searched.get(r.lower(), ""))  # never searched first
+    return (lead + rest)[:limit]
+
+
+def pool_config(base: dict, users: dict[str, dict], first: str | None = None, queries: list[str] | None = None) -> dict:
+    """Search for users' target roles; keep any posting at least one user could want."""
     roles = all_roles(users, first)
     cfg = copy.deepcopy(base)
     if roles:
-        queries = roles[:MAX_QUERIES]
+        queries = queries or roles[:MAX_QUERIES]
         src = cfg.setdefault("sources", {})
         for name in ("jobspy", "adzuna", "jooble"):
             if name in src:
@@ -101,8 +122,10 @@ def refresh_pool(store: Store, base: dict, session, now: datetime | None = None,
                  first: str | None = None) -> dict:
     now = _now(now)
     users = profiles(store)
-    cfg = pool_config(base, users, first)
     meta = store.get("pool", "meta") or {}
+    searched = dict(meta.get("searched") or {})
+    queries = search_roles(users, first, searched)
+    cfg = pool_config(base, users, first, queries)
     fetch_state = meta.get("fetch_state") or {}
     jobs, runs = fetcher(cfg, session, fetch_state, now=now)
     scorer = Scorer(cfg)
@@ -113,6 +136,7 @@ def refresh_pool(store: Store, base: dict, session, now: datetime | None = None,
             continue
         apply_type.annotate(job)
         job.contact_emails = outreach.extract_emails(job.description) or job.contact_emails  # "send your resume to …"
+        job.contact_people = recruiter.people_in(job.description, job.contact_emails) or job.contact_people
         d = job.to_dict()
         # Walk-in details (date, venue, documents) are often further down: keep more of those
         d["description"] = (job.description or "")[:WALKIN_DESC_CHARS if walkins.is_walkin(job, cfg) else DESC_CHARS]
@@ -127,6 +151,11 @@ def refresh_pool(store: Store, base: dict, session, now: datetime | None = None,
             d["description"] = old.description[:DESC_CHARS]
             kept.append(d)
     kept = collapse(kept)  # the same posting from LinkedIn, Naukri and the careers site is one job
+    wanted = {r.lower() for r in all_roles(users)}
+    searched = {k: v for k, v in searched.items() if k in wanted}
+    searched.update({q.lower(): _iso(now) for q in queries})
+    since = _iso(now - timedelta(hours=COVERED_HOURS))
+    recent = {k for k, v in searched.items() if v >= since}
     chunks = [kept[i:i + POOL_CHUNK] for i in range(0, len(kept), POOL_CHUNK)] or [[]]
     for i, c in enumerate(chunks):
         store.set("pool", f"c{i}", {"jobs": c})
@@ -134,9 +163,9 @@ def refresh_pool(store: Store, base: dict, session, now: datetime | None = None,
         store.delete("pool", f"c{i}")
     store.set("pool", "meta", {"chunks": len(chunks), "count": len(kept), "updated": _iso(now),
                                "fetch_state": fetch_state, "sources": runs,
-                               # every role wanted at this point counts as covered, so a role beyond the
-                               # query cap doesn't trigger a new search on every refresh
-                               "roles": all_roles(users, first),
+                               # when each role was last searched; "roles" = the ones searched in the last day
+                               "searched": searched, "roles": [r for r in all_roles(users) if r.lower() in recent],
+                               "queries": queries,
                                "by_site": dict(Counter(d.get("source", "?") for d in kept).most_common())})
     return {"jobs": len(kept), "sources": {k: v.get("status") for k, v in runs.items()}}
 
@@ -162,7 +191,9 @@ def match_user(store: Store, base: dict, uid: str, pool: list[Job] | None = None
     pool = load_pool(store) if pool is None else pool
     matcher = UserMatcher(base, p)
     pool = [j for j in pool if permitted(base, j.source)]  # switched-off portals never reach anyone's list
-    jobs = matcher.match(pool, now)[:MAX_MATCHES]
+    funnel: dict = {}
+    jobs = matcher.match(pool, now, funnel)[:MAX_MATCHES]
+    funnel["roles"] = roles_of(p)
     old = store.get("matches", uid) or {}
     seen = set(old.get("seen") or [])
     new = [j for j in jobs if j["id"] not in seen]
@@ -170,7 +201,7 @@ def match_user(store: Store, base: dict, uid: str, pool: list[Job] | None = None
         j.pop("description", None)
     store.set("matches", uid, {"jobs": jobs, "threshold": p.get("threshold", 70), "updated": _iso(now),
                                "count": len(jobs), "seen": sorted(seen | {j["id"] for j in jobs})[-3000:],
-                               "skills_scan": skill_scan(matcher, pool, p, now)})
+                               "skills_scan": skill_scan(matcher, pool, p, now), "funnel": funnel})
     return {"count": len(jobs), "new": [j["id"] for j in new]}
 
 

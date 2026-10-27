@@ -252,3 +252,52 @@ def test_switched_off_portals_never_reach_matches():
                 description="Python Airflow 2-5 years", posted_date="2026-10-24") for s in ("linkedin", "naukri", "indeed", "greenhouse", "adzuna")]
     tasks.match_user(store, load_config(), "u", pool, now)
     assert {j["source"] for j in store.get("matches", "u")["jobs"]} == {"linkedin", "naukri", "greenhouse"}
+
+
+def test_every_users_roles_are_searched_even_when_one_user_has_many():
+    from jobradar.backend import tasks
+    users = {"chakri": {"target_roles": ["Azure Data Engineer", "Data Engineer", "Databricks Engineer", "ETL Developer",
+                                         "Big Data Engineer", "Spark Developer", "Data Platform Engineer", "Analytics Engineer",
+                                         "BI Developer", "Data Architect", "Cloud Data Engineer"]},
+             "friend": {"target_roles": ["Frontend Developer", "React Developer"]}}
+    q = tasks.search_roles(users)
+    assert "Frontend Developer" in q and "React Developer" in q and len(q) == tasks.MAX_QUERIES
+    # Roles that didn't fit take their turn next run (searched longest ago first)
+    searched = {r.lower(): "2026-10-27T00:00:00+00:00" for r in q}
+    q2 = tasks.search_roles(users, searched=searched)
+    assert {"BI Developer", "Data Architect", "Cloud Data Engineer"} <= set(q2)
+
+
+def test_two_users_with_different_resumes_each_get_their_own_jobs():
+    from datetime import datetime, timezone
+    from jobradar.backend import tasks
+    from jobradar.backend.store import MemoryStore
+    from jobradar.config import load_config
+    from jobradar.models import Job
+    now = datetime(2026, 10, 27, tzinfo=timezone.utc)
+    store = MemoryStore()
+    store.set("profiles", "chakri", {"full_name": "C", "email": "c@x.com", "target_roles": ["Azure Data Engineer", "Data Engineer"],
+                                     "skills": ["ADF", "Databricks", "PySpark", "SQL"], "years_experience": 3, "locations": ["Hyderabad"]})
+    store.set("profiles", "friend", {"full_name": "F", "email": "f@x.com", "target_roles": ["Frontend Developer"],
+                                     "skills": ["React", "TypeScript", "JavaScript", "CSS"], "years_experience": 2, "locations": ["Bengaluru"]})
+    asked = []
+
+    def fetcher(cfg, session, state, now=None):
+        qs = cfg["sources"]["jobspy"]["queries"]
+        asked.extend(qs)
+        jobs = []
+        if any("frontend" in q.lower() for q in qs):
+            jobs.append(Job(title="Frontend Developer", company="Pixel", location="Bengaluru, India", url="https://l/1",
+                            source="linkedin", description="React TypeScript JavaScript CSS, 1-3 years", posted_date="2026-10-26"))
+        if any("data engineer" in q.lower() for q in qs):
+            jobs.append(Job(title="Azure Data Engineer", company="Lake", location="Hyderabad, India", url="https://l/2",
+                            source="linkedin", description="ADF Databricks PySpark SQL, 2-5 years", posted_date="2026-10-26"))
+        return jobs, {"jobspy": {"status": "ok", "count": len(jobs)}}
+
+    tasks.run_all(store, load_config(), None, now=now, fetcher=fetcher)
+    mine = [j["company"] for j in store.get("matches", "chakri")["jobs"]]
+    hers = [j["company"] for j in store.get("matches", "friend")["jobs"]]
+    assert "Frontend Developer" in asked
+    assert mine == ["Lake"] and hers == ["Pixel"]            # each sees their own role, nobody else's
+    f = store.get("matches", "friend")["funnel"]
+    assert f["role"] >= 1 and f["threshold"] == 1 and f["roles"] == ["Frontend Developer"]

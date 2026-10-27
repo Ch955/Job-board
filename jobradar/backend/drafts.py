@@ -13,8 +13,9 @@ from __future__ import annotations
 
 import re
 from datetime import datetime, timezone
+from email.utils import formataddr
 
-from .. import gmail
+from .. import gmail, recruiter
 
 TYPES = {
     "application": "Application",
@@ -48,7 +49,7 @@ def _join(lines) -> str:
 
 
 def compose(kind: str, profile: dict, job: dict | None = None, reply_to: dict | None = None,
-            attached: bool = True) -> tuple[str, str]:
+            attached: bool = True, to_name: str | None = None) -> tuple[str, str]:
     """(subject, body). `reply_to` = {"subject", "from_name"} of the email being answered;
     `attached` = the resume goes with it (otherwise the draft doesn't say it does)."""
     if kind not in TYPES:
@@ -61,6 +62,8 @@ def compose(kind: str, profile: dict, job: dict | None = None, reply_to: dict | 
     role, years = profile.get("current_role") or "", profile.get("years_experience")
     skills = _skills_for(job, profile)
     hi = f"Hi {reply_to['from_name'].split()[0]}," if reply_to and reply_to.get("from_name") and "@" not in reply_to["from_name"] else "Hi,"
+    if to_name and kind not in REPLIES:   # the recruiter's name, only when known (recruiter.py)
+        hi = f"Hi {to_name.split()[0]},"
     years_txt = f"{years:g}" if isinstance(years, (int, float)) else str(years or "")
 
     intro = None
@@ -215,7 +218,12 @@ def preview(kind: str, profile: dict, job: dict, state: dict | None = None, now:
         raise DraftError("Unknown draft type.")
     state = state or {}
     subject, body = compose(kind, profile, job, attached=True)
-    contacts = [{"email": e, "source": "found in the job posting"} for e in (job.get("contact_emails") or []) if valid_email(e)]
+    named = {p.get("email"): p.get("name") for p in job.get("contact_people") or []}
+    contacts = []
+    for e in (job.get("contact_emails") or []):
+        if valid_email(e):
+            name, src = (named.get(e), "posting") if named.get(e) else (recruiter.name_from_address(e), "address")
+            contacts.append({"email": e, "source": "found in the job posting", "name": name or "", "name_source": src if name else ""})
     apply_type = job.get("apply_type") or "unknown"
     out = {"type": kind, "subject": subject, "body": body, "contacts": contacts,
            "apply": {"type": apply_type, "url": job.get("apply_url") or job.get("url") or "", "evidence": job.get("apply_evidence", "")}}
@@ -257,7 +265,8 @@ def key_for(kind: str, job_id: str | None = None, thread_id: str | None = None) 
 def create(client: gmail.GmailClient, state: dict, profile: dict, kind: str, *, job: dict | None = None,
            to: str = "", reply_to_message: str | None = None, resume: tuple[str, bytes] | None = None,
            now: datetime | None = None, subject: str | None = None, body: str | None = None,
-           thread: tuple[str, str, str] | None = None, auto: bool = False) -> dict:
+           thread: tuple[str, str, str] | None = None, auto: bool = False,
+           to_name: str = "", to_name_source: str = "") -> dict:
     """Create one draft in this user's Gmail and record it. Returns the record (existing one if a duplicate).
 
     `thread` = (thread id, Message-ID, subject) of an email you sent: a follow-up then lands in that conversation.
@@ -291,11 +300,15 @@ def create(client: gmail.GmailClient, state: dict, profile: dict, kind: str, *, 
     if not to and kind not in NO_RECIPIENT_OK:
         raise DraftError("No recipient for this reply.")
     attachment = resume if kind in ATTACH else None
-    auto_subject, auto_body = compose(kind, profile, job, reply_ctx, attached=bool(attachment))
+    to_name = re.sub(r"\s+", " ", to_name or "").strip()[:60]
+    if to_name and not re.fullmatch(r"[A-Za-z][A-Za-z .'-]*", to_name):
+        raise DraftError("The recruiter's name can only have letters, spaces, dots, hyphens and apostrophes.")
+    auto_subject, auto_body = compose(kind, profile, job, reply_ctx, attached=bool(attachment), to_name=to_name or None)
     # The user may have edited the text in the app; it's their own words, used as-is
     subject = (subject or "").strip()[:200] or auto_subject
     body = (body or "").strip()[:20000] or auto_body
-    d = client.create_draft(to=to, subject=subject, body=body, attachment=attachment, sender=profile.get("email"),
+    header_to = formataddr((to_name, to)) if to and to_name else to
+    d = client.create_draft(to=header_to, subject=subject, body=body, attachment=attachment, sender=profile.get("email"),
                             thread_id=thread_id, in_reply_to=in_reply_to)
     at = (now or datetime.now(timezone.utc)).isoformat(timespec="seconds")
     rec = {"id": d["id"], "message_id": d.get("message_id", ""), "thread_id": d.get("thread_id") or thread_id or "",
@@ -303,5 +316,7 @@ def create(client: gmail.GmailClient, state: dict, profile: dict, kind: str, *, 
            "to": to, "subject": subject[:140], "attached": bool(attachment), "at": at, "created": at}
     if auto:
         rec["auto"] = True
+    if to_name:
+        rec["to_name"], rec["to_name_source"] = to_name, to_name_source or "you"
     drafts[key] = rec
     return rec

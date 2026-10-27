@@ -590,6 +590,18 @@ function renderHeader(jobs) {
   document.body.classList.toggle("read-only", !!readOnly);
 }
 
+// Why your list is empty, from your own last match: jobs searched → your roles → your places/work mode → your threshold
+function funnelText(f, threshold) {
+  if (!f || !f.pool) return `Nothing at or above your threshold (${threshold}) yet. New jobs are checked every 3 hours; you can lower the threshold in your profile.`;
+  const roles = (f.roles || []).join(", ") || "your roles";
+  const tips = [];
+  if (!f.role) tips.push("add more role names (e.g. other titles for the same work) in your profile");
+  else if (!f.preferences) tips.push("add cities, choose “Anywhere in India”, or allow remote/hybrid");
+  else if (!f.threshold) tips.push(`lower your threshold${f.best_below ? ` (your best match scored ${f.best_below})` : ""}`);
+  return `In the latest search: ${f.recent} recent jobs, ${f.role} match ${roles}, ${f.preferences} fit your cities and work mode, ` +
+    `${f.threshold} scored ${threshold}+.${tips.length ? ` Try: ${tips[0]}. ` : " "}New jobs are searched every 3 hours, including for your roles.`;
+}
+
 function render() {
   const jobs = allJobs();
   const cards = SECTIONS.some((x) => x.id === section);
@@ -627,7 +639,7 @@ function render() {
         : any ? "Try lowering the minimum fit or clearing filters."
         : section === "new" && multi && JRAccount.me?.missing?.length ? "Add your resume or profile (Settings → Your account) and your matches appear here."
         : section === "new" && data.searching ? "Searching for jobs that fit your profile. This usually takes a few minutes; matches appear here on their own."
-        : section === "new" && multi ? `Nothing at or above your threshold (${JRAccount.profile().threshold ?? 70}) yet. New jobs are checked every 3 hours; you can lower the threshold in your profile.`
+        : section === "new" && multi ? funnelText(data.funnel, JRAccount.profile().threshold ?? 70)
         : section === "new" ? "The next run (every 3 hours) fills this in."
         : section === "applied" ? "Tap Applied on a job and it moves here." : ""));
   } else {

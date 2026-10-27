@@ -9,7 +9,7 @@ from pathlib import Path
 
 import requests
 
-from . import apply_type, outreach, push, store
+from . import apply_type, outreach, push, recruiter, store
 from .config import ROOT, env
 from .http import make_session
 from .models import Job, company_core, same_posting, title_core
@@ -146,10 +146,12 @@ def collapse(jobs: list) -> list:
                 kept.append(j)
                 continue
             emails = list(dict.fromkeys([*get(twin, "contact_emails", []), *get(j, "contact_emails", [])]))[:3]
+            people = {p["email"]: p for p in [*get(j, "contact_people", []), *get(twin, "contact_people", [])] if p.get("email")}
+            people = [p for p in people.values() if p["email"] in emails]
             if isinstance(twin, dict):
-                twin["contact_emails"] = emails
+                twin["contact_emails"], twin["contact_people"] = emails, people
             else:
-                twin.contact_emails = emails
+                twin.contact_emails, twin.contact_people = emails, people
         out += kept
     return out
 
@@ -190,6 +192,7 @@ def process(
         job.status = old.status if old else "new"
         job.outreach = old.outreach if old and old.outreach else job.outreach
         job.contact_emails = outreach.extract_emails(job.description) or (old.contact_emails if old else [])
+        job.contact_people = recruiter.people_in(job.description, job.contact_emails) or (old.contact_people if old else [])
         if not job.description_snippet:
             job.description_snippet = job.description[:snippet_chars].rstrip()
         apply_type.annotate(job)

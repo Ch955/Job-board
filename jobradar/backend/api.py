@@ -284,7 +284,7 @@ def create_app(settings: Settings | None = None, store: Store | None = None, ses
         m = store.get("matches", u["uid"]) or {}
         meta = store.get("pool", "meta") or {}
         return {"jobs": m.get("jobs", []), "updated": m.get("updated"), "threshold": m.get("threshold"),
-                "sources_available": permitted_sources(base), "skills_scan": m.get("skills_scan"),
+                "sources_available": permitted_sources(base), "skills_scan": m.get("skills_scan"), "funnel": m.get("funnel"),
                 "run": {"at": meta.get("updated"), "failed": tasks.failed_sources(meta.get("sources") or {})},
                 **search.status()}
 
@@ -430,12 +430,17 @@ def create_app(settings: Settings | None = None, store: Store | None = None, ses
         limits.check(uid, "creating a draft", 3)
         job = find_job(uid, body.get("job_id"))
         attachment = resume_intake.load(store, uid) if kind in drafts.ATTACH else None
+        to = (body.get("to") or "").strip()
+        to_name, name_src = str(body.get("to_name") or "").strip(), "you"
+        if not to_name and to and kind in drafts.NO_RECIPIENT_OK:
+            to_name, name_src = autodraft.recipient_name(client, job or {}, to)   # post, your Gmail, or the address
         for _ in range(3):
             state, version, doc = tasks.read_state(store, uid)
             try:
-                rec = drafts.create(client, state, prof, kind, job=job, to=(body.get("to") or "").strip(),
+                rec = drafts.create(client, state, prof, kind, job=job, to=to,
                                     reply_to_message=body.get("message_id"), resume=attachment,
-                                    subject=body.get("subject"), body=body.get("body"))
+                                    subject=body.get("subject"), body=body.get("body"),
+                                    to_name=to_name, to_name_source=name_src)
             except drafts.DraftError as e:
                 raise HTTPException(422, str(e)) from None
             except gmail.GmailAuthError:

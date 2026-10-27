@@ -24,7 +24,7 @@ import logging
 import re
 from datetime import datetime, timedelta, timezone
 
-from .. import gmail, push
+from .. import gmail, push, recruiter
 from . import drafts, gmail_link, resume_intake
 from .store import Conflict, Store
 
@@ -60,6 +60,23 @@ def _parse(iso: str | None) -> datetime | None:
 
 def _header(msg: dict, name: str) -> str:
     return next((h["value"] for h in (msg.get("payload") or {}).get("headers") or [] if h["name"].lower() == name.lower()), "")
+
+
+def recipient_name(client: gmail.GmailClient, job: dict, email: str) -> tuple[str, str]:
+    """(name, source) for the greeting: the post names them, else they've emailed you before, else the
+    address is clearly a name. ("", "") when none of those: the draft then says "Hi,"."""
+    named = next((p.get("name") for p in job.get("contact_people") or [] if p.get("email", "").lower() == email.lower()), "")
+    if named:
+        return named, "posting"
+    try:
+        for mid in client.list_message_ids(f"from:{email}", limit=1):
+            name = recruiter.display_name(_header(client.message(mid), "From"), email)
+            if name:
+                return name, "gmail"
+    except gmail.GmailApiError:
+        pass  # a lookup that fails just means no name from Gmail
+    name = recruiter.name_from_address(email)
+    return (name, "address") if name else ("", "")
 
 
 def usable(addr: str) -> bool:
@@ -178,7 +195,8 @@ def run_user(store: Store, oauth: gmail_link.OAuthConfig, session, uid: str, now
             job = jobs.get(d.get("job_id")) or (state.get("saved") or {}).get(d.get("job_id")) or {"id": d.get("job_id")}
             thread = (d["thread_id"], d.get("sent_message_id") or "", d.get("sent_subject") or d.get("subject") or "")
             rec = drafts.create(client, scratch, profile, "follow_up", job=job, to=d["to"], resume=resume, now=now,
-                                thread=thread if thread[0] else None, auto=True)
+                                thread=thread if thread[0] else None, auto=True,
+                                to_name=d.get("to_name", ""), to_name_source=d.get("to_name_source", ""))
             if not rec.get("duplicate"):
                 new[f"follow_up:{d.get('job_id')}"] = rec
                 report["follow_ups"] += 1
@@ -189,7 +207,9 @@ def run_user(store: Store, oauth: gmail_link.OAuthConfig, session, uid: str, now
         todo = candidates(list(jobs.values()), state, profile, now)
         report["candidates"] = len(todo)
         for job, email in todo[:room]:
-            rec = drafts.create(client, scratch, profile, "outreach", job=job, to=email, resume=resume, now=now, auto=True)
+            name, source = recipient_name(client, job, email)
+            rec = drafts.create(client, scratch, profile, "outreach", job=job, to=email, resume=resume, now=now, auto=True,
+                                to_name=name, to_name_source=source)
             if not rec.get("duplicate"):
                 new[f"outreach:{job['id']}"] = rec
                 report["created"] += 1
