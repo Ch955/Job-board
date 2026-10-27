@@ -217,7 +217,7 @@ sources:
     queries: ['azure data engineer', 'databricks data engineer', 'data engineer pyspark']
     location: India
     country_indeed: india
-    results_wanted: 30       # per site per query
+    results_wanted: 50       # per site per query (more per role now that every user's roles share the searches)
     hours_old: 72            # only recent postings; runs every 3h so this has slack
     fetch_description: true  # needed for skill scoring; slower (one extra request per job)
   # Aggregator portals: off, only LinkedIn and Naukri are wanted (owner's choice, Oct 2026)
