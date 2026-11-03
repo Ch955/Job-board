@@ -1,6 +1,6 @@
 {
  "version": 1,
- "generated_at": "2026-11-03T17:02:18+00:00",
+ "generated_at": "2026-11-03T23:21:51+00:00",
  "sources_available": [
   "greenhouse",
   "lever",
@@ -14,50 +14,50 @@
   "role": "Azure Data Engineer"
  },
  "stats": {
-  "total": 361,
-  "new_this_run": 16,
-  "fetched_raw": 6806,
+  "total": 362,
+  "new_this_run": 1,
+  "fetched_raw": 6824,
   "by_source": {
    "linkedin": 207,
-   "naukri": 149,
+   "naukri": 150,
    "greenhouse": 2,
    "smartrecruiters": 2,
    "ashby": 1
   },
   "dropped": {
-   "irrelevant_title": 6401,
+   "irrelevant_title": 6419,
    "location": 92,
-   "experience": 121,
+   "experience": 125,
    "walk_in": 2,
    "too_old": 0,
    "low_score": 0,
-   "duplicates": 133
+   "duplicates": 131
   },
   "source_runs": {
    "greenhouse": {
     "status": "ok",
-    "count": 5406,
-    "seconds": 3.7
+    "count": 5419,
+    "seconds": 2.1
    },
    "lever": {
     "status": "ok",
-    "count": 461,
-    "seconds": 19.7
+    "count": 462,
+    "seconds": 4.1
    },
    "ashby": {
     "status": "ok",
-    "count": 604,
+    "count": 608,
     "seconds": 0.3
    },
    "smartrecruiters": {
     "status": "ok",
     "count": 35,
-    "seconds": 8.4
+    "seconds": 6.7
    },
    "jobspy": {
     "status": "ok",
     "count": 300,
-    "seconds": 255.6
+    "seconds": 261.0
    },
    "adzuna": {
     "status": "disabled",
@@ -85,11 +85,11 @@
  },
  "state": {
   "last_fetched": {
-   "greenhouse": "2026-11-03T17:02:18+00:00",
-   "lever": "2026-11-03T17:02:18+00:00",
-   "ashby": "2026-11-03T17:02:18+00:00",
-   "smartrecruiters": "2026-11-03T17:02:18+00:00",
-   "jobspy": "2026-11-03T17:02:18+00:00",
+   "greenhouse": "2026-11-03T23:21:51+00:00",
+   "lever": "2026-11-03T23:21:51+00:00",
+   "ashby": "2026-11-03T23:21:51+00:00",
+   "smartrecruiters": "2026-11-03T23:21:51+00:00",
+   "jobspy": "2026-11-03T23:21:51+00:00",
    "remotive": "2026-10-25T11:25:57+00:00",
    "arbeitnow": "2026-10-25T11:25:57+00:00"
   }
@@ -296,63 +296,6 @@
    "work_mode": ""
   },
   {
-   "title": "Data Engineer (Mid Level)",
-   "company": "Cornerstone Global Partners (CGP Group)",
-   "location": "India",
-   "url": "https://www.linkedin.com/jobs/view/4467835027",
-   "source": "linkedin",
-   "remote": false,
-   "posted_date": "2026-11-03T00:00:00+00:00",
-   "description_snippet": "Data Engineer (Mid-Level) Location: India | Remote | Direct Hire | Newly Created Position | Headcount: 1 About The Company Our client is a growing SaaS company that provides cloud-based software for damage prevention, asset integrity, stakeholder engagement, and land management, helping energy, util",
-   "score": 100,
-   "status": "new",
-   "matched_keywords": [
-    "ADF",
-    "Databricks",
-    "PySpark",
-    "Azure",
-    "SQL",
-    "SCD",
-    "Incremental Load",
-    "ETL/ELT",
-    "Python",
-    "Spark",
-    "Azure DevOps",
-    "Data Modeling",
-    "Power BI",
-    "Azure Security",
-    "Data Governance",
-    "Git",
-    "Delta Lake",
-    "Airflow"
-   ],
-   "score_breakdown": {
-    "title": 25,
-    "skills": 35,
-    "location": 20,
-    "experience": 10,
-    "recency": 10,
-    "penalty": 0,
-    "location_label": "India",
-    "location_eligible": true,
-    "walk_in": false,
-    "walk_in_eligible": true,
-    "years_required": 3,
-    "years_max": 5,
-    "experience_eligible": true,
-    "age_days": 0
-   },
-   "first_seen": "2026-10-31T19:16:45+00:00",
-   "id": "867f94b0952d",
-   "contact_emails": [],
-   "contact_people": [],
-   "outreach": {},
-   "apply_url": "https://www.linkedin.com/jobs/view/4467835027",
-   "apply_type": "unknown",
-   "apply_evidence": "LinkedIn page; the apply method isn't shown in the listing data",
-   "work_mode": ""
-  },
-  {
    "title": "Senior Data Engineer",
    "company": "ADA",
    "location": "Bengaluru, Karnataka, India",
@@ -405,6 +348,63 @@
    "contact_people": [],
    "outreach": {},
    "apply_url": "https://www.linkedin.com/jobs/view/4486043292",
+   "apply_type": "unknown",
+   "apply_evidence": "LinkedIn page; the apply method isn't shown in the listing data",
+   "work_mode": ""
+  },
+  {
+   "title": "Data Engineer (Mid Level)",
+   "company": "Cornerstone Global Partners (CGP Group)",
+   "location": "India",
+   "url": "https://www.linkedin.com/jobs/view/4467835027",
+   "source": "linkedin",
+   "remote": false,
+   "posted_date": "2026-11-03T00:00:00+00:00",
+   "description_snippet": "Data Engineer (Mid-Level) Location: India | Remote | Direct Hire | Newly Created Position | Headcount: 1 About The Company Our client is a growing SaaS company that provides cloud-based software for damage prevention, asset integrity, stakeholder engagement, and land management, helping energy, util",
+   "score": 100,
+   "status": "new",
+   "matched_keywords": [
+    "ADF",
+    "Databricks",
+    "PySpark",
+    "Azure",
+    "SQL",
+    "SCD",
+    "Incremental Load",
+    "ETL/ELT",
+    "Python",
+    "Spark",
+    "Azure DevOps",
+    "Data Modeling",
+    "Power BI",
+    "Azure Security",
+    "Data Governance",
+    "Git",
+    "Delta Lake",
+    "Airflow"
+   ],
+   "score_breakdown": {
+    "title": 25,
+    "skills": 35,
+    "location": 20,
+    "experience": 10,
+    "recency": 10,
+    "penalty": 0,
+    "location_label": "India",
+    "location_eligible": true,
+    "walk_in": false,
+    "walk_in_eligible": true,
+    "years_required": 3,
+    "years_max": 5,
+    "experience_eligible": true,
+    "age_days": 0
+   },
+   "first_seen": "2026-10-31T19:16:45+00:00",
+   "id": "867f94b0952d",
+   "contact_emails": [],
+   "contact_people": [],
+   "outreach": {},
+   "apply_url": "https://www.linkedin.com/jobs/view/4467835027",
    "apply_type": "unknown",
    "apply_evidence": "LinkedIn page; the apply method isn't shown in the listing data",
    "work_mode": ""
@@ -670,55 +670,6 @@
    "work_mode": "hybrid"
   },
   {
-   "title": "Data Engineer Advisor",
-   "company": "NTT DATA North America",
-   "location": "Bangalore Urban, Karnataka, India",
-   "url": "https://www.linkedin.com/jobs/view/4486182976",
-   "source": "linkedin",
-   "remote": false,
-   "posted_date": "2026-11-02T00:00:00+00:00",
-   "description_snippet": "India T&M Special Bonus: Data Engineer - Azure Databricks Advanced SQL programming for more than 4 years Data analysis skills for more than 2 years Experience with Agile delivery frameworks/methodologies (e.g. Scrum, SAFe) and tools (i.e. Jira, Azure DevOps). Demonstrate a proven track record of hav",
-   "score": 100,
-   "status": "new",
-   "matched_keywords": [
-    "ADF",
-    "Databricks",
-    "Azure",
-    "SQL",
-    "ETL/ELT",
-    "Python",
-    "Azure DevOps",
-    "Data Warehousing",
-    "SHIR / Hybrid",
-    "Data Modeling"
-   ],
-   "score_breakdown": {
-    "title": 25,
-    "skills": 35,
-    "location": 20,
-    "experience": 10,
-    "recency": 10,
-    "penalty": 0,
-    "location_label": "Bangalore",
-    "location_eligible": true,
-    "walk_in": false,
-    "walk_in_eligible": true,
-    "years_required": 4,
-    "years_max": null,
-    "experience_eligible": true,
-    "age_days": 1
-   },
-   "first_seen": "2026-11-02T21:42:20+00:00",
-   "id": "20a157f7ac59",
-   "contact_emails": [],
-   "contact_people": [],
-   "outreach": {},
-   "apply_url": "https://www.linkedin.com/jobs/view/4486182976",
-   "apply_type": "unknown",
-   "apply_evidence": "LinkedIn page; the apply method isn't shown in the listing data",
-   "work_mode": ""
-  },
-  {
    "title": "Data Engineer",
    "company": "Altera",
    "location": "Bengaluru, Karnataka, India",
@@ -971,6 +922,55 @@
    "apply_url": "https://www.naukri.com/job-listings-senior-data-engineer-bajaj-finance-limited-pune-4-to-6-years-011026926109",
    "apply_type": "unknown",
    "apply_evidence": "Naukri page; the apply method isn't shown in the listing data",
+   "work_mode": ""
+  },
+  {
+   "title": "Data Engineer Advisor",
+   "company": "NTT DATA North America",
+   "location": "Bangalore Urban, Karnataka, India",
+   "url": "https://www.linkedin.com/jobs/view/4486182976",
+   "source": "linkedin",
+   "remote": false,
+   "posted_date": "2026-11-02T00:00:00+00:00",
+   "description_snippet": "India T&M Special Bonus: Data Engineer - Azure Databricks Advanced SQL programming for more than 4 years Data analysis skills for more than 2 years Experience with Agile delivery frameworks/methodologies (e.g. Scrum, SAFe) and tools (i.e. Jira, Azure DevOps). Demonstrate a proven track record of hav",
+   "score": 100,
+   "status": "new",
+   "matched_keywords": [
+    "ADF",
+    "Databricks",
+    "Azure",
+    "SQL",
+    "ETL/ELT",
+    "Python",
+    "Azure DevOps",
+    "Data Warehousing",
+    "SHIR / Hybrid",
+    "Data Modeling"
+   ],
+   "score_breakdown": {
+    "title": 25,
+    "skills": 35,
+    "location": 20,
+    "experience": 10,
+    "recency": 10,
+    "penalty": 0,
+    "location_label": "Bangalore",
+    "location_eligible": true,
+    "walk_in": false,
+    "walk_in_eligible": true,
+    "years_required": 4,
+    "years_max": null,
+    "experience_eligible": true,
+    "age_days": 1
+   },
+   "first_seen": "2026-11-02T21:42:20+00:00",
+   "id": "20a157f7ac59",
+   "contact_emails": [],
+   "contact_people": [],
+   "outreach": {},
+   "apply_url": "https://www.linkedin.com/jobs/view/4486182976",
+   "apply_type": "unknown",
+   "apply_evidence": "LinkedIn page; the apply method isn't shown in the listing data",
    "work_mode": ""
   },
   {
@@ -8120,6 +8120,52 @@
    "apply_url": "https://www.linkedin.com/jobs/view/4486044948",
    "apply_type": "unknown",
    "apply_evidence": "LinkedIn page; the apply method isn't shown in the listing data",
+   "work_mode": ""
+  },
+  {
+   "title": "AI Data Engineer",
+   "company": "Infosys",
+   "location": "Bengaluru, India",
+   "url": "https://www.naukri.com/job-listings-ai-data-engineer-infosys-limited-bengaluru-3-to-5-years-031126929001",
+   "source": "naukri",
+   "remote": false,
+   "posted_date": "2026-11-03T00:00:00+00:00",
+   "description_snippet": "Job DescriptionAbout the job: Join a team where data engineering meets intelligent automation to power next-generation analytics and AI experiences. In this role, youll help build reliable, scalable data pipelines and enable GenAI-ready datasets that support experimentation, model development, and b",
+   "score": 87,
+   "status": "new",
+   "matched_keywords": [
+    "Databricks",
+    "SQL",
+    "ETL/ELT",
+    "Python",
+    "Spark",
+    "Data Modeling",
+    "Airflow"
+   ],
+   "score_breakdown": {
+    "title": 25,
+    "skills": 22,
+    "location": 20,
+    "experience": 10,
+    "recency": 10,
+    "penalty": 0,
+    "location_label": "Bangalore",
+    "location_eligible": true,
+    "walk_in": false,
+    "walk_in_eligible": true,
+    "years_required": 3,
+    "years_max": 5,
+    "experience_eligible": true,
+    "age_days": 0
+   },
+   "first_seen": "2026-11-03T23:21:51+00:00",
+   "id": "a5e916bc39be",
+   "contact_emails": [],
+   "contact_people": [],
+   "outreach": {},
+   "apply_url": "https://www.naukri.com/job-listings-ai-data-engineer-infosys-limited-bengaluru-3-to-5-years-031126929001",
+   "apply_type": "unknown",
+   "apply_evidence": "Naukri page; the apply method isn't shown in the listing data",
    "work_mode": ""
   },
   {
