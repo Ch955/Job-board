@@ -1,6 +1,6 @@
 {
  "version": 1,
- "generated_at": "2026-11-06T16:45:53+00:00",
+ "generated_at": "2026-11-06T23:06:52+00:00",
  "sources_available": [
   "greenhouse",
   "lever",
@@ -14,50 +14,50 @@
   "role": "Azure Data Engineer"
  },
  "stats": {
-  "total": 419,
-  "new_this_run": 15,
-  "fetched_raw": 6849,
+  "total": 421,
+  "new_this_run": 2,
+  "fetched_raw": 6882,
   "by_source": {
-   "linkedin": 235,
+   "linkedin": 237,
    "naukri": 179,
    "greenhouse": 2,
    "smartrecruiters": 2,
    "ashby": 1
   },
   "dropped": {
-   "irrelevant_title": 6456,
-   "location": 91,
+   "irrelevant_title": 6490,
+   "location": 90,
    "experience": 115,
    "walk_in": 0,
    "too_old": 0,
    "low_score": 0,
-   "duplicates": 126
+   "duplicates": 128
   },
   "source_runs": {
    "greenhouse": {
     "status": "ok",
-    "count": 5435,
+    "count": 5464,
     "seconds": 2.1
    },
    "lever": {
     "status": "ok",
     "count": 462,
-    "seconds": 20.8
+    "seconds": 1.5
    },
    "ashby": {
     "status": "ok",
-    "count": 616,
-    "seconds": 0.4
+    "count": 620,
+    "seconds": 0.3
    },
    "smartrecruiters": {
     "status": "ok",
     "count": 36,
-    "seconds": 7.1
+    "seconds": 7.8
    },
    "jobspy": {
     "status": "ok",
     "count": 300,
-    "seconds": 274.7
+    "seconds": 241.1
    },
    "adzuna": {
     "status": "disabled",
@@ -85,11 +85,11 @@
  },
  "state": {
   "last_fetched": {
-   "greenhouse": "2026-11-06T16:45:53+00:00",
-   "lever": "2026-11-06T16:45:53+00:00",
-   "ashby": "2026-11-06T16:45:53+00:00",
-   "smartrecruiters": "2026-11-06T16:45:53+00:00",
-   "jobspy": "2026-11-06T16:45:53+00:00",
+   "greenhouse": "2026-11-06T23:06:52+00:00",
+   "lever": "2026-11-06T23:06:52+00:00",
+   "ashby": "2026-11-06T23:06:52+00:00",
+   "smartrecruiters": "2026-11-06T23:06:52+00:00",
+   "jobspy": "2026-11-06T23:06:52+00:00",
    "remotive": "2026-10-25T11:25:57+00:00",
    "arbeitnow": "2026-10-25T11:25:57+00:00"
   }
@@ -466,57 +466,6 @@
    "work_mode": ""
   },
   {
-   "title": "Data Engineer – Azure Databricks | 4–6 Years | Mumabi | Female Candidates Only | Onsite | Immediate Joiner",
-   "company": "Codians.ai",
-   "location": "Mumbai, Maharashtra, India",
-   "url": "https://www.linkedin.com/jobs/view/4486796340",
-   "source": "linkedin",
-   "remote": false,
-   "posted_date": "2026-11-05T00:00:00+00:00",
-   "description_snippet": "We’re Hiring: Data Engineer – Azure Databricks | Location Mumabi and female Candidates only Experience: 4–6 Years Technology: Azure Databricks | PySpark | Python | SQL | Delta Lake We’re looking for an experienced Data Engineer to build, deploy, and operate modern, scalable data platforms on Azure D",
-   "score": 100,
-   "status": "new",
-   "matched_keywords": [
-    "Databricks",
-    "PySpark",
-    "ADLS Gen2",
-    "Azure",
-    "SQL",
-    "Python",
-    "Azure DevOps",
-    "Azure Security",
-    "Data Governance",
-    "Git",
-    "Delta Lake",
-    "Kafka"
-   ],
-   "score_breakdown": {
-    "title": 25,
-    "skills": 35,
-    "location": 20,
-    "experience": 10,
-    "recency": 10,
-    "penalty": 0,
-    "location_label": "Mumbai",
-    "location_eligible": true,
-    "walk_in": false,
-    "walk_in_eligible": true,
-    "years_required": 4,
-    "years_max": 6,
-    "experience_eligible": true,
-    "age_days": 1
-   },
-   "first_seen": "2026-11-05T23:37:44+00:00",
-   "id": "4e212dcc8a6b",
-   "contact_emails": [],
-   "contact_people": [],
-   "outreach": {},
-   "apply_url": "https://www.linkedin.com/jobs/view/4486796340",
-   "apply_type": "unknown",
-   "apply_evidence": "LinkedIn page; the apply method isn't shown in the listing data",
-   "work_mode": "onsite"
-  },
-  {
    "title": "Data Engineer- Azure Databricks- Senior Associate",
    "company": "PwC Acceleration Center India",
    "location": "Bengaluru East, Karnataka, India",
@@ -726,6 +675,57 @@
    "apply_type": "unknown",
    "apply_evidence": "Naukri page; the apply method isn't shown in the listing data",
    "work_mode": ""
+  },
+  {
+   "title": "Data Engineer – Azure Databricks | 4–6 Years | Mumabi | Female Candidates Only | Onsite | Immediate Joiner",
+   "company": "Codians.ai",
+   "location": "Mumbai, Maharashtra, India",
+   "url": "https://www.linkedin.com/jobs/view/4486796340",
+   "source": "linkedin",
+   "remote": false,
+   "posted_date": "2026-11-05T00:00:00+00:00",
+   "description_snippet": "We’re Hiring: Data Engineer – Azure Databricks | Location Mumabi and female Candidates only Experience: 4–6 Years Technology: Azure Databricks | PySpark | Python | SQL | Delta Lake We’re looking for an experienced Data Engineer to build, deploy, and operate modern, scalable data platforms on Azure D",
+   "score": 100,
+   "status": "new",
+   "matched_keywords": [
+    "Databricks",
+    "PySpark",
+    "ADLS Gen2",
+    "Azure",
+    "SQL",
+    "Python",
+    "Azure DevOps",
+    "Azure Security",
+    "Data Governance",
+    "Git",
+    "Delta Lake",
+    "Kafka"
+   ],
+   "score_breakdown": {
+    "title": 25,
+    "skills": 35,
+    "location": 20,
+    "experience": 10,
+    "recency": 10,
+    "penalty": 0,
+    "location_label": "Mumbai",
+    "location_eligible": true,
+    "walk_in": false,
+    "walk_in_eligible": true,
+    "years_required": 4,
+    "years_max": 6,
+    "experience_eligible": true,
+    "age_days": 1
+   },
+   "first_seen": "2026-11-05T23:37:44+00:00",
+   "id": "4e212dcc8a6b",
+   "contact_emails": [],
+   "contact_people": [],
+   "outreach": {},
+   "apply_url": "https://www.linkedin.com/jobs/view/4486796340",
+   "apply_type": "unknown",
+   "apply_evidence": "LinkedIn page; the apply method isn't shown in the listing data",
+   "work_mode": "onsite"
   },
   {
    "title": "Data Engineer",
@@ -6387,6 +6387,54 @@
    "work_mode": ""
   },
   {
+   "title": "Pyspark Developer",
+   "company": "Tata Consultancy Services",
+   "location": "Chennai, Tamil Nadu, India",
+   "url": "https://www.linkedin.com/jobs/view/4487342689",
+   "source": "linkedin",
+   "remote": false,
+   "posted_date": "2026-11-06T00:00:00+00:00",
+   "description_snippet": "Greetings from TCS!! TCS is hiring for Pyspark Developer Required Skill Set: Pyspark, Python, SQL and relational databases, SparkSQL, Spark Scripting, UNIX Shell Scripting, ETL, Data Warehousing, CI/CD Desired Experience Range: 4 to 15 Years Job Location: Bangalore, Chennai, Hyderabad, Kolkata and P",
+   "score": 92,
+   "status": "new",
+   "matched_keywords": [
+    "Databricks",
+    "PySpark",
+    "SQL",
+    "ETL/ELT",
+    "Python",
+    "Spark",
+    "Azure DevOps",
+    "Data Warehousing",
+    "Data Modeling"
+   ],
+   "score_breakdown": {
+    "title": 20,
+    "skills": 32,
+    "location": 20,
+    "experience": 10,
+    "recency": 10,
+    "penalty": 0,
+    "location_label": "India",
+    "location_eligible": true,
+    "walk_in": false,
+    "walk_in_eligible": true,
+    "years_required": 4,
+    "years_max": 15,
+    "experience_eligible": true,
+    "age_days": 0
+   },
+   "first_seen": "2026-11-06T23:06:52+00:00",
+   "id": "29c1669891d8",
+   "contact_emails": [],
+   "contact_people": [],
+   "outreach": {},
+   "apply_url": "https://www.linkedin.com/jobs/view/4487342689",
+   "apply_type": "unknown",
+   "apply_evidence": "LinkedIn page; the apply method isn't shown in the listing data",
+   "work_mode": ""
+  },
+  {
    "title": "Data Engineer / Data Architect",
    "company": "Soul Ai",
    "location": "Noida, India",
@@ -11771,7 +11819,7 @@
    "title": "Senior Data Engineer",
    "company": "Citi",
    "location": "Chennai, Tamil Nadu, India",
-   "url": "https://www.linkedin.com/jobs/view/4486926334",
+   "url": "https://www.linkedin.com/jobs/view/4486908770",
    "source": "linkedin",
    "remote": false,
    "posted_date": "2026-11-05T00:00:00+00:00",
@@ -11807,7 +11855,7 @@
    "contact_emails": [],
    "contact_people": [],
    "outreach": {},
-   "apply_url": "https://www.linkedin.com/jobs/view/4486926334",
+   "apply_url": "https://www.linkedin.com/jobs/view/4486908770",
    "apply_type": "unknown",
    "apply_evidence": "LinkedIn page; the apply method isn't shown in the listing data",
    "work_mode": ""
@@ -14114,6 +14162,51 @@
    "apply_type": "unknown",
    "apply_evidence": "LinkedIn page; the apply method isn't shown in the listing data",
    "work_mode": ""
+  },
+  {
+   "title": "Data Engineer / Data Architect",
+   "company": "Cognizant",
+   "location": "Chennai, Tamil Nadu, India",
+   "url": "https://www.linkedin.com/jobs/view/4479387261",
+   "source": "linkedin",
+   "remote": false,
+   "posted_date": "2026-11-06T00:00:00+00:00",
+   "description_snippet": "Job Summary Design and optimize cloud based data platforms that power analytics and decision making for a global property and casualty insurance business using AWS PySpark Python and Databricks within a hybrid work model ensuring resilient data pipelines reliable governance and scalable architecture",
+   "score": 75,
+   "status": "new",
+   "matched_keywords": [
+    "Databricks",
+    "PySpark",
+    "SQL",
+    "Python",
+    "Spark",
+    "Data Modeling"
+   ],
+   "score_breakdown": {
+    "title": 25,
+    "skills": 23,
+    "location": 20,
+    "experience": 5,
+    "recency": 10,
+    "penalty": -8,
+    "location_label": "India",
+    "location_eligible": true,
+    "walk_in": false,
+    "walk_in_eligible": true,
+    "years_required": null,
+    "years_max": null,
+    "experience_eligible": true,
+    "age_days": 0
+   },
+   "first_seen": "2026-11-06T23:06:52+00:00",
+   "id": "0eae3639140b",
+   "contact_emails": [],
+   "contact_people": [],
+   "outreach": {},
+   "apply_url": "https://www.linkedin.com/jobs/view/4479387261",
+   "apply_type": "unknown",
+   "apply_evidence": "LinkedIn page; the apply method isn't shown in the listing data",
+   "work_mode": "hybrid"
   },
   {
    "title": "Data Engineer",
