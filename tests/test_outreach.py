@@ -27,9 +27,9 @@ def test_extract_emails_keeps_people_drops_noise():
 
 def test_email_and_note_render(config):
     subject, body = outreach.email_for(job(), config)
-    assert subject == "Immediate Joiner - Azure Data Engineer (3 yrs) - Chakravardhana Rao Edupulapati"
+    assert subject == "Azure Data Engineer (3 yrs, LWD 5 Jan 2027) - Chakravardhana Rao Edupulapati"
     assert "Acme Analytics (Hyderabad)" in body and "ADF, Databricks, PySpark" in body
-    assert "I'm an immediate joiner" in body and "{" not in body
+    assert "I'm serving notice, last working day 5 Jan 2027, and my resume" in body and "{" not in body
     note = outreach.linkedin_note(job(title="Senior Azure Data Engineer - Databricks, ADF, Synapse, Purview"), config)
     assert len(note) <= 200 and note.startswith("Hi! I'm an Azure Data Engineer") and note.endswith("Thanks, Chakri")
 
